@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Painel MDU</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <h2>MDU</h2>
+
+    <nav class="sidebar-menu">
+      <button onclick="mostrarSecao('inicio')" class="menu-btn">🏠 Página Inicial</button>
+      <button onclick="mostrarSecao('pesquisa')" class="menu-btn">🔍 Pesquisar ID</button>
+      <button onclick="mostrarSecao('ongoing')" class="menu-btn">⏳ ONGOING</button>
+      <button onclick="mostrarSecao('relatorios')" class="menu-btn">📊 Relatórios</button>
+      <a href="about:blank" target="_blank" class="menu-btn" style="text-decoration: none; color: inherit; display: block;">🏗️ Novos Empreendimentos</a>
+    </nav>
+
+    <button class="sair" onclick="logout()">Sair</button>
+  </aside>
+
+  <!-- CONTEÚDO -->
+  <main class="main">
+
+    <!-- TOPBAR COM PERFIL -->
+    <div class="topbar">
+      <div class="topbar-user">
+        <div class="user-profile">
+          <img id="profileImage" src="" alt="Foto de perfil" class="profile-photo">
+          <label for="fotoPerfil" class="photo-upload-label" title="Clique para adicionar foto">
+            <input type="file" id="fotoPerfil" accept="image/*" style="display: none;">
+            <span class="upload-icon">📷</span>
+          </label>
+        </div>
+        <div class="user-info">
+          <p class="user-name">MAURO</p>
+          <p class="user-role">Administrador</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="notification-btn" title="Notificações" onclick="toggleNotifications()">
+          🔔 <span id="notificationBadge" class="notification-badge hidden"></span>
+        </button>
+        <button class="settings-btn" title="Configurações">⚙️</button>
+      </div>
+    </div>
+
+    <div id="notificationPanel" class="notification-panel hidden" aria-live="polite">
+      <div class="notification-header">
+        <h3>Notificações</h3>
+        <button class="close-notifications" onclick="toggleNotifications()">✕</button>
+      </div>
+      <div id="notificationList" class="notification-list">
+        <p class="notification-empty">Nenhuma solicitação pendente.</p>
+      </div>
+    </div>
+
+    <!-- PÁGINA INICIAL -->
+    <section id="inicio" class="secao ativa">
+      <h1>Página Inicial</h1>
+
+      <!-- CARDS CLICÁVEIS - CATEGORIAS -->
+      <div class="categorias-grid">
+        <div class="categoria-card" onclick="abrirCategoria('pendente-autorizacao')">
+          <div class="categoria-icon">📋</div>
+          <h3 class="categoria-titulo">Pendente Autorização</h3>
+          <p class="categoria-subtitulo">MDU/SAR</p>
+          <p class="categoria-count" id="count-pendente-autorizacao">0</p>
+        </div>
+
+        <div class="categoria-card" onclick="abrirCategoria('ongoing')">
+          <div class="categoria-icon">⏳</div>
+          <h3 class="categoria-titulo">Ongoing</h3>
+          <p class="categoria-subtitulo">Demandas em Progresso</p>
+          <p class="categoria-count" id="count-ongoing">0</p>
+        </div>
+
+        <div class="categoria-card" onclick="abrirCategoria('novos-empreendimentos')">
+          <div class="categoria-icon">🏗️</div>
+          <h3 class="categoria-titulo">Novos Empreendimentos</h3>
+          <p class="categoria-subtitulo">Novos Projetos</p>
+          <p class="categoria-count" id="count-novos">0</p>
+        </div>
+
+        <div class="categoria-card" onclick="abrirCategoria('empresarial')">
+          <div class="categoria-icon">🏢</div>
+          <h3 class="categoria-titulo">Empresarial</h3>
+          <p class="categoria-subtitulo">Clientes Corporativos</p>
+          <p class="categoria-count" id="count-empresarial">0</p>
+        </div>
+
+        <div class="categoria-card" onclick="abrirCategoria('sar-rede')">
+          <div class="categoria-icon">🔗</div>
+          <h3 class="categoria-titulo">SAR Rede</h3>
+          <p class="categoria-subtitulo">Rede SAR</p>
+          <p class="categoria-count" id="count-sar-rede">0</p>
+        </div>
+
+        <div class="categoria-card" onclick="abrirCategoria('mdu-ongoing')">
+          <div class="categoria-icon">📡</div>
+          <h3 class="categoria-titulo">MDU Ongoing</h3>
+          <p class="categoria-subtitulo">MDU em Progresso</p>
+          <p class="categoria-count" id="count-mdu-ongoing">0</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PESQUISA -->
+    <section id="pesquisa" class="secao">
+      <h1>Pesquisar por Código MDU</h1>
+
+      <div class="card search-section">
+        <div class="search-controls">
+          <input type="text" id="pesquisaCodigo" placeholder="Digite o COD-MDUGO..." class="search-input">
+          <button onclick="pesquisarEndereco()" class="btn-primary">🔍 Pesquisar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Cidade</th>
+              <th>Status</th>
+              <th>AGE</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-pesquisa">
+            <tr>
+              <td colspan="6" style="text-align:center">
+                Nenhum resultado
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SEÇÃO: PENDENTE AUTORIZAÇÃO -->
+    <section id="pendente-autorizacao" class="secao categoria-secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>📋 Pendente Autorização - MDU/SAR</h1>
+      </div>
+
+      <div class="card import-section">
+        <div class="import-controls">
+          <label for="arquivoCSV" class="file-label">
+            <span>📁 Escolher arquivo</span>
+            <input type="file" id="arquivoCSV" accept=".csv">
+          </label>
+          <button onclick="importarCSV()" class="btn-primary">Importar CSV</button>
+          <button onclick="exportarPaginaInicial()" class="btn-primary">📥 Exportar Planilha</button>
+          <span id="file-name" class="file-name"></span>
+        </div>
+      </div>
+
+      <!-- FILTROS POR DDD -->
+      <div class="card ddd-filtros">
+        <h3 class="filtros-titulo">Filtrar por DDD</h3>
+        <div class="ddd-botoes">
+          <button class="ddd-btn" data-ddd="todos" onclick="selecionarDDD('todos')">Todos</button>
+          <button class="ddd-btn" data-ddd="12" onclick="selecionarDDD('12')">DDD 12</button>
+          <button class="ddd-btn" data-ddd="13" onclick="selecionarDDD('13')">DDD 13</button>
+          <button class="ddd-btn" data-ddd="14" onclick="selecionarDDD('14')">DDD 14</button>
+          <button class="ddd-btn" data-ddd="15" onclick="selecionarDDD('15')">DDD 15</button>
+          <button class="ddd-btn" data-ddd="16" onclick="selecionarDDD('16')">DDD 16</button>
+          <button class="ddd-btn" data-ddd="17" onclick="selecionarDDD('17')">DDD 17</button>
+          <button class="ddd-btn" data-ddd="18" onclick="selecionarDDD('18')">DDD 18</button>
+          <button class="ddd-btn" data-ddd="19" onclick="selecionarDDD('19')">DDD 19</button>
+        </div>
+        <div class="ddd-contagem">
+          <span id="ddd-total" class="ddd-badge">104 registros</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Cidade</th>
+              <th>Status</th>
+              <th>AGE</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-enderecos">
+            <tr>
+              <td colspan="6" style="text-align:center">
+                Nenhum dado carregado
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card search-section">
+        <div class="search-controls">
+          <input type="text" id="buscar-pendente" placeholder="🔍 Buscar por ID..." class="search-input">
+          <button onclick="buscarEmCategoria('pendente-autorizacao')" class="btn-primary">Buscar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Cidade</th>
+              <th>Status</th>
+              <th>AGE</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-pendente-autorizacao">
+            <tr>
+              <td colspan="6" style="text-align:center">Nenhum dado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SEÇÃO: NOVOS EMPREENDIMENTOS -->
+    <section id="novos-empreendimentos" class="secao categoria-secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>🏗️ Novos Empreendimentos</h1>
+      </div>
+
+      <div class="card search-section">
+        <div class="search-controls">
+          <input type="text" id="buscar-novos" placeholder="🔍 Buscar por ID..." class="search-input">
+          <button onclick="buscarEmCategoria('novos-empreendimentos')" class="btn-primary">Buscar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Cidade</th>
+              <th>Status</th>
+              <th>AGE</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-novos-empreendimentos">
+            <tr>
+              <td colspan="6" style="text-align:center">Nenhum dado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SEÇÃO: EMPRESARIAL -->
+    <section id="empresarial" class="secao categoria-secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>🏢 Empresarial</h1>
+      </div>
+
+      <div class="card search-section">
+        <div class="search-controls">
+          <input type="text" id="buscar-empresarial" placeholder="🔍 Buscar por ID..." class="search-input">
+          <button onclick="buscarEmCategoria('empresarial')" class="btn-primary">Buscar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Cidade</th>
+              <th>Status</th>
+              <th>AGE</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-empresarial">
+            <tr>
+              <td colspan="6" style="text-align:center">Nenhum dado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SEÇÃO: SAR REDE -->
+    <section id="sar-rede" class="secao categoria-secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>🔗 SAR Rede</h1>
+      </div>
+
+      <div class="card search-section">
+        <div class="search-controls">
+          <input type="text" id="buscar-sar" placeholder="🔍 Buscar por ID..." class="search-input">
+          <button onclick="buscarEmCategoria('sar-rede')" class="btn-primary">Buscar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Cidade</th>
+              <th>Status</th>
+              <th>AGE</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-sar-rede">
+            <tr>
+              <td colspan="6" style="text-align:center">Nenhum dado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SEÇÃO: MDU ONGOING -->
+    <section id="mdu-ongoing" class="secao categoria-secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>📡 MDU Ongoing</h1>
+      </div>
+
+      <div class="card search-section">
+        <div class="search-controls">
+          <input type="text" id="buscar-mdu-ongoing" placeholder="🔍 Buscar por ID..." class="search-input">
+          <button onclick="buscarEmCategoria('mdu-ongoing')" class="btn-primary">Buscar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Cidade</th>
+              <th>Status</th>
+              <th>AGE</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-mdu-ongoing">
+            <tr>
+              <td colspan="6" style="text-align:center">Nenhum dado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ONGOING -->
+    <section id="ongoing" class="secao categoria-secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>⏳ ONGOING</h1>
+      </div>
+
+      <!-- ESTATÍSTICAS NO TOPO -->
+      <div class="stats-grid-ongoing">
+        <div class="stat-card">
+          <p class="stat-label">Total de Endereços</p>
+          <p class="stat-value" id="total-enderecos-ongoing">0</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Dentro SLA</p>
+          <p class="stat-value" id="dentro-sla">0</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Fora SLA</p>
+          <p class="stat-value" id="fora-sla">0</p>
+        </div>
+        <div class="stat-card search-card">
+          <input type="text" id="buscarIDOngoing" placeholder="🔍 Buscar por ID..." class="search-input-ongoing">
+          <button onclick="buscarPorIDOngoing()" class="btn-search-ongoing">Buscar</button>
+        </div>
+      </div>
+
+      <div class="card import-section">
+        <div class="import-controls">
+          <label for="arquivoCSVOngoing" class="file-label">
+            <span>📁 Escolher arquivo</span>
+            <input type="file" id="arquivoCSVOngoing" accept=".csv">
+          </label>
+          <button onclick="importarCSVOngoing()" class="btn-primary">Importar CSV</button>
+          <button onclick="exportarOngoing()" class="btn-primary">📥 Exportar Planilha</button>
+          <span id="file-name-ongoing" class="file-name"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Dados ONGOING</h2>
+        
+        <!-- Botões de Filtro por Fila -->
+        <div class="filtro-fila">
+          <button class="fila-btn ativo" data-fila="todos" onclick="filtrarPorFila('todos')">📊 Todos</button>
+          <button class="fila-btn" data-fila="vistoria" onclick="filtrarPorFila('vistoria')">👁️ VISTORIA</button>
+          <button class="fila-btn" data-fila="backbone" onclick="filtrarPorFila('backbone')">🔗 BACKBONE</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>ID Demanda</th>
+              <th>Fila</th>
+              <th>Tipo</th>
+              <th>Endereço</th>
+              <th>epo</th>
+              <th>Aging</th>
+              <th>SLA TUDO</th>
+              <th>Status</th>
+              <th>Motivo</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-ongoing">
+            <tr>
+              <td colspan="9" style="text-align:center">
+                Nenhum dado carregado
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- DETALHES DO REGISTRO ONGOING -->
+    <section id="detalhes-ongoing" class="secao">
+      <div class="card">
+        <div class="detalhes-header">
+          <button onclick="voltarOngoing()" class="btn-voltar">&#8592; Voltar</button>
+          <h2>Detalhes do Registro</h2>
+        </div>
+
+        <div class="detalhes-grid">
+          <div class="detalhe-item">
+            <label>ID Demanda</label>
+            <p id="detalhe-iddemanda">-</p>
+          </div>
+          <div class="detalhe-item">
+            <label>Fila</label>
+            <p id="detalhe-fila">-</p>
+          </div>
+          <div class="detalhe-item">
+            <label>Tipo</label>
+            <p id="detalhe-tipo">-</p>
+          </div>
+          <div class="detalhe-item">
+            <label>Endereço</label>
+            <p id="detalhe-endereco">-</p>
+          </div>
+          <div class="detalhe-item">
+            <label>Aging</label>
+            <p id="detalhe-aging">-</p>
+          </div>
+          <div class="detalhe-item">
+            <label>SLA TUDO</label>
+            <p id="detalhe-sla">-</p>
+          </div>
+          <div class="detalhe-item">
+            <label>Status Geral</label>
+            <p id="detalhe-status">-</p>
+          </div>
+          <div class="detalhe-item">
+            <label>Motivo Geral</label>
+            <p id="detalhe-motivo">-</p>
+          </div>
+          <div class="detalhe-item detalhe-full">
+            <label>Observações (OBS)</label>
+            <div class="obs-box">
+              <p id="detalhe-obs">-</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RELÓRIOS -->
+    <section id="relatorios" class="secao">
+      <div class="relatorio-header">
+        <h1>Dashboard de Acompanhamento</h1>
+        <!-- Card de Total de Registros no topo -->
+        <div class="total-registros-card">
+          <p class="total-label">TOTAL DE REGISTROS</p>
+          <p class="total-numero" id="totalRegistrosTop">104</p>
+        </div>
+      </div>
+
+      <!-- GRID DE GRÁFICOS - NOVA ORGANIZAÇÃO -->
+      <div class="dashboard-grid-novo">
+        <!-- Gráfico de Pizza (Pequeno à esquerda) -->
+        <div class="chart-card chart-pizza-container">
+          <div class="chart-wrapper-pizza">
+            <canvas id="chartPizza"></canvas>
+            <div class="chart-center">
+              <p class="chart-total" id="totalEnderecos">0</p>
+              <p class="chart-label">Endereços</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gráfico de Linha - AGE (Largo à direita) -->
+        <div class="chart-card chart-age-container">
+          <h3 class="chart-title-small">AGE</h3>
+          <canvas id="chartAge"></canvas>
+        </div>
+      </div>
+
+      <!-- Gráfico DDD (Abaixo, full-width) -->
+      <div class="chart-card chart-ddd-container">
+        <h3 class="chart-title-small">AGE</h3>
+        <canvas id="chartDDD"></canvas>
+      </div>
+
+      <!-- TABELA DE DADOS -->
+      <div class="card table-card">
+        <div class="table-header">
+          <h3>Detalhes dos Endereços</h3>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Cidade</th>
+              <th>Status</th>
+              <th>AGE</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-relatorios">
+            <tr>
+              <td colspan="6" style="text-align:center">
+                Nenhum dado carregado
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
