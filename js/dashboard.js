@@ -274,7 +274,12 @@ async function carregarDadosCompartilhados() {
 
     Object.entries(datasets).forEach(([categoria, snapshot]) => {
       const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
-      applyDatasetToState(categoria, items);
+      const existingItems = Array.isArray(dadosPorCategoria[categoria]) ? dadosPorCategoria[categoria] : [];
+
+      // Evita que um snapshot vazio do servidor apague dados já carregados localmente.
+      if (items.length || !existingItems.length) {
+        applyDatasetToState(categoria, items);
+      }
     });
 
     Object.entries(localCache).forEach(([categoria, snapshot]) => {
@@ -2737,6 +2742,16 @@ function renderVisaoGerencia() {
         ? dadosPorCategoria['ongoing']
         : (Array.isArray(dadosCSV) ? dadosCSV : [])));
   const projetoF = Array.isArray(dadosPorCategoria['projeto-f']) ? dadosPorCategoria['projeto-f'] : [];
+
+  if ((!Array.isArray(ongoing) || !ongoing.length) && window.location.protocol.startsWith('http')) {
+    analyticsContainer.innerHTML = `
+      <div class="analytics-card" style="padding:16px; text-align:center; opacity:.85;">
+        Carregando indicadores de ONGOING...
+      </div>
+    `;
+    carregarDaBacklog('mdu-ongoing');
+    return;
+  }
 
   const ongoingEpoKeys = ['EPO', 'epo', 'EPO / Cluster', 'epo / cluster', 'EPO_CLUSTER', 'Cluster', 'cluster'];
   const projetoFEpoKeys = ['PARCEIRA', 'parceira'];
