@@ -33,7 +33,8 @@
   }
 
   const fallbackApiBase = window.location.protocol === "file:" ? "http://localhost:5000" : "";
-  const apiBase = [queryApiBase, globalApiBase, metaApiBase, getSavedApiBase(), fallbackApiBase].find(Boolean) || "";
+  const runtimeOrigin = window.location.protocol.startsWith("http") ? window.location.origin : "";
+  const apiBase = [queryApiBase, globalApiBase, metaApiBase, runtimeOrigin, getSavedApiBase(), fallbackApiBase].find(Boolean) || "";
   const normalizedBase = apiBase.replace(/\/+$/, "");
 
   window.PORTAL_API_BASE_URL = normalizedBase;
