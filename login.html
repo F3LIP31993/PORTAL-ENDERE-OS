@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="portal-api-base" content="">
   <title>Login | Portal MDU</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -33,11 +34,6 @@
       </form>
 
       <div class="login-extra">
-        <p class="share-text">
-          💡 Compartilhe este link com sua equipe:
-          <button type="button" class="copy-link-btn" onclick="copyPortalLink()">Copiar link</button>
-        </p>
-        <input type="text" id="portalLink" class="portal-link" readonly>
         <p class="register-text">
           Ainda não tem acesso? <a href="register.html">Cadastre-se aqui</a>
         </p>
@@ -49,6 +45,7 @@
     </div>
   </div>
 
+  <script src="js/api-config.js"></script>
   <script src="js/login.js"></script>
 </body>
 </html>
