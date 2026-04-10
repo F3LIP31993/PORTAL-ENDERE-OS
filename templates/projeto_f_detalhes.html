@@ -1,0 +1,142 @@
+<style>
+    .det-card {
+        background: #ffffff;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 3px 12px rgba(0,0,0,0.18);
+        width: 70%;
+        margin: auto;
+        margin-top: 30px;
+    }
+
+    .det-title {
+        font-size: 24px;
+        font-weight: bold;
+        color: #003b80;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .det-title i {
+        font-size: 28px;
+        color: #003b80;
+    }
+
+    .det-line {
+        margin-bottom: 15px;
+        font-size: 18px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #ccc;
+    }
+
+    .btn-voltar {
+        background: #6c757d;
+        padding: 10px 18px;
+        color: white;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: bold;
+        transition: .2s;
+    }
+
+    .btn-voltar:hover {
+        background: #565e64;
+    }
+</style>
+
+<div class="det-card">
+
+    <div class="det-title">
+        <i class="fas fa-file-alt"></i>
+        DETALHES DO PROJETO F
+    </div>
+
+    <div class="det-line"><strong>CODGED:</strong> {{ dados["CODGED"] }}</div>
+    <div class="det-line"><strong>ENDEREÇO:</strong> {{ dados["ENDEREÇO"] }}</div>
+    <div class="det-line"><strong>CIDADE:</strong> {{ dados["CIDADE"] }}</div>
+
+    <div class="det-line"><strong>DATA DE CONSTRUÇÃO:</strong> {{ dados["DT_CONSTRUÇÃO"] }}</div>
+    <div class="det-line"><strong>OBSERVAÇÕES:</strong><br>{{ dados["OBS"] }}</div>
+    <div class="det-line"><strong>DDD:</strong> {{ dados["DDD"] }}</div>
+
+    <br>
+
+    <!-- Seção de Observações -->
+    <div class="det-line">
+        <strong>OBSERVAÇÕES ADICIONAIS:</strong>
+        <div id="notes-list">
+            {% for note in notes %}
+            <div class="note-item" style="border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 5px;">
+                <strong>{{ note.created_by }}</strong> - {{ note.created_at.strftime('%d/%m/%Y %H:%M') }}<br>
+                {{ note.note }}
+            </div>
+            {% endfor %}
+        </div>
+        <textarea id="new-note" placeholder="Adicionar observação..." rows="3" style="width: 100%; margin-top: 10px;"></textarea>
+        <button onclick="addNote()" style="margin-top: 5px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px;">Adicionar Observação</button>
+    </div>
+
+    <!-- Seção de Anexos -->
+    <div class="det-line">
+        <strong>ANEXOS:</strong>
+        <div id="attachments-list">
+            {% for att in attachments %}
+            <div class="attachment-item" style="border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 5px;">
+                <a href="/api/projeto_f/{{ dados['CODGED'] }}/attachments/{{ att.id }}" target="_blank">{{ att.filename }}</a>
+                - {{ att.created_by }} - {{ att.created_at.strftime('%d/%m/%Y %H:%M') }}
+            </div>
+            {% endfor %}
+        </div>
+        <input type="file" id="file-input" style="margin-top: 10px;">
+        <button onclick="uploadAttachment()" style="margin-top: 5px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px;">Anexar Arquivo</button>
+    </div>
+
+    <br>
+
+    <a href="/projeto_f" class="btn-voltar">⬅ Voltar</a>
+</div>
+
+<script>
+function addNote() {
+    const note = document.getElementById('new-note').value.trim();
+    if (!note) return;
+
+    fetch(`/api/projeto_f/${'{{ dados["CODGED"] }}'}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: note })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Erro: ' + data.error);
+        }
+    });
+}
+
+function uploadAttachment() {
+    const fileInput = document.getElementById('file-input');
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    fetch(`/api/projeto_f/${'{{ dados["CODGED"] }}'}/attachments`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Erro: ' + data.error);
+        }
+    });
+}
+</script>

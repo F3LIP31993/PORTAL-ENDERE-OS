@@ -1,0 +1,114 @@
+/* ===== Layout ===== */
+.dashboard {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ===== Menu lateral ===== */
+.sidebar {
+  width: 240px;
+  background: #ffffff;
+  border-right: 1px solid #e0e0e0;
+  padding: 20px;
+}
+
+.sidebar h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #0057b8; /* tom corporativo */
+}
+
+.sidebar a,
+.sidebar button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 14px;
+  color: #333;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.sidebar a:hover,
+.sidebar button:hover {
+  background: #eef4ff;
+  color: #0057b8;
+}
+
+/* ===== Conteúdo ===== */
+.content {
+  flex: 1;
+  padding: 25px;
+}
+
+/* ===== Topo ===== */
+.header {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+/* ===== Botões ===== */
+button {
+  background: #0057b8;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #0046a1;
+}
+
+/* ===== Inputs ===== */
+input[type="file"],
+input[type="text"] {
+  padding: 7px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+/* ===== Tabela ===== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  margin-top: 15px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+table thead {
+  background: #f0f2f5;
+}
+
+table th {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+table td {
+  font-size: 13px;
+  padding: 9px 10px;
+  border-bottom: 1px solid #eee;
+}
+
+table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+table tbody tr:hover {
+  background: #eef4ff;
+}

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>SGD - Sistema</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <h2>MDU</h2>
+
+  <ul>
+    <li onclick="abrirTela('home')">🏠 Dashboard</li>
+    <li onclick="abrirTela('pendente')">📋 Pendente</li>
+    <li onclick="abrirTela('ongoing')">⏳ Ongoing</li>
+    <li onclick="abrirTela('projeto-f')">📡 Projeto F</li>
+    <li onclick="abrirTela('relatorio')">📊 Relatórios</li>
+  </ul>
+
+  <button class="btn-sair">Sair</button>
+</div>
+
+<!-- CONTEÚDO -->
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="header">
+    <h1>Bem-vindo ao Sistema</h1>
+    <span>Mauro Faria</span>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="home" class="tela ativa">
+    <div class="cards">
+
+      <div class="card">📋 Pendente<br><b>120</b></div>
+      <div class="card">⏳ Ongoing<br><b>85</b></div>
+      <div class="card">📡 Projeto F<br><b>32</b></div>
+      <div class="card">📊 Concluídos<br><b>210</b></div>
+
+    </div>
+  </div>
+
+  <!-- PROJETO F -->
+  <div id="projeto-f" class="tela">
+    <h2>📡 Projeto F</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Endereço</th>
+          <th>Cidade</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="tabela-projeto-f"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

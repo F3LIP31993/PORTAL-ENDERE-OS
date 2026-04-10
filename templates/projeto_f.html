@@ -1,0 +1,115 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='css/projeto_f.css') }}">
+<style>
+    .card {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 22px;
+        box-shadow: 0 3px 12px rgba(0,0,0,0.15);
+        margin-bottom: 25px;
+    }
+
+    .card-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+
+    .card-header i {
+        font-size: 26px;
+        color: #0056b3;
+    }
+
+    .card-title {
+        font-size: 22px;
+        font-weight: bold;
+        color: #333;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        border-radius: 10px;
+        overflow: hidden;
+        font-size: 15px;
+    }
+
+    thead {
+        background: #0056b3;
+        color: white;
+    }
+
+    thead th {
+        padding: 10px;
+        text-align: left;
+    }
+
+    tbody tr:nth-child(even) {
+        background: #f4f4f4;
+    }
+
+    tbody td {
+        padding: 10px;
+    }
+
+    .btn-visualizar {
+        background: #0d6efd;
+        color: white;
+        padding: 8px 14px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: bold;
+        transition: .2s;
+    }
+
+    .btn-visualizar:hover {
+        background: #084298;
+    }
+
+    .scroll-table {
+        max-height: 420px;
+        overflow-y: auto;
+        border-radius: 10px;
+    }
+</style>
+
+<div class="card">
+    <div class="card-header">
+        <i class="fas fa-building"></i>
+        <div class="card-title">PROJETO F – BOM PROJETO</div>
+    </div>
+
+    <div class="scroll-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>CIDADE</th>
+                    <th>CODGED</th>
+                    <th>ENDEREÇO</th>
+                    <th>STATUS MDU</th>
+                    <th>LIB. CONCLUIDA?</th>
+                    <th>PARCEIRA</th>
+                    <th>AÇÕES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in dados %}
+                <tr>
+                    <td>{{ item["CIDADE"] }}</td>
+                    <td>{{ item["CODGED"] }}</td>
+                    <td>{{ item["ENDEREÇO"] }}</td>
+                    <td>{{ item["STATUS MDU"] }}</td>
+                    <td>{{ item["LIBERAÇÃO CONCLUIDA?"] }}</td>
+                    <td>{{ item["PARCEIRA"] }}</td>
+
+                    <td>
+                        <a href="/projeto_f/{{ item['CODGED'] }}" class="btn-visualizar">
+                            VISUALIZAR
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

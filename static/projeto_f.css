@@ -1,0 +1,110 @@
+.card-projeto {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.15);
+    margin-bottom: 25px;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.card-header i {
+    font-size: 26px;
+    color: #0056b3;
+}
+
+.card-header h2 {
+    font-size: 22px;
+    font-weight: bold;
+    color: #333;
+}
+
+.tabela-scroll {
+    max-height: 420px;
+    overflow-y: auto;
+    border-radius: 10px;
+}
+
+.tabela-projeto {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+}
+
+.tabela-projeto thead {
+    background: #0056b3;
+    color: white;
+}
+
+.tabela-projeto thead th {
+    padding: 10px;
+    text-align: left;
+}
+
+.tabela-projeto tbody tr:nth-child(even) {
+    background: #f4f4f4;
+}
+
+.tabela-projeto tbody td {
+    padding: 10px;
+}
+
+.btn-visualizar {
+    background: #0d6efd;
+    color: white;
+    padding: 6px 14px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: .2s;
+}
+
+.btn-visualizar:hover {
+    background: #003b80;
+}
+
+.det-card {
+    background: #ffffff;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.18);
+    width: 65%;
+    margin: auto;
+    margin-top: 30px;
+}
+
+.det-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #003b80;
+}
+
+.det-title i {
+    font-size: 28px;
+}
+
+.det-item {
+    margin-bottom: 15px;
+    font-size: 18px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ccc;
+}
+
+.btn-voltar {
+    background: #6c757d;
+    padding: 10px 18px;
+    color: white;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.btn-voltar:hover {
+    background: #565e64;
+}
