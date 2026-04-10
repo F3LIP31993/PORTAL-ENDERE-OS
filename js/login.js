@@ -2,11 +2,8 @@ const STORAGE_USERS_KEY = "portalUsers";
 const STORAGE_CURRENT_USER_KEY = "portalCurrentUser";
 
 function initLogin() {
+  // Local fallback para uso sem servidor.
   seedDefaultUsers();
-  const linkInput = document.getElementById("portalLink");
-  if (linkInput) {
-    linkInput.value = window.location.href;
-  }
 }
 
 function seedDefaultUsers() {
@@ -43,21 +40,6 @@ function findUser(username) {
   return users.find(u => u.username.toLowerCase() === username.toLowerCase()) || null;
 }
 
-function copyPortalLink() {
-  const linkInput = document.getElementById("portalLink");
-  if (!linkInput) return;
-
-  linkInput.select();
-  linkInput.setSelectionRange(0, 99999);
-  document.execCommand("copy");
-
-  const originalText = linkInput.value;
-  linkInput.value = "Copiado!";
-  setTimeout(() => {
-    linkInput.value = originalText;
-  }, 1200);
-}
-
 function login(event) {
   event.preventDefault();
 
@@ -89,6 +71,54 @@ function login(event) {
   btnLogin.disabled = true;
   btnLogin.textContent = "Entrando...";
 
+  const useApi = window.location.protocol.startsWith("http");
+
+  if (useApi) {
+    fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: usuario, password: senha }),
+      credentials: "include",
+    })
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(body.error || "Falha ao autenticar");
+        }
+        localStorage.setItem(STORAGE_CURRENT_USER_KEY, usuario);
+        erroEl.style.color = "#16a34a";
+        erroEl.innerText = "✅ Bem-vindo! Redirecionando...";
+        setTimeout(() => {
+          window.location.href = "dashboard.html";
+        }, 600);
+      })
+      .catch((err) => {
+        // Fallback para o modo local, se o servidor não respondeu.
+        const user = findUser(usuario);
+        if (!user) {
+          erroEl.innerText = "❌ Usuário não encontrado. Cadastre-se para solicitar acesso.";
+        } else if (user.role === "pending") {
+          erroEl.innerText = "⏳ Sua solicitação está pendente de aprovação. Aguarde.";
+        } else if (user.password !== senha) {
+          erroEl.innerText = "❌ Usuário ou senha inválidos";
+          document.getElementById("senha").value = "";
+          document.getElementById("senha").focus();
+        } else {
+          localStorage.setItem(STORAGE_CURRENT_USER_KEY, user.username);
+          erroEl.style.color = "#16a34a";
+          erroEl.innerText = "✅ Bem-vindo! Redirecionando...";
+          setTimeout(() => {
+            window.location.href = "dashboard.html";
+          }, 600);
+        }
+        btnLogin.disabled = false;
+        btnLogin.textContent = "Entrar";
+      });
+
+    return;
+  }
+
+  // Fallback local (sem servidor)
   setTimeout(() => {
     const user = findUser(usuario);
 

@@ -1,4 +1,5 @@
 const STORAGE_USERS_KEY = "portalUsers";
+const STORAGE_CURRENT_USER_KEY = "portalCurrentUser";
 
 seedDefaultUsers();
 
@@ -28,6 +29,39 @@ function getStoredUsers() {
 
 function saveStoredUsers(users) {
   localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users || []));
+}
+
+function finalizarCadastroComAcesso({ nome, email, usuario, senha, role = "viewer" }, erroEl) {
+  const users = getStoredUsers();
+  const idx = users.findIndex(u => u.username.toLowerCase() === usuario.toLowerCase());
+  const now = new Date().toISOString();
+
+  const payload = {
+    username: usuario,
+    password: senha,
+    name: nome,
+    email,
+    role,
+    createdAt: users[idx]?.createdAt || now,
+    approvedAt: now,
+  };
+
+  if (idx === -1) {
+    users.push(payload);
+  } else {
+    users[idx] = { ...users[idx], ...payload };
+  }
+
+  saveStoredUsers(users);
+  localStorage.setItem(STORAGE_CURRENT_USER_KEY, usuario);
+
+  erroEl.style.color = "#16a34a";
+  erroEl.innerHTML = "✅ Cadastro realizado com sucesso! Redirecionando para o portal...";
+  document.querySelector(".btn-login").disabled = true;
+
+  window.setTimeout(() => {
+    window.location.href = "dashboard.html";
+  }, 900);
 }
 
 function register(event) {
@@ -63,6 +97,50 @@ function register(event) {
     return;
   }
 
+  const useApi = window.location.protocol.startsWith("http");
+  if (useApi) {
+    fetch("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: nome, email, username: usuario, password: senha }),
+      credentials: "include",
+    })
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(body.error || "Falha ao registrar");
+        }
+
+        finalizarCadastroComAcesso({
+          nome,
+          email,
+          usuario,
+          senha,
+          role: body?.user?.role || 'viewer'
+        }, erroEl);
+      })
+      .catch((err) => {
+        // fallback para localStorage em caso de erro de rede.
+        const users = getStoredUsers();
+        const existing = users.find(u => u.username.toLowerCase() === usuario.toLowerCase());
+        if (existing) {
+          erroEl.innerText = "❌ Usuário já existe. Tente outro.";
+          return;
+        }
+
+        finalizarCadastroComAcesso({
+          nome,
+          email,
+          usuario,
+          senha,
+          role: 'viewer'
+        }, erroEl);
+      });
+
+    return;
+  }
+
+  // Fallback local
   const users = getStoredUsers();
   const existing = users.find(u => u.username.toLowerCase() === usuario.toLowerCase());
   if (existing) {
@@ -70,21 +148,11 @@ function register(event) {
     return;
   }
 
-  users.push({
-    username: usuario,
-    password: senha,
-    name: nome,
-    email: email,
-    role: "pending",
-    createdAt: new Date().toISOString(),
-  });
-  saveStoredUsers(users);
-
-  erroEl.style.color = "#16a34a";
-  erroEl.innerText = "✅ Solicitação enviada! Aguarde aprovação.";
-  document.querySelector(".btn-login").disabled = true;
-
-  setTimeout(() => {
-    window.location.href = "login.html";
-  }, 2000);
+  finalizarCadastroComAcesso({
+    nome,
+    email,
+    usuario,
+    senha,
+    role: 'viewer'
+  }, erroEl);
 }
