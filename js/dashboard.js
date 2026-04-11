@@ -274,7 +274,12 @@ async function carregarDadosCompartilhados() {
 
     Object.entries(datasets).forEach(([categoria, snapshot]) => {
       const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
-      applyDatasetToState(categoria, items);
+      const existingItems = Array.isArray(dadosPorCategoria[categoria]) ? dadosPorCategoria[categoria] : [];
+
+      // Evita que um snapshot vazio do servidor apague dados já carregados localmente.
+      if (items.length || !existingItems.length) {
+        applyDatasetToState(categoria, items);
+      }
     });
 
     Object.entries(localCache).forEach(([categoria, snapshot]) => {
@@ -2445,6 +2450,40 @@ function buildOngoingAnalyticsData(dados, options = {}) {
     return backlogConcluido;
   }
 
+  const ongoingEmAndamento = agruparRegistrosPorData(dados, {
+    ...sharedOptions,
+    statusKeys: [
+      'STATUS_GERAL', 'STATUS', 'status_geral', 'status',
+      'MOTIVO_GERAL', 'motivo_geral', 'MOTIVO', 'motivo',
+      'STATUS_VISTORIA', 'status_vistoria',
+      'STATUS_PROJETO', 'status_projeto',
+      'STATUS_SAR', 'status_sar',
+      'STATUS_CRI', 'status_cri',
+      'STATUS_LIBERACAO', 'STATUS_LIBERAÇÃO', 'status_liberacao'
+    ],
+    statusValues: ['VISTORIA', 'PROJETO', 'CONSTRUCAO', 'CONSTRUÇÃO', 'LIBERACAO', 'LIBERAÇÃO', 'EXPANSAO', 'EXPANSÃO', 'EM_LIBERACAO', 'EM_LIBERAÇÃO'],
+    dateKeys: [
+      'DT_SOLICITACAO', 'dt_solicitacao',
+      'DT_INICIO_VISTORIA', 'dt_inicio_vistoria',
+      'DT_FIM_VISTORIA', 'dt_fim_vistoria',
+      'DT_INICIO_PROJETO', 'dt_inicio_projeto',
+      'DT_FIM_PROJETO', 'dt_fim_projeto',
+      'DT_INICIO_PROJETO_SAR', 'dt_inicio_projeto_sar',
+      'DT_FIM_PROJETO_SAR', 'dt_fim_projeto_sar',
+      'DT_INICIO_SAR', 'dt_inicio_sar',
+      'DT_FIM_SAR', 'dt_fim_sar',
+      'DT_INICIO_CRI', 'dt_inicio_cri',
+      'DT_FIM_CRI', 'dt_fim_cri',
+      'DT_INICIO_LIBERACAO', 'DT_INICIO_LIBERAÇÃO', 'dt_inicio_liberacao',
+      'DT_FIM_LIBERACAO', 'DT_FIM_LIBERAÇÃO', 'dt_fim_liberacao',
+      'DATA', 'data'
+    ]
+  });
+
+  if ((ongoingEmAndamento.daily || []).length || (ongoingEmAndamento.monthly || []).length) {
+    return ongoingEmAndamento;
+  }
+
   return agruparRegistrosPorData(dados, {
     ...sharedOptions,
     statusKeys: [
@@ -2704,7 +2743,17 @@ function renderVisaoGerencia() {
         : (Array.isArray(dadosCSV) ? dadosCSV : [])));
   const projetoF = Array.isArray(dadosPorCategoria['projeto-f']) ? dadosPorCategoria['projeto-f'] : [];
 
-  const ongoingEpoKeys = ['EPO', 'epo'];
+  if ((!Array.isArray(ongoing) || !ongoing.length) && window.location.protocol.startsWith('http')) {
+    analyticsContainer.innerHTML = `
+      <div class="analytics-card" style="padding:16px; text-align:center; opacity:.85;">
+        Carregando indicadores de ONGOING...
+      </div>
+    `;
+    carregarDaBacklog('mdu-ongoing');
+    return;
+  }
+
+  const ongoingEpoKeys = ['EPO', 'epo', 'EPO / Cluster', 'epo / cluster', 'EPO_CLUSTER', 'Cluster', 'cluster'];
   const projetoFEpoKeys = ['PARCEIRA', 'parceira'];
 
   const ongoingEpoOptions = getEpoOptions(ongoing, ongoingEpoKeys, 'ongoing');
@@ -2789,7 +2838,23 @@ function renderVisaoGerencia() {
 
   const ongoingEpoRows = buildEpoMetrics(ongoing, {
     quantityKeys: ['QTD_BLOCOS', 'QTDE_BLOCOS', 'qtd_blocos', 'qtd blocos'],
-    dateKeys: ['DATA CONCLUÍDO', 'DATA CONCLUIDO', 'DT_CONCLUSAO', 'dt_conclusao', 'DATA_CONCLUSAO', 'data_conclusao', 'dthinicio', 'DTINICIO', 'DT_INICIO', 'DATA', 'data'],
+    dateKeys: [
+      'DATA CONCLUÍDO', 'DATA CONCLUIDO', 'DT_CONCLUSAO', 'dt_conclusao', 'DATA_CONCLUSAO', 'data_conclusao',
+      'dthinicio', 'DTINICIO', 'DT_INICIO', 'DATA', 'data',
+      'DT_SOLICITACAO', 'dt_solicitacao',
+      'DT_INICIO_VISTORIA', 'dt_inicio_vistoria',
+      'DT_FIM_VISTORIA', 'dt_fim_vistoria',
+      'DT_INICIO_PROJETO', 'dt_inicio_projeto',
+      'DT_FIM_PROJETO', 'dt_fim_projeto',
+      'DT_INICIO_PROJETO_SAR', 'dt_inicio_projeto_sar',
+      'DT_FIM_PROJETO_SAR', 'dt_fim_projeto_sar',
+      'DT_INICIO_SAR', 'dt_inicio_sar',
+      'DT_FIM_SAR', 'dt_fim_sar',
+      'DT_INICIO_CRI', 'dt_inicio_cri',
+      'DT_FIM_CRI', 'dt_fim_cri',
+      'DT_INICIO_LIBERACAO', 'DT_INICIO_LIBERAÇÃO', 'dt_inicio_liberacao',
+      'DT_FIM_LIBERACAO', 'DT_FIM_LIBERAÇÃO', 'dt_fim_liberacao'
+    ],
     epoKeys: ongoingEpoKeys,
     epoMode: 'ongoing',
     selectedYear,
