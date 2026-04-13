@@ -86,6 +86,34 @@ function hasLockedDataset(categoria) {
   return Boolean(cache?.[categoria]?.locked);
 }
 
+function getPreferredDataset(categoriaId) {
+  const localCache = getLocalDatasetCache();
+  const localSnapshot = localCache?.[categoriaId] || {};
+  const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
+  const stateItems = Array.isArray(dadosPorCategoria[categoriaId]) ? dadosPorCategoria[categoriaId] : [];
+
+  if (localSnapshot?.locked && localItems.length) {
+    return localItems;
+  }
+
+  if (stateItems.length) {
+    return stateItems;
+  }
+
+  if (localItems.length) {
+    return localItems;
+  }
+
+  if (['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede'].includes(categoriaId)) {
+    const backlogRows = Array.isArray(dadosPorCategoria['backlog']) ? dadosPorCategoria['backlog'] : [];
+    if (backlogRows.length) {
+      return getDerivedBacklogItems(categoriaId, backlogRows);
+    }
+  }
+
+  return [];
+}
+
 function applyDatasetToState(categoria, items) {
   const safeItems = Array.isArray(items) ? items : [];
   dadosPorCategoria[categoria] = safeItems;
@@ -194,8 +222,24 @@ function getCurrentUser() {
 
   const username = localStorage.getItem(STORAGE_CURRENT_USER_KEY);
   if (!username) return null;
+
   const users = getStoredUsers();
-  return users.find(u => u.username.toLowerCase() === username.toLowerCase()) || null;
+  const storedUser = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+
+  if (storedUser) {
+    currentUser = storedUser;
+    return storedUser;
+  }
+
+  const fallbackUser = {
+    username,
+    name: username,
+    email: "",
+    role: "viewer",
+  };
+
+  currentUser = fallbackUser;
+  return fallbackUser;
 }
 
 function setCurrentUserLocally(user) {
@@ -275,6 +319,16 @@ async function carregarDadosCompartilhados() {
     Object.entries(datasets).forEach(([categoria, snapshot]) => {
       const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
       const existingItems = Array.isArray(dadosPorCategoria[categoria]) ? dadosPorCategoria[categoria] : [];
+      const localSnapshot = localCache?.[categoria] || {};
+      const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
+      const shouldKeepLockedLocal = ['empresarial', 'mdu-ongoing'].includes(categoria)
+        && Boolean(localSnapshot?.locked)
+        && localItems.length;
+
+      if (shouldKeepLockedLocal) {
+        applyDatasetToState(categoria, localItems);
+        return;
+      }
 
       // Evita que um snapshot vazio do servidor apague dados já carregados localmente.
       if (items.length || !existingItems.length) {
@@ -375,7 +429,7 @@ function updateUserProfileInfo() {
     if (user.role === "admin") {
       roleEl.textContent = "Administrador";
     } else if (user.role === "viewer") {
-      roleEl.textContent = "Acompanhamento";
+      roleEl.textContent = "Visualização";
     } else {
       roleEl.textContent = "Solicitante";
     }
@@ -811,7 +865,7 @@ async function renderNotificationList() {
           <p class="notification-meta">${escapeHtml(u.email || 'sem e-mail')} • ${created}</p>
           <div class="notification-actions">
             <button class="approve" onclick="approveUser('${u.username}', 'admin')">Aprovar (Admin)</button>
-            <button class="approve-alt" onclick="approveUser('${u.username}', 'viewer')">Aprovar (Acompanh.)</button>
+            <button class="approve-alt" onclick="approveUser('${u.username}', 'viewer')">Aprovar (Visualização)</button>
             <button class="deny" onclick="denyUser('${u.username}')">Rejeitar</button>
           </div>
         </div>
@@ -828,7 +882,7 @@ async function renderNotificationList() {
           <p class="notification-meta">${escapeHtml(u.email || 'sem e-mail')} • ${created}</p>
           <div class="notification-actions">
             <button class="approve" onclick="approveUser('${u.username}', 'admin')">Aprovar (Admin)</button>
-            <button class="approve-alt" onclick="approveUser('${u.username}', 'viewer')">Aprovar (Acompanh.)</button>
+            <button class="approve-alt" onclick="approveUser('${u.username}', 'viewer')">Aprovar (Visualização)</button>
             <button class="deny" onclick="denyUser('${u.username}')">Rejeitar</button>
           </div>
         </div>
@@ -869,7 +923,7 @@ function approveUser(username, role) {
 
         updateNotificationBadge();
         renderNotificationList();
-        alert(`✅ Usuário '${username}' aprovado como ${role === "admin" ? "Administrador" : "Acompanhamento"}.`);
+        alert(`✅ Usuário '${username}' aprovado como ${role === "admin" ? "Administrador" : "Visualização"}.`);
       })
       .catch(() => {
         // fallback local
@@ -883,7 +937,7 @@ function approveUser(username, role) {
 
         updateNotificationBadge();
         renderNotificationList();
-        alert(`✅ Usuário '${users[idx].username}' aprovado como ${role === "admin" ? "Administrador" : "Acompanhamento"}.`);
+        alert(`✅ Usuário '${users[idx].username}' aprovado como ${role === "admin" ? "Administrador" : "Visualização"}.`);
       });
 
     return;
@@ -899,7 +953,7 @@ function approveUser(username, role) {
 
   updateNotificationBadge();
   renderNotificationList();
-  alert(`✅ Usuário '${users[idx].username}' aprovado como ${role === "admin" ? "Administrador" : "Acompanhamento"}.`);
+  alert(`✅ Usuário '${users[idx].username}' aprovado como ${role === "admin" ? "Administrador" : "Visualização"}.`);
 }
 
 function denyUser(username) {
@@ -1052,6 +1106,10 @@ function getCategoriaNome(categoriaId) {
     "sar-rede": "SAR Rede",
     "mdu-ongoing": "MDU Ongoing",
     "ongoing": "ONGOING",
+    "projeto-f": "Projeto F",
+    "epo": "EPO",
+    "financeiro": "Financeiro",
+    "reuniao": "Reunião",
   };
   return mapping[categoriaId] || categoriaId || "-";
 }
@@ -2190,11 +2248,11 @@ function sanitizeEpoName(value, epoMode = '') {
   }
 
   if (epoMode === 'ongoing') {
-    return ONGOING_EPO_ALIAS_MAP[normalized] || '';
+    return ONGOING_EPO_ALIAS_MAP[normalized] || raw.toUpperCase();
   }
 
   if (epoMode === 'projeto-f') {
-    return PROJETO_F_EPO_ALIAS_MAP[normalized] || '';
+    return PROJETO_F_EPO_ALIAS_MAP[normalized] || raw.toUpperCase();
   }
 
   return raw;
@@ -2425,7 +2483,7 @@ function buildOngoingAnalyticsData(dados, options = {}) {
   } = options;
 
   const sharedOptions = {
-    quantityKeys: ['QTD_BLOCOS', 'QTDE_BLOCOS', 'qtd_blocos', 'qtd blocos', 'Qtde Blocos'],
+    quantityKeys: ['QTD_BLOCOS', 'QTDE_BLOCOS', 'QTDE BLOCOS', 'QTD BLOCOS', 'qtd_blocos', 'qtd blocos', 'Qtde Blocos'],
     epoKeys,
     epoMode: 'ongoing',
     selectedYear,
@@ -2734,14 +2792,14 @@ function renderVisaoGerencia() {
     container.insertBefore(analyticsContainer, container.querySelector('.search-section') || null);
   }
 
-  const ongoing = (Array.isArray(dadosPorCategoria['backlog']) && dadosPorCategoria['backlog'].length)
-    ? dadosPorCategoria['backlog']
-    : ((Array.isArray(dadosPorCategoria['mdu-ongoing']) && dadosPorCategoria['mdu-ongoing'].length)
-      ? dadosPorCategoria['mdu-ongoing']
-      : ((Array.isArray(dadosPorCategoria['ongoing']) && dadosPorCategoria['ongoing'].length)
-        ? dadosPorCategoria['ongoing']
-        : (Array.isArray(dadosCSV) ? dadosCSV : [])));
-  const projetoF = Array.isArray(dadosPorCategoria['projeto-f']) ? dadosPorCategoria['projeto-f'] : [];
+  const mduOngoing = getPreferredDataset('mdu-ongoing');
+  const ongoingLegacy = getPreferredDataset('ongoing');
+  const projetoF = getPreferredDataset('projeto-f');
+  const ongoing = (Array.isArray(mduOngoing) && mduOngoing.length)
+    ? mduOngoing
+    : (Array.isArray(ongoingLegacy) ? ongoingLegacy : []);
+  const ongoingQuantityKeys = ['QTD_BLOCOS', 'QTDE_BLOCOS', 'QTDE BLOCOS', 'QTD BLOCOS', 'qtd_blocos', 'qtd blocos', 'Qtde Blocos'];
+  const projetoFQuantityKeys = ['Qtde Blocos', 'QTDE_BLOCOS', 'QTDE BLOCOS', 'QTD_BLOCOS', 'QTD BLOCOS', 'qtd_blocos'];
 
   if ((!Array.isArray(ongoing) || !ongoing.length) && window.location.protocol.startsWith('http')) {
     analyticsContainer.innerHTML = `
@@ -2836,8 +2894,11 @@ function renderVisaoGerencia() {
   const ongoingLastDay = ongoingData.daily.length ? ongoingData.daily[ongoingData.daily.length - 1] : ['—', 0];
   const projetoFLastDay = projetoFData.daily.length ? projetoFData.daily[projetoFData.daily.length - 1] : ['—', 0];
 
+  const ongoingTotalBlocos = (ongoing || []).reduce((acc, item) => acc + getItemQuantity(item, ongoingQuantityKeys), 0);
+  const projetoFTotalBlocos = (projetoF || []).reduce((acc, item) => acc + getItemQuantity(item, projetoFQuantityKeys), 0);
+
   const ongoingEpoRows = buildEpoMetrics(ongoing, {
-    quantityKeys: ['QTD_BLOCOS', 'QTDE_BLOCOS', 'qtd_blocos', 'qtd blocos'],
+    quantityKeys: ongoingQuantityKeys,
     dateKeys: [
       'DATA CONCLUÍDO', 'DATA CONCLUIDO', 'DT_CONCLUSAO', 'dt_conclusao', 'DATA_CONCLUSAO', 'data_conclusao',
       'dthinicio', 'DTINICIO', 'DT_INICIO', 'DATA', 'data',
@@ -2865,7 +2926,7 @@ function renderVisaoGerencia() {
   });
 
   const projetoFEpoRows = buildEpoMetrics(projetoF, {
-    quantityKeys: ['Qtde Blocos', 'QTDE_BLOCOS', 'QTD_BLOCOS', 'qtd_blocos'],
+    quantityKeys: projetoFQuantityKeys,
     dateKeys: ['DT_CONSTRUÇÃO', 'DT_CONSTRUCAO', 'DATA', 'DATA_CONCLUSAO', 'dthinicio', 'DTINICIO'],
     epoKeys: projetoFEpoKeys,
     epoMode: 'projeto-f',
@@ -2968,9 +3029,11 @@ function renderVisaoGerencia() {
     </div>
 
     <div class="visao-gerencia-summary">
+      ${createSummaryCard('ONGOING • TOTAL DE BLOCOS', ongoingTotalBlocos, 'Blocos totais carregados no MDU Ongoing')}
       ${createSummaryCard(`ONGOING • ${periodLabelUpper}`, ongoingMonthTotal, 'Blocos do MDU Ongoing no período filtrado')}
-      ${createSummaryCard(`PROJETO F • ${periodLabelUpper}`, projetoFMonthTotal, 'Blocos OK no período filtrado')}
       ${createSummaryCard('ONGOING • DIA A DIA', ongoingLastDay[1], `Última data: ${ongoingLastDay[0]}`)}
+      ${createSummaryCard(`PROJETO F • ${periodLabelUpper}`, projetoFMonthTotal, 'Blocos OK no período filtrado')}
+      ${createSummaryCard('PROJETO F • TOTAL DE BLOCOS', projetoFTotalBlocos, 'Blocos totais carregados no Projeto F')}
       ${createSummaryCard('PROJETO F • DIA A DIA', projetoFLastDay[1], `Última data: ${projetoFLastDay[0]}`)}
     </div>
 
@@ -4221,30 +4284,106 @@ function buscarPorIDOngoing() {
 }
 
 // Abrir detalhes do registro
-function abrirDetalhesOngoing(indice) {
+async function abrirDetalhesOngoing(indice) {
   const item = dadosTabelaExibida[indice]; // Usar dados atualmente exibidos
   if (!item) return;
-  
+
+  const idDemanda = getField(item, "iddemanda", "IDDEMANDA", "ID_DEMANDA", "id") || "-";
+  const fila = getField(item, "fila", "FILA") || "-";
+  const tipo = getField(item, "tipo", "TIPO") || "-";
+  const endereco = getField(item, "endereco_unico", "endereco", "endereço", "endereco_entrada") || "-";
+  const bairro = getField(item, "bairro", "BAIRRO") || "-";
+  const cidade = getField(item, "cidade", "CIDADE") || "-";
+  const epo = getField(item, "epo", "EPO", "regional", "REGIONAL", "cluster", "CLUSTER") || "-";
+  const status = getField(item, "STATUS_GERAL", "status") || "-";
+  const motivo = getField(item, "MOTIVO_GERAL", "motivo") || "-";
+  const sla = getField(item, "SLA TUDO", "SLA FASE", "sla_tudo", "sla_fase", "sla") || "-";
+  const obsOriginal = getField(item, "STATUS OBS", "OBS", "OBSERVACAO", "observacao") || "Nenhuma observação disponível";
+
   // Extrair apenas o número do Aging de forma robusta
   const agingRaw = item["Aging arredondado"] || "0";
   const match = agingRaw.toString().match(/\d+/);
-  const agingNumero = match ? parseInt(match[0]) : 0;
-  
-  // Preencher os campos de detalhes
-  document.getElementById("detalhe-iddemanda").textContent = item["iddemanda"] || "-";
-  document.getElementById("detalhe-fila").innerHTML = renderModalBadge(item["fila"] || "-");
-  document.getElementById("detalhe-tipo").textContent = item["tipo"] || "-";
-  document.getElementById("detalhe-endereco").textContent = item["endereco_unico"] || item["endereco"] || item["endereco_entrada"] || "-";
+  const agingNumero = match ? parseInt(match[0], 10) : 0;
+
+  const referenceKey = [
+    idDemanda,
+    getField(item, "COD-MDUGO", "cod-mdugo", "codmdugo"),
+    endereco
+  ].find(value => value && value !== "-") || `ongoing-${indice}`;
+
+  currentPendenteCodigo = String(referenceKey);
+
+  // Mantém a página de detalhes sincronizada, caso seja usada no futuro.
+  document.getElementById("detalhe-iddemanda").textContent = idDemanda;
+  document.getElementById("detalhe-fila").innerHTML = renderModalBadge(fila);
+  document.getElementById("detalhe-tipo").textContent = tipo;
+  document.getElementById("detalhe-endereco").textContent = endereco;
   document.getElementById("detalhe-aging").innerHTML = `<span class="modal-badge ${agingNumero > 20 ? 'badge-danger' : 'badge-success'}">${agingNumero}</span>`;
-  document.getElementById("detalhe-sla").innerHTML = renderModalBadge(getField(item, "SLA TUDO", "SLA FASE", "sla_tudo", "sla_fase", "sla") || "-");
-  document.getElementById("detalhe-status").innerHTML = renderModalBadge(item["STATUS_GERAL"] || "-");
-  document.getElementById("detalhe-motivo").innerHTML = renderModalBadge(item["MOTIVO_GERAL"] || "-");
-  document.getElementById("detalhe-obs").textContent = item["STATUS OBS"] || item["OBS"] || "Nenhuma observação disponível";
-  
-  // Mostrar seção de detalhes usando o sistema de navegação (classes .secao/.ativa)
-  mostrarSecao('detalhes-ongoing');
-  
-  // Scroll para o topo
+  document.getElementById("detalhe-sla").innerHTML = renderModalBadge(sla);
+  document.getElementById("detalhe-status").innerHTML = renderModalBadge(status);
+  document.getElementById("detalhe-motivo").innerHTML = renderModalBadge(motivo);
+  document.getElementById("detalhe-obs").textContent = obsOriginal;
+
+  document.getElementById('modal-codigo').textContent = idDemanda;
+  document.getElementById('modal-endereco').textContent = endereco;
+  document.getElementById('modal-bairro').textContent = bairro;
+  document.getElementById('modal-cidade').textContent = cidade;
+  document.getElementById('modal-epo').textContent = epo;
+  document.getElementById('modal-status').innerHTML = renderModalBadge(status);
+  document.getElementById('modal-motivo').innerHTML = renderModalBadge(motivo);
+  document.getElementById('modal-obs-original').textContent = obsOriginal;
+  document.getElementById('modal-obs-adicional').value = "";
+
+  applyModalContext({
+    themeClass: 'mdu-ongoing-modal',
+    title: 'Detalhes Ongoing',
+    kicker: 'Painel operacional do ongoing',
+    heroChip: 'Ongoing',
+    heroTitle: endereco || idDemanda,
+    heroSubtitle: [fila, tipo, epo].filter(value => value && value !== '-').join(' • ') || 'Acompanhamento detalhado do registro selecionado.',
+    statusLabel: 'Status Geral',
+    motivoLabel: 'Motivo Geral',
+    heroPills: [
+      { label: 'ID Demanda', value: idDemanda },
+      { label: 'Aging', value: String(agingNumero || 0) },
+      { label: 'SLA', value: sla, badge: true }
+    ]
+  });
+
+  const modalBody = document.querySelector('#modal-obs .modal-body');
+  if (modalBody) {
+    const extraHtml = `
+      <div class="modal-extra modal-extra-grid">
+        ${renderModalInfoCard('Fila', fila, { featured: true })}
+        ${renderModalInfoCard('Tipo', tipo)}
+        ${renderModalInfoCard('EPO / Cluster', epo)}
+        ${renderModalInfoCard('Aging', String(agingNumero || 0))}
+        ${renderModalInfoCard('SLA Tudo', sla)}
+      </div>
+    `;
+    const obsRow = document.getElementById('modal-obs-original')?.closest('.modal-row');
+    if (obsRow) {
+      obsRow.insertAdjacentHTML('beforebegin', extraHtml);
+    }
+  }
+
+  await carregarObservacoesPendente(currentPendenteCodigo);
+  await carregarAnexosPendente(currentPendenteCodigo);
+
+  const modal = document.getElementById('modal-obs');
+  if (modal) modal.classList.remove('hidden');
+
+  const anexoInput = document.getElementById('modal-anexo');
+  if (anexoInput) {
+    anexoInput.value = "";
+    anexoInput.onchange = (evt) => {
+      const file = evt.target.files[0];
+      if (file) {
+        uploadAnexoPendente(currentPendenteCodigo, file);
+      }
+    };
+  }
+
   window.scrollTo(0, 0);
 }
 
@@ -4267,6 +4406,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
 // LOGOUT
 function logout() {
+  currentUser = null;
+  localStorage.removeItem(STORAGE_CURRENT_USER_KEY);
+
   if (window.location.protocol.startsWith("http")) {
     fetch("/api/logout", { method: "POST", credentials: "include" })
       .finally(() => {
@@ -4373,6 +4515,531 @@ function voltarDoCategoria() {
   document.querySelectorAll('[id^="buscar-"]').forEach(input => {
     input.value = '';
   });
+}
+
+let epoSelecionadaAtual = '';
+let epoAcaoAtual = '';
+let epoUltimoAceite = null;
+const STORAGE_EPO_TECNICOS_KEY = 'portalEpoTecnicos';
+const STORAGE_EPO_ACEITES_KEY = 'portalEpoAceites';
+
+function getEpoTecnicosStore() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_EPO_TECNICOS_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveEpoTecnicosStore(store) {
+  localStorage.setItem(STORAGE_EPO_TECNICOS_KEY, JSON.stringify(store || {}));
+}
+
+function getEpoAceitesStore() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_EPO_ACEITES_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveEpoAceitesStore(store) {
+  localStorage.setItem(STORAGE_EPO_ACEITES_KEY, JSON.stringify(store || {}));
+}
+
+function getNomeResponsavelAtual() {
+  const user = getCurrentUser();
+  return String(user?.name || user?.username || 'Usuário').trim() || 'Usuário';
+}
+
+function normalizeListaAceitesEpo(lista) {
+  if (!Array.isArray(lista)) return [];
+
+  return lista
+    .map((item) => {
+      if (typeof item === 'string') {
+        return { codigo: item, responsavel: '-', aceitoEm: null };
+      }
+
+      if (!item || typeof item !== 'object') return null;
+
+      return {
+        codigo: String(item.codigo || item.cod || item.COD_MDUGO || '').trim(),
+        responsavel: String(item.responsavel || item.user || '-').trim() || '-',
+        aceitoEm: item.aceitoEm || item.createdAt || null
+      };
+    })
+    .filter((item) => item && item.codigo);
+}
+
+function formatDateTimeBr(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('pt-BR');
+}
+
+function getTecnicosDaEpo(nomeEpo) {
+  const store = getEpoTecnicosStore();
+  const lista = Array.isArray(store?.[nomeEpo]) ? store[nomeEpo] : [];
+  return lista;
+}
+
+function saveTecnicosDaEpo(nomeEpo, lista) {
+  const store = getEpoTecnicosStore();
+  store[nomeEpo] = Array.isArray(lista) ? lista : [];
+  saveEpoTecnicosStore(store);
+}
+
+function setEpoActionButtonActive(tipoAcao) {
+  document.querySelectorAll('#epo .epo-action-trigger').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.action === tipoAcao);
+  });
+}
+
+function renderTabelaTecnicosEpo(lista) {
+  if (!Array.isArray(lista) || !lista.length) {
+    return '<p style="opacity:.75; margin:8px 0 0 0;">Nenhum técnico cadastrado para esta EPO.</p>';
+  }
+
+  const rows = lista.map(item => `
+    <tr>
+      <td>${escapeHtml(item.nome || '-')}</td>
+      <td>${escapeHtml(item.rg || '-')}</td>
+      <td>${escapeHtml(item.cpf || '-')}</td>
+      <td>${escapeHtml(item.placa || '-')}</td>
+      <td>${escapeHtml(item.modelo || '-')}</td>
+      <td>${escapeHtml(item.createdAt ? new Date(item.createdAt).toLocaleString() : '-')}</td>
+    </tr>
+  `).join('');
+
+  return `
+    <div class="epo-table-wrap">
+      <table class="epo-table">
+        <thead>
+          <tr>
+            <th>Nome do Técnico</th>
+            <th>RG</th>
+            <th>CPF</th>
+            <th>Placa Carro</th>
+            <th>Modelo Carro</th>
+            <th>Cadastrado em</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderListaEquipesEpo() {
+  const container = document.getElementById('epo-action-content');
+  if (!container) return;
+
+  const tecnicos = getTecnicosDaEpo(epoSelecionadaAtual);
+  container.innerHTML = `
+    <p class="epo-section-title">${escapeHtml(epoSelecionadaAtual)} • LISTA DE EQUIPES</p>
+    <button type="button" class="btn-primary" onclick="toggleCadastroTecnicoEpo()">CADASTRAR TÉCNICO</button>
+
+    <div id="cadastro-tecnico-form" class="epo-form-shell" style="display:none;">
+      <div class="epo-form-grid">
+        <input id="epo-tecnico-nome" type="text" placeholder="NOME DO TECNICO" />
+        <input id="epo-tecnico-rg" type="text" placeholder="RG" />
+        <input id="epo-tecnico-cpf" type="text" placeholder="CPF" />
+        <input id="epo-tecnico-placa" type="text" placeholder="PLACA CARRO" />
+        <input id="epo-tecnico-modelo" type="text" placeholder="MODELO CARRO" />
+      </div>
+      <div class="epo-form-actions">
+        <button type="button" class="btn-primary" onclick="salvarCadastroTecnicoEpo()">SALVAR CADASTRO</button>
+      </div>
+      <div class="epo-form-actions epo-upload-row">
+        <input id="epo-tecnicos-file" type="file" accept=".csv,.txt" style="display:none;" onchange="importarTecnicosEpoPorPlanilha()" />
+        <button type="button" class="btn-secondary epo-clip-upload" onclick="abrirSeletorPlanilhaTecnicosEpo()" title="Adicionar planilha">📎</button>
+        <span id="epo-tecnicos-file-name" class="epo-file-name">Nenhum arquivo selecionado</span>
+      </div>
+      <p class="epo-upload-note">Importação esperada: NOME DO TECNICO, RG, CPF, PLACA CARRO, MODELO CARRO.</p>
+    </div>
+
+    ${renderTabelaTecnicosEpo(tecnicos)}
+  `;
+}
+
+function toggleCadastroTecnicoEpo() {
+  const form = document.getElementById('cadastro-tecnico-form');
+  if (!form) return;
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+function abrirSeletorPlanilhaTecnicosEpo() {
+  const input = document.getElementById('epo-tecnicos-file');
+  if (input) input.click();
+}
+
+function salvarCadastroTecnicoEpo() {
+  if (!epoSelecionadaAtual) return;
+
+  const nome = (document.getElementById('epo-tecnico-nome')?.value || '').trim();
+  const rg = (document.getElementById('epo-tecnico-rg')?.value || '').trim();
+  const cpf = (document.getElementById('epo-tecnico-cpf')?.value || '').trim();
+  const placa = (document.getElementById('epo-tecnico-placa')?.value || '').trim();
+  const modelo = (document.getElementById('epo-tecnico-modelo')?.value || '').trim();
+
+  if (!nome || !rg || !cpf || !placa || !modelo) {
+    alert('⚠️ Preencha todos os campos do cadastro técnico.');
+    return;
+  }
+
+  const tecnicos = getTecnicosDaEpo(epoSelecionadaAtual);
+  tecnicos.push({ nome, rg, cpf, placa, modelo, createdAt: new Date().toISOString() });
+  saveTecnicosDaEpo(epoSelecionadaAtual, tecnicos);
+
+  executarAcaoEpo('equipes');
+  const resultEl = document.getElementById('epo-action-result');
+  if (resultEl) resultEl.textContent = `✅ Técnico cadastrado com sucesso em ${epoSelecionadaAtual}.`;
+}
+
+function importarTecnicosEpoPorPlanilha() {
+  if (!epoSelecionadaAtual) return;
+
+  const input = document.getElementById('epo-tecnicos-file');
+  const nomeArquivo = document.getElementById('epo-tecnicos-file-name');
+  const file = input?.files?.[0];
+  if (!file) {
+    if (nomeArquivo) nomeArquivo.textContent = 'Nenhum arquivo selecionado';
+    alert('⚠️ Selecione uma planilha CSV para importar os técnicos.');
+    return;
+  }
+
+  if (nomeArquivo) nomeArquivo.textContent = file.name;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const text = String(e.target?.result || '').replace(/^\uFEFF/, '');
+    const cabecalho = text.split(/\r?\n/)[0] || '';
+    const delimiter = cabecalho.includes(';') ? ';' : ',';
+    const linhas = parseGenericCsvRows(text, delimiter);
+
+    const novos = linhas.map(item => ({
+      nome: getField(item, 'NOME DO TECNICO', 'NOME_TECNICO', 'NOME', 'nome') || '',
+      rg: getField(item, 'RG', 'rg') || '',
+      cpf: getField(item, 'CPF', 'cpf') || '',
+      placa: getField(item, 'PLACA CARRO', 'PLACA', 'placa') || '',
+      modelo: getField(item, 'MODELO CARRO', 'MODELO', 'modelo') || '',
+      createdAt: new Date().toISOString()
+    })).filter(item => item.nome);
+
+    if (!novos.length) {
+      alert('⚠️ Não foi possível identificar técnicos na planilha.');
+      return;
+    }
+
+    const tecnicos = getTecnicosDaEpo(epoSelecionadaAtual);
+    saveTecnicosDaEpo(epoSelecionadaAtual, [...tecnicos, ...novos]);
+    executarAcaoEpo('equipes');
+
+    const resultEl = document.getElementById('epo-action-result');
+    if (resultEl) resultEl.textContent = `✅ ${novos.length} técnico(s) importado(s) para ${epoSelecionadaAtual}.`;
+
+    if (input) input.value = '';
+    if (nomeArquivo) nomeArquivo.textContent = 'Nenhum arquivo selecionado';
+  };
+
+  reader.readAsText(file);
+}
+
+function getBacklogParaNovosEntrantes() {
+  const preferred = getPreferredDataset('backlog');
+  if (Array.isArray(preferred) && preferred.length) return preferred;
+
+  const local = getLocalDatasetCache()?.backlog?.items;
+  if (Array.isArray(local) && local.length) return local;
+
+  return [];
+}
+
+function renderNovosEntrantesEpo() {
+  const container = document.getElementById('epo-action-content');
+  if (!container) return;
+
+  const backlog = getBacklogParaNovosEntrantes();
+  if (!backlog.length) {
+    container.innerHTML = '<p class="epo-empty-state">Nenhum backlog carregado. Importe a base do backlog para visualizar os novos entrantes.</p>';
+    return;
+  }
+
+  const aceitesStore = getEpoAceitesStore();
+  const listaAceites = normalizeListaAceitesEpo(aceitesStore?.[epoSelecionadaAtual]);
+  const aceites = new Map(listaAceites.map((item) => [String(item.codigo), item]));
+  window.__epoNovosEntrantesRows = backlog;
+
+  const rows = backlog.slice(0, 300).map((item, idx) => {
+    const codigo = String(getField(item, 'COD-MDUGO', 'cod-mdugo', 'codmdugo') || `LINHA-${idx + 1}`);
+    const endereco = `${getField(item, 'ENDEREÇO', 'ENDERECO', 'endereco')} ${getField(item, 'NUMERO', 'numero', 'num')}`.trim() || '-';
+    const cidade = getField(item, 'CIDADE', 'cidade') || '-';
+    const status = getField(item, 'STATUS_GERAL', 'STATUS', 'status') || '-';
+    const motivo = getField(item, 'MOTIVO_GERAL', 'MOTIVO', 'motivo') || '-';
+    const aceiteInfo = aceites.get(codigo);
+    const aceito = Boolean(aceiteInfo);
+    const responsavel = aceiteInfo?.responsavel || '-';
+    const destaqueRecente = Boolean(
+      aceito
+      && epoUltimoAceite
+      && epoUltimoAceite.epo === epoSelecionadaAtual
+      && epoUltimoAceite.codigo === codigo
+      && (Date.now() - Number(epoUltimoAceite.at || 0) <= 15000)
+    );
+
+    return `
+      <tr class="${aceito ? 'epo-row-aceita' : ''} ${destaqueRecente ? 'epo-row-aceita-recente' : ''}">
+        <td>${escapeHtml(codigo)}</td>
+        <td>${escapeHtml(endereco)}</td>
+        <td>${escapeHtml(cidade)}</td>
+        <td>${escapeHtml(status)}</td>
+        <td>${escapeHtml(motivo)}</td>
+        <td>
+          <div class="epo-inline-actions">
+            <button type="button" class="btn-secondary" onclick="visualizarNovoEntrante(${idx})">Visualizar</button>
+            <button type="button" class="btn-primary ${aceito ? `epo-btn-aceito ${destaqueRecente ? 'pulse' : ''}` : ''}" ${aceito ? 'disabled' : ''} onclick="aceitarNovoEntrante(${idx})">${aceito ? 'Aceito' : 'Aceite'}</button>
+          </div>
+          ${aceito ? `<p class="epo-aceite-owner">Responsável: ${escapeHtml(responsavel)}</p>` : ''}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <p class="epo-section-title">${escapeHtml(epoSelecionadaAtual)} • NOVOS ENTRANTES</p>
+    <div class="epo-table-wrap">
+      <table class="epo-table">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Endereço</th>
+            <th>Cidade</th>
+            <th>Status</th>
+            <th>Motivo</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function visualizarNovoEntrante(index) {
+  const item = window.__epoNovosEntrantesRows?.[index];
+  if (!item) return;
+
+  const codigo = String(getField(item, 'COD-MDUGO', 'cod-mdugo', 'codmdugo') || `LINHA-${index + 1}`);
+  const enderecoBase = getField(item, 'ENDEREÇO', 'ENDERECO', 'endereco') || '-';
+  const numero = getField(item, 'NUMERO', 'numero', 'num') || '-';
+  const enderecoCompleto = `${enderecoBase} ${numero === '-' ? '' : numero}`.trim() || '-';
+  const bairro = getField(item, 'BAIRRO', 'bairro') || '-';
+  const cidade = getField(item, 'CIDADE', 'cidade') || '-';
+  const tipoRede = getField(item, 'TIPO_REDE', 'tipo_rede', 'TIPO DE REDE') || '-';
+  const contato = getField(item, 'CONTATO', 'contato', 'TELEFONE') || '-';
+  const status = getField(item, 'STATUS_GERAL', 'STATUS', 'status') || '-';
+  const motivo = getField(item, 'MOTIVO_GERAL', 'MOTIVO', 'motivo') || '-';
+  const obsOriginal = getField(item, 'OBS', 'OBSERVACAO', 'observacao') || '-';
+
+  const aceitesStore = getEpoAceitesStore();
+  const listaAceites = normalizeListaAceitesEpo(aceitesStore?.[epoSelecionadaAtual]);
+  const aceiteInfo = listaAceites.find((entry) => String(entry.codigo) === codigo) || null;
+  const responsavelAceite = aceiteInfo?.responsavel || 'Sem responsável';
+  const aceiteEm = formatDateTimeBr(aceiteInfo?.aceitoEm);
+
+  const referencia = `${epoSelecionadaAtual || 'EPO'}::${codigo}`;
+  currentPendenteCodigo = referencia;
+
+  document.getElementById('modal-codigo').textContent = codigo;
+  document.getElementById('modal-endereco').textContent = enderecoCompleto;
+  document.getElementById('modal-bairro').textContent = bairro;
+  document.getElementById('modal-cidade').textContent = cidade;
+  document.getElementById('modal-epo').textContent = epoSelecionadaAtual || '-';
+  document.getElementById('modal-status').innerHTML = renderModalBadge(status);
+  document.getElementById('modal-motivo').innerHTML = renderModalBadge(motivo);
+  document.getElementById('modal-obs-original').textContent = obsOriginal;
+  document.getElementById('modal-obs-adicional').value = '';
+
+  applyModalContext({
+    themeClass: 'empresarial-modal',
+    title: 'Detalhes EPO',
+    kicker: 'Painel executivo de novos entrantes',
+    heroChip: 'EPO',
+    heroTitle: enderecoCompleto || codigo,
+    heroSubtitle: [cidade, bairro, epoSelecionadaAtual].filter(v => v && v !== '-').join(' • ') || 'Visualização detalhada do entrante selecionado.',
+    statusLabel: 'Status Geral',
+    motivoLabel: 'Motivo Geral',
+    heroPills: [
+      { label: 'COD-MDUGO', value: codigo },
+      { label: 'RESPONSÁVEL', value: responsavelAceite },
+      { label: 'STATUS', value: status, badge: true },
+      { label: 'MOTIVO', value: motivo, badge: true }
+    ]
+  });
+
+  const modalBody = document.querySelector('#modal-obs .modal-body');
+  if (modalBody) {
+    const extraHtml = `
+      <div class="modal-extra modal-extra-grid">
+        ${renderModalInfoCard('RESPONSÁVEL DO ACEITE', responsavelAceite, { featured: true })}
+        ${renderModalInfoCard('ACEITO EM', aceiteEm)}
+        ${renderModalInfoCard('TIPO_REDE', tipoRede, { featured: true })}
+        ${renderModalInfoCard('CONTATO', contato)}
+        ${renderModalInfoCard('ENDEREÇO', enderecoBase)}
+        ${renderModalInfoCard('NUMERO', numero)}
+        ${renderModalInfoCard('BAIRRO', bairro)}
+        ${renderModalInfoCard('CIDADE', cidade)}
+      </div>
+    `;
+    const obsRow = document.getElementById('modal-obs-original')?.closest('.modal-row');
+    if (obsRow) {
+      obsRow.insertAdjacentHTML('beforebegin', extraHtml);
+    }
+  }
+
+  await carregarObservacoesPendente(referencia);
+  await carregarAnexosPendente(referencia);
+
+  const modal = document.getElementById('modal-obs');
+  if (modal) modal.classList.remove('hidden');
+
+  const footer = document.querySelector('#modal-obs .modal-footer');
+  if (footer) {
+    const oldBtn = document.getElementById('modal-retirar-responsavel');
+    if (oldBtn) oldBtn.remove();
+
+    if (aceiteInfo) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'modal-retirar-responsavel';
+      btn.className = 'btn-secondary';
+      btn.textContent = 'Retirar do responsável';
+      btn.onclick = () => retirarResponsavelNovoEntrante(index);
+      footer.insertBefore(btn, footer.querySelector('.btn-primary'));
+    }
+  }
+
+  const anexoInput = document.getElementById('modal-anexo');
+  if (anexoInput) {
+    anexoInput.value = '';
+    anexoInput.onchange = (evt) => {
+      const file = evt.target.files[0];
+      if (file) {
+        uploadAnexoPendente(referencia, file);
+      }
+    };
+  }
+}
+
+async function aceitarNovoEntrante(index) {
+  const item = window.__epoNovosEntrantesRows?.[index];
+  if (!item || !epoSelecionadaAtual) return;
+
+  const codigo = String(getField(item, 'COD-MDUGO', 'cod-mdugo', 'codmdugo') || `LINHA-${index + 1}`);
+  const aceitesStore = getEpoAceitesStore();
+  const listaAtual = normalizeListaAceitesEpo(aceitesStore?.[epoSelecionadaAtual]);
+  const responsavel = getNomeResponsavelAtual();
+  const idxExistente = listaAtual.findIndex((entry) => String(entry.codigo) === codigo);
+
+  if (idxExistente === -1) {
+    listaAtual.push({ codigo, responsavel, aceitoEm: new Date().toISOString() });
+  } else {
+    listaAtual[idxExistente] = {
+      ...listaAtual[idxExistente],
+      responsavel,
+      aceitoEm: new Date().toISOString()
+    };
+  }
+
+  aceitesStore[epoSelecionadaAtual] = listaAtual;
+  saveEpoAceitesStore(aceitesStore);
+
+  epoUltimoAceite = {
+    epo: epoSelecionadaAtual,
+    codigo,
+    at: Date.now()
+  };
+
+  executarAcaoEpo('novos');
+  const resultEl = document.getElementById('epo-action-result');
+  if (resultEl) resultEl.textContent = `✅ Endereço ${codigo} aceito por ${responsavel}.`;
+
+  await visualizarNovoEntrante(index);
+}
+
+async function retirarResponsavelNovoEntrante(index) {
+  const item = window.__epoNovosEntrantesRows?.[index];
+  if (!item || !epoSelecionadaAtual) return;
+
+  const codigo = String(getField(item, 'COD-MDUGO', 'cod-mdugo', 'codmdugo') || `LINHA-${index + 1}`);
+  const aceitesStore = getEpoAceitesStore();
+  const listaAtual = normalizeListaAceitesEpo(aceitesStore?.[epoSelecionadaAtual]);
+
+  aceitesStore[epoSelecionadaAtual] = listaAtual.filter((entry) => String(entry.codigo) !== codigo);
+  saveEpoAceitesStore(aceitesStore);
+
+  if (epoUltimoAceite && epoUltimoAceite.epo === epoSelecionadaAtual && epoUltimoAceite.codigo === codigo) {
+    epoUltimoAceite = null;
+  }
+
+  executarAcaoEpo('novos');
+  const resultEl = document.getElementById('epo-action-result');
+  if (resultEl) resultEl.textContent = `↩️ Responsável removido do endereço ${codigo}. O aceite foi liberado novamente.`;
+
+  await visualizarNovoEntrante(index);
+}
+
+function selecionarEpo(nomeEpo) {
+  epoSelecionadaAtual = String(nomeEpo || '').trim();
+
+  const panel = document.getElementById('epo-action-panel');
+  const selectedNameEl = document.getElementById('epo-selected-name');
+  const resultEl = document.getElementById('epo-action-result');
+
+  document.querySelectorAll('#epo .epo-pill').forEach(btn => {
+    const texto = (btn.textContent || '').replace(/\s+/g, ' ').trim();
+    const nomeNormalizado = texto;
+    btn.classList.toggle('active', nomeNormalizado === epoSelecionadaAtual);
+  });
+
+  if (panel) panel.style.display = 'block';
+  if (selectedNameEl) selectedNameEl.textContent = epoSelecionadaAtual || '-';
+  if (resultEl) {
+    resultEl.textContent = epoSelecionadaAtual
+      ? `Selecione uma opção para ${epoSelecionadaAtual}.`
+      : 'Selecione uma EPO para habilitar as opções.';
+  }
+
+  if (epoAcaoAtual) {
+    executarAcaoEpo(epoAcaoAtual);
+  }
+}
+
+function executarAcaoEpo(tipoAcao) {
+  epoAcaoAtual = tipoAcao;
+  setEpoActionButtonActive(tipoAcao);
+
+  const resultEl = document.getElementById('epo-action-result');
+  if (!epoSelecionadaAtual) {
+    if (resultEl) {
+      resultEl.textContent = 'Selecione uma EPO antes de clicar nas opções.';
+    }
+    return;
+  }
+
+  const acao = tipoAcao === 'equipes' ? 'LISTA DE EQUIPES' : 'NOVOS ENTRANTES';
+
+  if (tipoAcao === 'equipes') {
+    renderListaEquipesEpo();
+  } else {
+    renderNovosEntrantesEpo();
+  }
+
+  if (resultEl) {
+    resultEl.textContent = `✅ ${acao} clicado para ${epoSelecionadaAtual}.`;
+  }
 }
 
 // Auxiliares para normalizar textos e chaves de CSV (para lidar com acentos, maiúsculas, espaços)
@@ -4633,10 +5300,11 @@ async function salvarObsModal() {
 
   const user = getCurrentUser();
   const useApi = window.location.protocol.startsWith('http');
+  const reference = encodeURIComponent(String(currentPendenteCodigo));
 
   if (useApi) {
     try {
-      const res = await fetch(`/api/pendente/${currentPendenteCodigo}/notes`, {
+      const res = await fetch(`/api/pendente/${reference}/notes`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -4682,11 +5350,12 @@ async function salvarObsModal() {
 
 async function carregarObservacoesPendente(codigo) {
   const useApi = window.location.protocol.startsWith('http');
+  const reference = encodeURIComponent(String(codigo));
   let notes = [];
 
   if (useApi) {
     try {
-      const res = await fetch(`/api/pendente/${codigo}/notes`, { credentials: 'include' });
+      const res = await fetch(`/api/pendente/${reference}/notes`, { credentials: 'include' });
       if (res.ok) {
         notes = await res.json();
       }
@@ -4738,6 +5407,7 @@ function renderObservacoesLista(codigo, notas) {
 
 async function carregarAnexosPendente(codigo) {
   const useApi = window.location.protocol.startsWith('http');
+  const reference = encodeURIComponent(String(codigo));
   let anexos = [];
   let isAdmin = false;
 
@@ -4765,7 +5435,7 @@ async function carregarAnexosPendente(codigo) {
 
   if (useApi) {
     try {
-      const res = await fetch(`/api/pendente/${codigo}/attachments`, { credentials: 'include' });
+      const res = await fetch(`/api/pendente/${reference}/attachments`, { credentials: 'include' });
       if (res.ok) {
         anexos = await res.json();
       }
@@ -4795,13 +5465,14 @@ async function carregarAnexosPendente(codigo) {
 async function uploadAnexoPendente(codigo, file) {
   const useApi = window.location.protocol.startsWith('http');
   const user = getCurrentUser();
+  const reference = encodeURIComponent(String(codigo));
 
   if (useApi && user) {
     const form = new FormData();
     form.append('file', file);
 
     try {
-      const res = await fetch(`/api/pendente/${codigo}/attachments`, {
+      const res = await fetch(`/api/pendente/${reference}/attachments`, {
         method: 'POST',
         credentials: 'include',
         body: form,
@@ -4853,7 +5524,7 @@ function renderAnexosLista(codigo, anexos) {
       const name = item.filename || `Anexo ${index + 1}`;
       const createdBy = item.created_by ? ` por ${item.created_by}` : '';
       const createdAt = item.created_at ? ` (${new Date(item.created_at).toLocaleString()})` : '';
-      const href = item.dataUrl ? item.dataUrl : `/api/pendente/${codigo}/attachments/${item.id}`;
+      const href = item.dataUrl ? item.dataUrl : `/api/pendente/${encodeURIComponent(String(codigo))}/attachments/${item.id}`;
       const downloadAttr = item.dataUrl ? `download="${name}"` : '';
       return `
       <li style="margin-bottom:6px;">
@@ -4864,6 +5535,28 @@ function renderAnexosLista(codigo, anexos) {
 }
 
 function carregarDaBacklog(categoriaId) {
+  const localSnapshot = getLocalDatasetCache()?.[categoriaId];
+  const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
+  const shouldPreserveManualImport = ['empresarial', 'mdu-ongoing'].includes(categoriaId)
+    && Boolean(localSnapshot?.locked)
+    && localItems.length;
+
+  if (shouldPreserveManualImport) {
+    applyDatasetToState(categoriaId, localItems);
+
+    if (categoriaId === 'empresarial') {
+      renderTabelaEmpresarial(`tabela-${categoriaId}`, localItems);
+      popularFiltrosEmpresarial(localItems);
+    } else if (categoriaId === 'mdu-ongoing') {
+      renderTabelaMduOngoing(`tabela-${categoriaId}`, localItems);
+    }
+
+    atualizarContadores();
+    invalidateVisaoGerenciaCache();
+    agendarRenderVisaoGerencia();
+    return;
+  }
+
   // Carregar automaticamente da BACKLOG via API
   fetch(`/api/backlog/${categoriaId}`, { credentials: "include" })
     .then(response => {
@@ -4924,7 +5617,7 @@ function carregarDadosCategoria(categoriaId) {
   }
 
   // Verificar se já temos dados carregados para esta categoria
-  let dados = dadosPorCategoria[categoriaId];
+  let dados = getPreferredDataset(categoriaId);
 
   const localCache = getLocalDatasetCache();
   if ((!dados || dados.length === 0) && Array.isArray(localCache?.[categoriaId]?.items) && localCache[categoriaId].items.length) {
