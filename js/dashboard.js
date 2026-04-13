@@ -333,6 +333,14 @@ async function carregarDadosCompartilhados() {
       // Evita que um snapshot vazio do servidor apague dados já carregados localmente.
       if (items.length || !existingItems.length) {
         applyDatasetToState(categoria, items);
+        // Mantem o card Empresarial estavel no cliente entre sincronizacoes periodicas.
+        if (categoria === 'empresarial' && items.length) {
+          cacheDatasetLocally(categoria, items, {
+            source: snapshot?.source || 'shared',
+            updatedAt: snapshot?.updated_at || snapshot?.updatedAt || new Date().toISOString(),
+            locked: true,
+          });
+        }
       }
     });
 
@@ -5703,7 +5711,10 @@ function carregarDaBacklog(categoriaId) {
 
       applyDatasetToState(categoriaId, dados);
       if (['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede'].includes(categoriaId)) {
-        persistirDadosCompartilhados(categoriaId, dados);
+        persistirDadosCompartilhados(categoriaId, dados, {
+          source: 'shared',
+          locked: categoriaId === 'empresarial',
+        });
       }
       
       // Re-renderizar após carregar
