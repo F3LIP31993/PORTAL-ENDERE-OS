@@ -5002,7 +5002,8 @@ async function visualizarNovoEntrante(index) {
     motivoLabel: 'Motivo Geral',
     heroPills: [
       { label: 'COD-MDUGO', value: codigo },
-      { label: 'RESPONSÁVEL', value: responsavelAceite },
+      { label: 'NOME', value: dadosCliente },
+      { label: 'CONTATO', value: contato },
       { label: 'STATUS', value: status, badge: true },
       { label: 'MOTIVO', value: motivo, badge: true }
     ]
