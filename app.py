@@ -897,6 +897,22 @@ def api_save_shared_dataset(categoria):
     return jsonify({"success": True, "category": categoria, "count": len(items)})
 
 
+@app.route("/api/projeto_f_dataset", methods=["GET"])
+@require_login
+def api_projeto_f_dataset():
+    """Retorna dados do Projeto F para qualquer usuario autenticado."""
+    try:
+        df = carregar_projeto_f()
+        if df is None or df.empty:
+            return jsonify({"items": []})
+
+        rows = df.to_dict(orient="records")
+        return jsonify({"items": rows})
+    except Exception as e:
+        app.logger.warning("Erro ao carregar dataset Projeto F: %s", e)
+        return jsonify({"items": [], "error": "Falha ao carregar Projeto F"}), 500
+
+
 @app.route("/", defaults={"path": "login.html"})
 @app.route("/<path:path>")
 def serve_static(path):

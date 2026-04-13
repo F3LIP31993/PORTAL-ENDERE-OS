@@ -5832,16 +5832,30 @@ function carregarDadosCategoria(categoriaId) {
       }
     } else if (categoriaId === 'projeto-f') {
       if ((!dados || dados.length === 0) && window.location.protocol.startsWith('http')) {
-        fetch('/api/shared_datasets', { credentials: 'include' })
+        fetch('/api/projeto_f_dataset', { credentials: 'include' })
           .then(response => response.ok ? response.json() : null)
           .then(payload => {
-            const itensCompartilhados = payload?.datasets?.['projeto-f']?.items;
-            if (Array.isArray(itensCompartilhados) && itensCompartilhados.length) {
-              applyDatasetToState('projeto-f', itensCompartilhados);
-              cacheDatasetLocally('projeto-f', itensCompartilhados, { source: 'shared' });
-              renderTabelaProjetoF(tabelaId, itensCompartilhados);
+            const itensProjetoF = payload?.items;
+            if (Array.isArray(itensProjetoF) && itensProjetoF.length) {
+              applyDatasetToState('projeto-f', itensProjetoF);
+              cacheDatasetLocally('projeto-f', itensProjetoF, { source: 'api-projeto-f' });
+              renderTabelaProjetoF(tabelaId, itensProjetoF);
               atualizarContadores();
+              return;
             }
+
+            // Fallback legado: tenta dataset compartilhado se a API dedicada retornar vazio.
+            return fetch('/api/shared_datasets', { credentials: 'include' })
+              .then(resp => resp.ok ? resp.json() : null)
+              .then(sharedPayload => {
+                const itensCompartilhados = sharedPayload?.datasets?.['projeto-f']?.items;
+                if (Array.isArray(itensCompartilhados) && itensCompartilhados.length) {
+                  applyDatasetToState('projeto-f', itensCompartilhados);
+                  cacheDatasetLocally('projeto-f', itensCompartilhados, { source: 'shared' });
+                  renderTabelaProjetoF(tabelaId, itensCompartilhados);
+                  atualizarContadores();
+                }
+              });
           })
           .catch(() => {});
       }
