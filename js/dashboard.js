@@ -4560,11 +4560,10 @@ function importarPlanilhaEpoNovos() {
   if (!file) return;
   if (statusEl) statusEl.textContent = 'Importando...';
 
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const text = String(e.target?.result || '').replace(/^\uFEFF/, '');
-    const delimiter = (text.split(/\r?\n/)[0] || '').includes(';') ? ';' : ',';
-    const linhas = parseGenericCsvRows(text, delimiter);
+  const processarTexto = (text) => {
+    const textClean = text.replace(/^\uFEFF/, '');
+    const delimiter = (textClean.split(/\r?\n/)[0] || '').includes(';') ? ';' : ',';
+    const linhas = parseGenericCsvRows(textClean, delimiter);
 
     const vistorias = linhas.filter(item => {
       const s = (getField(item, 'STATUS_GERAL', 'STATUS', 'status') || '').toString().trim();
@@ -4592,6 +4591,20 @@ function importarPlanilhaEpoNovos() {
 
     if (epoAcaoAtual === 'novos' && epoSelecionadaAtual) renderNovosEntrantesEpo();
     if (input) input.value = '';
+  };
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const text = String(e.target?.result || '');
+    // Se contiver caractere de substituição, o arquivo é ANSI — relê como windows-1252
+    if (text.includes('\ufffd')) {
+      const reader2 = new FileReader();
+      reader2.onload = (e2) => processarTexto(String(e2.target?.result || ''));
+      reader2.onerror = () => { if (statusEl) statusEl.textContent = '⚠️ Erro ao ler arquivo.'; };
+      reader2.readAsText(file, 'windows-1252');
+    } else {
+      processarTexto(text);
+    }
   };
   reader.onerror = () => { if (statusEl) statusEl.textContent = '⚠️ Erro ao ler arquivo.'; };
   reader.readAsText(file);
@@ -4886,7 +4899,6 @@ function renderNovosEntrantesEpo() {
         <td>${escapeHtml(cidade)}</td>
         <td>${escapeHtml(solicitante)}</td>
         <td>${escapeHtml(status)}</td>
-        <td>${escapeHtml(motivo)}</td>
         <td>
           <div class="epo-inline-actions">
             <button type="button" class="btn-secondary" onclick="visualizarNovoEntrante(${idx})">Visualizar</button>
@@ -4912,7 +4924,6 @@ function renderNovosEntrantesEpo() {
             <th>CIDADE</th>
             <th>SOLICITANTE</th>
             <th>STATUS_GERAL</th>
-            <th>MOTIVO_GERAL</th>
             <th>Ações</th>
           </tr>
         </thead>
