@@ -31,7 +31,7 @@ function saveStoredUsers(users) {
   localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users || []));
 }
 
-function finalizarCadastroComAcesso({ nome, email, usuario, senha, role = "viewer" }, erroEl) {
+function registrarSolicitacaoPendente({ nome, email, usuario, senha }, erroEl) {
   const users = getStoredUsers();
   const idx = users.findIndex(u => u.username.toLowerCase() === usuario.toLowerCase());
   const now = new Date().toISOString();
@@ -41,9 +41,9 @@ function finalizarCadastroComAcesso({ nome, email, usuario, senha, role = "viewe
     password: senha,
     name: nome,
     email,
-    role,
+    role: "pending",
     createdAt: users[idx]?.createdAt || now,
-    approvedAt: now,
+    approvedAt: null,
   };
 
   if (idx === -1) {
@@ -53,15 +53,15 @@ function finalizarCadastroComAcesso({ nome, email, usuario, senha, role = "viewe
   }
 
   saveStoredUsers(users);
-  localStorage.setItem(STORAGE_CURRENT_USER_KEY, usuario);
+  localStorage.removeItem(STORAGE_CURRENT_USER_KEY);
 
   erroEl.style.color = "#16a34a";
-  erroEl.innerHTML = "✅ Cadastro realizado com sucesso! Redirecionando para o portal...";
+  erroEl.innerHTML = "✅ Solicitação enviada ao administrador. Aguarde a aprovação para acessar o portal.";
   document.querySelector(".btn-login").disabled = true;
 
   window.setTimeout(() => {
-    window.location.href = "dashboard.html";
-  }, 900);
+    window.location.href = "login.html";
+  }, 1400);
 }
 
 function register(event) {
@@ -111,12 +111,11 @@ function register(event) {
           throw new Error(body.error || "Falha ao registrar");
         }
 
-        finalizarCadastroComAcesso({
+        registrarSolicitacaoPendente({
           nome,
           email,
           usuario,
-          senha,
-          role: body?.user?.role || 'viewer'
+          senha
         }, erroEl);
       })
       .catch((err) => {
@@ -128,12 +127,11 @@ function register(event) {
           return;
         }
 
-        finalizarCadastroComAcesso({
+        registrarSolicitacaoPendente({
           nome,
           email,
           usuario,
-          senha,
-          role: 'viewer'
+          senha
         }, erroEl);
       });
 
@@ -148,11 +146,10 @@ function register(event) {
     return;
   }
 
-  finalizarCadastroComAcesso({
+  registrarSolicitacaoPendente({
     nome,
     email,
     usuario,
-    senha,
-    role: 'viewer'
+    senha
   }, erroEl);
 }

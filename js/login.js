@@ -40,6 +40,31 @@ function findUser(username) {
   return users.find(u => u.username.toLowerCase() === username.toLowerCase()) || null;
 }
 
+function upsertStoredUser(user, password = "") {
+  if (!user || !user.username) return;
+
+  const users = getStoredUsers();
+  const idx = users.findIndex(u => u.username.toLowerCase() === user.username.toLowerCase());
+  const now = new Date().toISOString();
+  const normalizedUser = {
+    username: user.username,
+    password: password || users[idx]?.password || user.password || "",
+    name: user.name || users[idx]?.name || user.username,
+    email: user.email || users[idx]?.email || "",
+    role: user.role || users[idx]?.role || "viewer",
+    createdAt: users[idx]?.createdAt || now,
+    approvedAt: user.approvedAt || users[idx]?.approvedAt || now,
+  };
+
+  if (idx === -1) {
+    users.push(normalizedUser);
+  } else {
+    users[idx] = { ...users[idx], ...normalizedUser };
+  }
+
+  saveStoredUsers(users);
+}
+
 function login(event) {
   event.preventDefault();
 
@@ -85,7 +110,17 @@ function login(event) {
         if (!res.ok) {
           throw new Error(body.error || "Falha ao autenticar");
         }
-        localStorage.setItem(STORAGE_CURRENT_USER_KEY, usuario);
+
+        const loggedUser = body?.user || {
+          username: usuario,
+          name: usuario,
+          email: "",
+          role: "viewer",
+        };
+
+        upsertStoredUser(loggedUser, senha);
+        localStorage.setItem(STORAGE_CURRENT_USER_KEY, loggedUser.username || usuario);
+
         erroEl.style.color = "#16a34a";
         erroEl.innerText = "✅ Bem-vindo! Redirecionando...";
         setTimeout(() => {

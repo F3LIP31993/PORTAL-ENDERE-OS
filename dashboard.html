@@ -19,6 +19,7 @@
       <button onclick="mostrarSecao('historico')" class="menu-btn" data-admin-only="true">🕒 Histórico</button>
       <button onclick="mostrarSecao('pesquisa')" class="menu-btn">📈 Visão Gerência</button>
       <button onclick="mostrarSecao('relatorios')" class="menu-btn" data-admin-only="true">📊 Relatórios</button>
+      <button onclick="mostrarSecao('reuniao')" class="menu-btn">🗓️ Reunião</button>
     </nav>
 
     <button class="sair" onclick="logout()">Sair</button>
@@ -127,6 +128,20 @@
           <p class="categoria-subtitulo">MDU em Progresso</p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
+
+        <div class="categoria-card" onclick="abrirCategoria('epo')">
+          <div class="categoria-icon">👷</div>
+          <h3 class="categoria-titulo">EPO</h3>
+          <p class="categoria-subtitulo">Gestão por parceira</p>
+          <p class="categoria-acao">Clique para abrir</p>
+        </div>
+
+        <div class="categoria-card" onclick="abrirCategoria('financeiro')">
+          <div class="categoria-icon">💰</div>
+          <h3 class="categoria-titulo">Financeiro</h3>
+          <p class="categoria-subtitulo">Acompanhamento financeiro</p>
+          <p class="categoria-acao">Clique para abrir</p>
+        </div>
       </div>
     </section>
 
@@ -200,6 +215,55 @@
       <p class="visao-gerencia-intro">Painel executivo com leitura rápida dos indicadores de ONGOING e Projeto F, destacando resultados por período, EPO e status.</p>
 
       <div id="visao-gerencia-analytics" class="visao-gerencia-analytics"></div>
+    </section>
+
+    <section id="epo" class="secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>👷 EPO</h1>
+      </div>
+      <div class="card epo-premium-card">
+        <div class="epo-heading-wrap">
+          <h2 class="epo-heading">EPO</h2>
+        </div>
+
+        <div class="epo-pill-grid" role="list" aria-label="Lista de EPOs">
+          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('ACESSO')">ACESSO</button>
+          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('ANTEC')">ANTEC</button>
+          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('ARCAD')">ARCAD</button>
+          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('BASIC')">BASIC</button>
+          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('CANTOIA')">CANTOIA</button>
+          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('CSC')">CSC</button>
+          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('DANLEX')">DANLEX</button>
+          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('ELETRONET')">ELETRONET</button>
+          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('PSNET')">PSNET</button>
+          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('SCRIPT_CALL')">SCRIPT_CALL</button>
+          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('VISIUM')">VISIUM</button>
+        </div>
+
+        <div id="epo-action-panel" class="epo-action-panel" style="display:none;">
+          <p class="epo-action-title">EPO selecionada: <strong id="epo-selected-name">-</strong></p>
+          <div class="epo-action-buttons">
+            <button type="button" class="btn-primary epo-action-trigger" data-action="equipes" onclick="executarAcaoEpo('equipes')">LISTA DE EQUIPES</button>
+            <button type="button" class="btn-secondary epo-action-trigger" data-action="novos" onclick="executarAcaoEpo('novos')">NOVOS ENTRANTES</button>
+          </div>
+          <div id="epo-action-content" class="epo-action-content"></div>
+          <div id="epo-action-result" class="epo-action-result">Selecione uma EPO para habilitar as opções.</div>
+        </div>
+      </div>
+
+    </section>
+
+    <section id="financeiro" class="secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>💰 Financeiro</h1>
+      </div>
+      <div class="card">
+        <h2 style="margin-top:0;">Painel Financeiro</h2>
+        <p>Área criada para acompanhar valores, medições, aprovações e status financeiro do portal.</p>
+        <p style="opacity:.8; margin-top:8px;">Quando quiser, eu posso estruturar os indicadores e relatórios desta seção.</p>
+      </div>
     </section>
 
     <!-- SEÇÃO: PENDENTE AUTORIZAÇÃO -->
@@ -657,6 +721,22 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <section id="reuniao" class="secao">
+      <div class="categoria-header">
+        <h1>🗓️ Reunião</h1>
+      </div>
+      <div class="card">
+        <h2 style="margin-top:0;">Espaço de reunião</h2>
+        <p>Use esta área para registrar pauta, alinhamentos, decisões e próximos passos do portal.</p>
+        <ul style="margin-top:10px; padding-left:18px; line-height:1.7;">
+          <li>Pauta do dia</li>
+          <li>Decisões tomadas</li>
+          <li>Pendências e responsáveis</li>
+          <li>Próxima reunião</li>
+        </ul>
       </div>
     </section>
 

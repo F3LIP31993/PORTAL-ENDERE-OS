@@ -687,7 +687,10 @@ def api_login():
         return jsonify({"error": "Senha incorreta"}), 401
 
     if user.role == "pending":
-        return jsonify({"error": "Sua solicitação ainda está pendente"}), 403
+        return jsonify({"error": "Sua solicitação está aguardando aprovação do administrador"}), 403
+
+    if user.role == "rejected":
+        return jsonify({"error": "Seu acesso foi recusado. Fale com o administrador do portal"}), 403
 
     session["username"] = user.username
     return jsonify({"user": {"username": user.username, "name": user.name, "email": user.email, "role": user.role}})
@@ -721,29 +724,28 @@ def api_register():
         password=password,
         name=nome,
         email=email,
-        role="viewer",
+        role="pending",
         created_at=now,
-        approved_at=now,
+        approved_at=None,
     )
     db.session.add(user)
     db.session.commit()
 
-    session["username"] = user.username
-
     # Notificar administrador via email (se configurado)
-    subject = f"Novo acesso cadastrado: {username}"
+    subject = f"Nova solicitação de acesso: {username}"
     body = (
-        f"Um novo usuário foi cadastrado no portal.\n\n"
+        f"Uma nova solicitação de acesso foi registrada no portal.\n\n"
         f"Nome: {nome}\n"
         f"Email: {email}\n"
         f"Usuário: {username}\n"
-        f"Perfil: viewer\n"
-        f"Data: {now.isoformat()}\n"
+        f"Status inicial: pending\n"
+        f"Data: {now.isoformat()}\n\n"
+        f"A decisão deve ser feita pelo administrador do portal."
     )
     send_admin_email(subject, body)
 
     return jsonify({
-        "message": "Cadastro realizado com sucesso",
+        "message": "Solicitação enviada com sucesso. Aguarde a aprovação do administrador.",
         "user": {
             "username": user.username,
             "name": user.name,
