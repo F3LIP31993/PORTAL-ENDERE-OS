@@ -223,22 +223,27 @@
         <h1>👷 EPO</h1>
       </div>
       <div class="card epo-premium-card">
-        <div class="epo-heading-wrap">
+        <div class="epo-heading-wrap" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <h2 class="epo-heading">EPO</h2>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input id="epo-novos-import-file" type="file" accept=".csv,.txt,.xlsx" style="display:none;" onchange="importarPlanilhaEpoNovos()" />
+            <button type="button" class="btn-secondary epo-clip-upload" onclick="abrirImportEpoNovos()" title="Importar planilha de endereços (1.VISTORIA)">📎</button>
+            <span id="epo-novos-import-status" style="font-size:11px;color:#64748b;font-weight:600;"></span>
+          </div>
         </div>
 
         <div class="epo-pill-grid" role="list" aria-label="Lista de EPOs">
-          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('ACESSO')">ACESSO</button>
-          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('ANTEC')">ANTEC</button>
-          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('ARCAD')">ARCAD</button>
-          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('BASIC')">BASIC</button>
-          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('CANTOIA')">CANTOIA</button>
-          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('CSC')">CSC</button>
-          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('DANLEX')">DANLEX</button>
-          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('ELETRONET')">ELETRONET</button>
-          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('PSNET')">PSNET</button>
-          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('SCRIPT_CALL')">SCRIPT_CALL</button>
-          <button type="button" class="epo-pill" role="listitem" onclick="selecionarEpo('VISIUM')">VISIUM</button>
+          <button type="button" class="epo-pill" data-epo="ACESSO" role="listitem" onclick="selecionarEpo('ACESSO')">ACESSO<span class="epo-pill-count"></span></button>
+          <button type="button" class="epo-pill" data-epo="ANTEC" role="listitem" onclick="selecionarEpo('ANTEC')">ANTEC<span class="epo-pill-count"></span></button>
+          <button type="button" class="epo-pill" data-epo="ARCAD" role="listitem" onclick="selecionarEpo('ARCAD')">ARCAD<span class="epo-pill-count"></span></button>
+          <button type="button" class="epo-pill" data-epo="BASIC" role="listitem" onclick="selecionarEpo('BASIC')">BASIC<span class="epo-pill-count"></span></button>
+          <button type="button" class="epo-pill" data-epo="CANTOIA" role="listitem" onclick="selecionarEpo('CANTOIA')">CANTOIA<span class="epo-pill-count"></span></button>
+          <button type="button" class="epo-pill" data-epo="CSC" role="listitem" onclick="selecionarEpo('CSC')">CSC<span class="epo-pill-count"></span></button>
+          <button type="button" class="epo-pill" data-epo="DANLEX" role="listitem" onclick="selecionarEpo('DANLEX')">DANLEX<span class="epo-pill-count"></span></button>
+          <button type="button" class="epo-pill" data-epo="ELETRONET" role="listitem" onclick="selecionarEpo('ELETRONET')">ELETRONET<span class="epo-pill-count"></span></button>
+          <button type="button" class="epo-pill" data-epo="PSNET" role="listitem" onclick="selecionarEpo('PSNET')">PSNET<span class="epo-pill-count"></span></button>
+          <button type="button" class="epo-pill" data-epo="SCRIPT_CALL" role="listitem" onclick="selecionarEpo('SCRIPT_CALL')">SCRIPT_CALL<span class="epo-pill-count"></span></button>
+          <button type="button" class="epo-pill" data-epo="VISIUM" role="listitem" onclick="selecionarEpo('VISIUM')">VISIUM<span class="epo-pill-count"></span></button>
         </div>
 
         <div id="epo-action-panel" class="epo-action-panel" style="display:none;">

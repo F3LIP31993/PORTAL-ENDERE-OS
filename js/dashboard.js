@@ -4522,6 +4522,90 @@ let epoAcaoAtual = '';
 let epoUltimoAceite = null;
 const STORAGE_EPO_TECNICOS_KEY = 'portalEpoTecnicos';
 const STORAGE_EPO_ACEITES_KEY = 'portalEpoAceites';
+const STORAGE_EPO_NOVOS_KEY = 'portalEpoNovosEntrantes';
+
+const EPO_PILLS = ['ACESSO','ANTEC','ARCAD','BASIC','CANTOIA','CSC','DANLEX','ELETRONET','PSNET','SCRIPT_CALL','VISIUM'];
+
+function getEpoNovosStore() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_EPO_NOVOS_KEY) || '{}'); } catch { return {}; }
+}
+
+function saveEpoNovosStore(store) {
+  localStorage.setItem(STORAGE_EPO_NOVOS_KEY, JSON.stringify(store || {}));
+}
+
+function getEpoNovosParaEpo(nomeEpo) {
+  const store = getEpoNovosStore();
+  return Array.isArray(store[nomeEpo]) ? store[nomeEpo] : [];
+}
+
+function abrirImportEpoNovos() {
+  const input = document.getElementById('epo-novos-import-file');
+  if (input) { input.value = ''; input.click(); }
+}
+
+function _resolverEpoDaLinha(item) {
+  const EPO_KEYS = ['EPO','epo','PARCEIRA','parceira','CLUSTER','cluster','EPO / Cluster','epo / cluster'];
+  const raw = (getField(item, ...EPO_KEYS) || '').toString().trim().toUpperCase();
+  if (!raw) return null;
+  const exact = EPO_PILLS.find(p => p === raw);
+  if (exact) return exact;
+  return EPO_PILLS.find(p => raw.includes(p) || p.includes(raw)) || raw;
+}
+
+function importarPlanilhaEpoNovos() {
+  const input = document.getElementById('epo-novos-import-file');
+  const statusEl = document.getElementById('epo-novos-import-status');
+  const file = input?.files?.[0];
+  if (!file) return;
+  if (statusEl) statusEl.textContent = 'Importando...';
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const text = String(e.target?.result || '').replace(/^\uFEFF/, '');
+    const delimiter = (text.split(/\r?\n/)[0] || '').includes(';') ? ';' : ',';
+    const linhas = parseGenericCsvRows(text, delimiter);
+
+    const vistorias = linhas.filter(item => {
+      const s = (getField(item, 'STATUS_GERAL', 'STATUS', 'status') || '').toString().trim();
+      return s === '1.VISTORIA' || normalizeText(s) === '1.vistoria';
+    });
+
+    const byEpo = {};
+    vistorias.forEach(item => {
+      const key = _resolverEpoDaLinha(item);
+      if (!key) return;
+      if (!byEpo[key]) byEpo[key] = [];
+      byEpo[key].push(item);
+    });
+
+    saveEpoNovosStore(byEpo);
+    atualizarCountPillsEpo();
+
+    const total = vistorias.length;
+    const epoCount = Object.keys(byEpo).length;
+    const resumo = Object.entries(byEpo).map(([k, v]) => `${k}:${v.length}`).join(' | ');
+
+    if (statusEl) statusEl.textContent = `✅ ${total} endereços em ${epoCount} EPOs`;
+    const resultEl = document.getElementById('epo-action-result');
+    if (resultEl) resultEl.textContent = `✅ Importado: ${resumo}`;
+
+    if (epoAcaoAtual === 'novos' && epoSelecionadaAtual) renderNovosEntrantesEpo();
+    if (input) input.value = '';
+  };
+  reader.onerror = () => { if (statusEl) statusEl.textContent = '⚠️ Erro ao ler arquivo.'; };
+  reader.readAsText(file);
+}
+
+function atualizarCountPillsEpo() {
+  const store = getEpoNovosStore();
+  document.querySelectorAll('#epo .epo-pill[data-epo]').forEach(btn => {
+    const epoName = btn.dataset.epo;
+    const count = Array.isArray(store[epoName]) ? store[epoName].length : 0;
+    const span = btn.querySelector('.epo-pill-count');
+    if (span) span.textContent = count > 0 ? ` (${count})` : '';
+  });
+}
 
 function getEpoTecnicosStore() {
   try {
@@ -4761,29 +4845,33 @@ function renderNovosEntrantesEpo() {
   const container = document.getElementById('epo-action-content');
   if (!container) return;
 
-  const backlog = getBacklogParaNovosEntrantes();
-  if (!backlog.length) {
-    container.innerHTML = '<p class="epo-empty-state">Nenhum backlog carregado. Importe a base do backlog para visualizar os novos entrantes.</p>';
+  const dados = getEpoNovosParaEpo(epoSelecionadaAtual);
+  if (!dados.length) {
+    container.innerHTML = '<p class="epo-empty-state">Nenhum endereço encontrado para esta EPO. Use o 📎 para importar a planilha com STATUS 1.VISTORIA.</p>';
     return;
   }
 
   const aceitesStore = getEpoAceitesStore();
   const listaAceites = normalizeListaAceitesEpo(aceitesStore?.[epoSelecionadaAtual]);
   const aceites = new Map(listaAceites.map((item) => [String(item.codigo), item]));
-  window.__epoNovosEntrantesRows = backlog;
+  window.__epoNovosEntrantesRows = dados;
 
-  const rows = backlog.slice(0, 300).map((item, idx) => {
+  const rows = dados.map((item, idx) => {
     const codigo = String(getField(item, 'COD-MDUGO', 'cod-mdugo', 'codmdugo') || `LINHA-${idx + 1}`);
-    const endereco = `${getField(item, 'ENDEREÇO', 'ENDERECO', 'endereco')} ${getField(item, 'NUMERO', 'numero', 'num')}`.trim() || '-';
+    const tipoRede = getField(item, 'TIPO_REDE', 'tipo_rede', 'TIPO DE REDE') || '-';
+    const enderecoBase = getField(item, 'ENDEREÇO', 'ENDERECO', 'endereco') || '-';
+    const numero = getField(item, 'NUMERO', 'numero', 'num') || '-';
+    const endereco = numero && numero !== '-' ? `${enderecoBase}, ${numero}` : enderecoBase;
+    const bairro = getField(item, 'BAIRRO', 'bairro') || '-';
     const cidade = getField(item, 'CIDADE', 'cidade') || '-';
+    const solicitante = getField(item, 'SOLICITANTE', 'solicitante') || '-';
     const status = getField(item, 'STATUS_GERAL', 'STATUS', 'status') || '-';
     const motivo = getField(item, 'MOTIVO_GERAL', 'MOTIVO', 'motivo') || '-';
     const aceiteInfo = aceites.get(codigo);
     const aceito = Boolean(aceiteInfo);
     const responsavel = aceiteInfo?.responsavel || '-';
     const destaqueRecente = Boolean(
-      aceito
-      && epoUltimoAceite
+      aceito && epoUltimoAceite
       && epoUltimoAceite.epo === epoSelecionadaAtual
       && epoUltimoAceite.codigo === codigo
       && (Date.now() - Number(epoUltimoAceite.at || 0) <= 15000)
@@ -4792,8 +4880,11 @@ function renderNovosEntrantesEpo() {
     return `
       <tr class="${aceito ? 'epo-row-aceita' : ''} ${destaqueRecente ? 'epo-row-aceita-recente' : ''}">
         <td>${escapeHtml(codigo)}</td>
+        <td>${escapeHtml(tipoRede)}</td>
         <td>${escapeHtml(endereco)}</td>
+        <td>${escapeHtml(bairro)}</td>
         <td>${escapeHtml(cidade)}</td>
+        <td>${escapeHtml(solicitante)}</td>
         <td>${escapeHtml(status)}</td>
         <td>${escapeHtml(motivo)}</td>
         <td>
@@ -4808,16 +4899,19 @@ function renderNovosEntrantesEpo() {
   }).join('');
 
   container.innerHTML = `
-    <p class="epo-section-title">${escapeHtml(epoSelecionadaAtual)} • NOVOS ENTRANTES</p>
+    <p class="epo-section-title">${escapeHtml(epoSelecionadaAtual)} • NOVOS ENTRANTES (${dados.length})</p>
     <div class="epo-table-wrap">
       <table class="epo-table">
         <thead>
           <tr>
-            <th>Código</th>
-            <th>Endereço</th>
-            <th>Cidade</th>
-            <th>Status</th>
-            <th>Motivo</th>
+            <th>COD-MDUGO</th>
+            <th>TIPO_REDE</th>
+            <th>ENDEREÇO</th>
+            <th>BAIRRO</th>
+            <th>CIDADE</th>
+            <th>SOLICITANTE</th>
+            <th>STATUS_GERAL</th>
+            <th>MOTIVO_GERAL</th>
             <th>Ações</th>
           </tr>
         </thead>
@@ -4842,6 +4936,9 @@ async function visualizarNovoEntrante(index) {
   const status = getField(item, 'STATUS_GERAL', 'STATUS', 'status') || '-';
   const motivo = getField(item, 'MOTIVO_GERAL', 'MOTIVO', 'motivo') || '-';
   const obsOriginal = getField(item, 'OBS', 'OBSERVACAO', 'observacao') || '-';
+  const nodeAreaTecnica = getField(item, 'NODE&ÁREA TÉCNICA', 'NODE&AREA TECNICA', 'NODE_AREA_TECNICA', 'NODE', 'node') || '-';
+  const dadosCliente = getField(item, 'DADOS_CLIENTE', 'DADOS CLIENTE', 'dados_cliente') || '-';
+  const solicitante = getField(item, 'SOLICITANTE', 'solicitante') || '-';
 
   const aceitesStore = getEpoAceitesStore();
   const listaAceites = normalizeListaAceitesEpo(aceitesStore?.[epoSelecionadaAtual]);
@@ -4883,14 +4980,14 @@ async function visualizarNovoEntrante(index) {
   if (modalBody) {
     const extraHtml = `
       <div class="modal-extra modal-extra-grid">
-        ${renderModalInfoCard('RESPONSÁVEL DO ACEITE', responsavelAceite, { featured: true })}
-        ${renderModalInfoCard('ACEITO EM', aceiteEm)}
+        ${renderModalInfoCard('NODE&ÁREA TÉCNICA', nodeAreaTecnica, { featured: true })}
         ${renderModalInfoCard('TIPO_REDE', tipoRede, { featured: true })}
+        ${renderModalInfoCard('DADOS_CLIENTE', dadosCliente)}
         ${renderModalInfoCard('CONTATO', contato)}
-        ${renderModalInfoCard('ENDEREÇO', enderecoBase)}
-        ${renderModalInfoCard('NUMERO', numero)}
-        ${renderModalInfoCard('BAIRRO', bairro)}
-        ${renderModalInfoCard('CIDADE', cidade)}
+        ${renderModalInfoCard('OBS', obsOriginal)}
+        ${renderModalInfoCard('SOLICITANTE', solicitante)}
+        ${renderModalInfoCard('RESPONSÁVEL DO ACEITE', responsavelAceite)}
+        ${renderModalInfoCard('ACEITO EM', aceiteEm)}
       </div>
     `;
     const obsRow = document.getElementById('modal-obs-original')?.closest('.modal-row');
@@ -4998,11 +5095,10 @@ function selecionarEpo(nomeEpo) {
   const selectedNameEl = document.getElementById('epo-selected-name');
   const resultEl = document.getElementById('epo-action-result');
 
-  document.querySelectorAll('#epo .epo-pill').forEach(btn => {
-    const texto = (btn.textContent || '').replace(/\s+/g, ' ').trim();
-    const nomeNormalizado = texto;
-    btn.classList.toggle('active', nomeNormalizado === epoSelecionadaAtual);
+  document.querySelectorAll('#epo .epo-pill[data-epo]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.epo === epoSelecionadaAtual);
   });
+  atualizarCountPillsEpo();
 
   if (panel) panel.style.display = 'block';
   if (selectedNameEl) selectedNameEl.textContent = epoSelecionadaAtual || '-';

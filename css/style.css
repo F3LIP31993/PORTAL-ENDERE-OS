@@ -3084,6 +3084,22 @@ td:first-child {
   line-height: 1;
 }
 
+.epo-pill-count {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  background: rgba(0,0,0,0.12);
+  border-radius: 999px;
+  padding: 1px 5px;
+  margin-left: 4px;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+.epo-pill.active .epo-pill-count {
+  background: rgba(255,255,255,0.25);
+}
+
 .epo-action-panel {
   margin-top: 16px;
   padding: 14px;
