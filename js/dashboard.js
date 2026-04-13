@@ -4861,7 +4861,6 @@ function renderNovosEntrantesEpo() {
     const tipoRede = getField(item, 'TIPO_REDE', 'tipo_rede', 'TIPO DE REDE') || '-';
     const enderecoBase = getField(item, 'ENDEREÇO', 'ENDERECO', 'endereco') || '-';
     const numero = getField(item, 'NUMERO', 'numero', 'num') || '-';
-    const endereco = numero && numero !== '-' ? `${enderecoBase}, ${numero}` : enderecoBase;
     const bairro = getField(item, 'BAIRRO', 'bairro') || '-';
     const cidade = getField(item, 'CIDADE', 'cidade') || '-';
     const solicitante = getField(item, 'SOLICITANTE', 'solicitante') || '-';
@@ -4881,7 +4880,8 @@ function renderNovosEntrantesEpo() {
       <tr class="${aceito ? 'epo-row-aceita' : ''} ${destaqueRecente ? 'epo-row-aceita-recente' : ''}">
         <td>${escapeHtml(codigo)}</td>
         <td>${escapeHtml(tipoRede)}</td>
-        <td>${escapeHtml(endereco)}</td>
+        <td>${escapeHtml(enderecoBase)}</td>
+        <td>${escapeHtml(numero)}</td>
         <td>${escapeHtml(bairro)}</td>
         <td>${escapeHtml(cidade)}</td>
         <td>${escapeHtml(solicitante)}</td>
@@ -4907,6 +4907,7 @@ function renderNovosEntrantesEpo() {
             <th>COD-MDUGO</th>
             <th>TIPO_REDE</th>
             <th>ENDEREÇO</th>
+            <th>NUMERO</th>
             <th>BAIRRO</th>
             <th>CIDADE</th>
             <th>SOLICITANTE</th>
@@ -4928,7 +4929,7 @@ async function visualizarNovoEntrante(index) {
   const codigo = String(getField(item, 'COD-MDUGO', 'cod-mdugo', 'codmdugo') || `LINHA-${index + 1}`);
   const enderecoBase = getField(item, 'ENDEREÇO', 'ENDERECO', 'endereco') || '-';
   const numero = getField(item, 'NUMERO', 'numero', 'num') || '-';
-  const enderecoCompleto = `${enderecoBase} ${numero === '-' ? '' : numero}`.trim() || '-';
+  const enderecoCompleto = numero && numero !== '-' ? `${enderecoBase}, ${numero}` : enderecoBase || '-';
   const bairro = getField(item, 'BAIRRO', 'bairro') || '-';
   const cidade = getField(item, 'CIDADE', 'cidade') || '-';
   const tipoRede = getField(item, 'TIPO_REDE', 'tipo_rede', 'TIPO DE REDE') || '-';
@@ -4978,6 +4979,8 @@ async function visualizarNovoEntrante(index) {
 
   const modalBody = document.querySelector('#modal-obs .modal-body');
   if (modalBody) {
+    const oldExtra = modalBody.querySelector('.modal-extra.modal-extra-grid');
+    if (oldExtra) oldExtra.remove();
     const extraHtml = `
       <div class="modal-extra modal-extra-grid">
         ${renderModalInfoCard('NODE&ÁREA TÉCNICA', nodeAreaTecnica, { featured: true })}
