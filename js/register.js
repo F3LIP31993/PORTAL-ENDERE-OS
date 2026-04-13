@@ -99,10 +99,11 @@ function register(event) {
 
   const useApi = window.location.protocol.startsWith("http");
   if (useApi) {
+    const obs = document.getElementById("obs")?.value.trim() || "";
     fetch("/api/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: nome, email, username: usuario, password: senha }),
+      body: JSON.stringify({ name: nome, email, username: usuario, password: senha, obs }),
       credentials: "include",
     })
       .then(async (res) => {

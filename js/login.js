@@ -107,8 +107,13 @@ function login(event) {
     })
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
+
         if (!res.ok) {
-          throw new Error(body.error || "Falha ao autenticar");
+          // Erro HTTP do servidor — exibir mensagem diretamente, sem fallback local.
+          erroEl.innerText = `❌ ${body.error || "Falha ao autenticar"}`;
+          btnLogin.disabled = false;
+          btnLogin.textContent = "Entrar";
+          return;
         }
 
         const loggedUser = body?.user || {
@@ -127,8 +132,8 @@ function login(event) {
           window.location.href = "dashboard.html";
         }, 600);
       })
-      .catch((err) => {
-        // Fallback para o modo local, se o servidor não respondeu.
+      .catch(() => {
+        // Apenas erros de rede chegam aqui (servidor inacessível) — fallback local.
         const user = findUser(usuario);
         if (!user) {
           erroEl.innerText = "❌ Usuário não encontrado. Cadastre-se para solicitar acesso.";

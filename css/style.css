@@ -3821,6 +3821,85 @@ td:first-child {
 }
 
 @media (max-width: 768px) {
+  /* Sidebar vira barra horizontal no topo */
+  .layout {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    width: 100% !important;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 8px 12px !important;
+    gap: 4px;
+    height: auto !important;
+    min-height: 0 !important;
+    box-sizing: border-box;
+  }
+
+  .sidebar h2 {
+    font-size: 11px;
+    margin-bottom: 0;
+    margin-right: 6px;
+    white-space: nowrap;
+  }
+
+  .sidebar-menu {
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-bottom: 0;
+    flex: 1;
+  }
+
+  .menu-btn {
+    font-size: 10px !important;
+    padding: 5px 8px !important;
+    white-space: nowrap;
+  }
+
+  .sidebar .sair {
+    margin-top: 0 !important;
+    font-size: 10px;
+    padding: 5px 10px;
+    white-space: nowrap;
+  }
+
+  /* Conteúdo ocupa largura total */
+  .main {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .main > .secao {
+    padding: 10px 8px;
+  }
+
+  /* Tabelas: scroll horizontal para evitar texto vertical */
+  .categoria-secao .card,
+  .card {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .categoria-secao .card table {
+    table-layout: auto !important;
+    width: auto !important;
+    min-width: 500px;
+    white-space: nowrap;
+  }
+
+  .categoria-secao .card table th,
+  .categoria-secao .card table td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+  }
+
   .categorias-grid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 15px;

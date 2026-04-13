@@ -118,6 +118,7 @@ class User(db.Model):
     role = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
     approved_at = db.Column(db.DateTime, nullable=True)
+    registration_obs = db.Column(db.Text, nullable=True)
 
 
 class PendenteNote(db.Model):
@@ -175,8 +176,20 @@ class SharedDataset(db.Model):
 
 
 def init_db():
+    from sqlalchemy import text, inspect as sqla_inspect
     # Cria as tabelas se ainda não existirem e garante admin padrão
     db.create_all()
+
+    # Migração: adiciona coluna registration_obs se ainda não existir
+    try:
+        insp = sqla_inspect(db.engine)
+        cols = [c["name"] for c in insp.get_columns("users")]
+        if "registration_obs" not in cols:
+            with db.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN registration_obs TEXT"))
+                conn.commit()
+    except Exception as e:
+        app.logger.warning("Migração registration_obs ignorada: %s", e)
 
     admin = User.query.filter_by(username="admin").first()
     if not admin:
@@ -589,9 +602,10 @@ def build_notifications_feed(limit: int = 30):
         events.append({
             "type": "cadastro",
             "source": "Cadastro",
-            "title": f"Novo cadastro: {u.name or u.username}",
+            "title": f"{u.name or u.username} fez o cadastro. O que será permitido?",
             "subtitle": f"Usuário: {u.username}",
-            "message": f"E-mail: {u.email or 'sem e-mail'} • Perfil: {role_label}",
+            "message": f"E-mail: {u.email or 'sem e-mail'} • Status: {role_label}",
+            "obs": u.registration_obs or "",
             "created_by": u.username,
             "created_at": u.created_at.isoformat() if u.created_at else None,
             "reference": u.username,
@@ -710,6 +724,7 @@ def api_register():
     email = (data.get("email") or "").strip()
     username = (data.get("username") or "").strip()
     password = (data.get("password") or "").strip()
+    obs = (data.get("obs") or "").strip()[:500]
 
     if not nome or not email or not username or not password:
         return jsonify({"error": "Todos os campos são obrigatórios"}), 400
@@ -727,6 +742,7 @@ def api_register():
         role="pending",
         created_at=now,
         approved_at=None,
+        registration_obs=obs or None,
     )
     db.session.add(user)
     db.session.commit()
@@ -739,8 +755,9 @@ def api_register():
         f"Email: {email}\n"
         f"Usuário: {username}\n"
         f"Status inicial: pending\n"
-        f"Data: {now.isoformat()}\n\n"
-        f"A decisão deve ser feita pelo administrador do portal."
+        f"Data: {now.isoformat()}\n"
+        + (f"OBS: {obs}\n" if obs else "")
+        + f"\nA decisão deve ser feita pelo administrador do portal."
     )
     send_admin_email(subject, body)
 

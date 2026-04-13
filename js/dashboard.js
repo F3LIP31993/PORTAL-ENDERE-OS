@@ -349,8 +349,8 @@ async function carregarDadosCompartilhados() {
       // Evita que um snapshot vazio do servidor apague dados já carregados localmente.
       if (items.length || !existingItems.length) {
         applyDatasetToState(categoria, items);
-        // Mantem o card Empresarial estavel no cliente entre sincronizacoes periodicas.
-        if (categoria === 'empresarial' && items.length) {
+        // Mantém snapshot local atualizado e bloqueado para todas as categorias com dados
+        if (items.length) {
           cacheDatasetLocally(categoria, items, {
             source: snapshot?.source || 'shared',
             updatedAt: snapshot?.updated_at || snapshot?.updatedAt || new Date().toISOString(),
@@ -410,8 +410,8 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
     return;
   }
 
-  // Evita sobrescrever o snapshot do Empresarial com payload vazio em sync automatico.
-  if (categoria === "empresarial" && items.length === 0) {
+  // Evita sobrescrever snapshot local não-vazio com payload vazio em sync automático.
+  if (items.length === 0) {
     const localSnapshot = getLocalDatasetCache()?.[categoria];
     const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
     if (localItems.length) {
@@ -856,11 +856,11 @@ async function renderNotificationList() {
   const [serverPendings, events] = await Promise.all([serverPendingsPromise, fetchNotificationFeed()]);
 
   const hasLocal = pendings.length > 0;
-  const hasServer = Array.isArray(serverPendings) && serverPendings.length > 0;
+  const pendingSet = new Set((serverPendings || []).map(u => u.username));
   const registrationEvents = (events || []).filter(event => event.type === 'cadastro');
   const noteEvents = (events || []).filter(event => event.type === 'observacao');
 
-  if (!hasLocal && !hasServer && registrationEvents.length === 0 && noteEvents.length === 0) {
+  if (!hasLocal && registrationEvents.length === 0 && noteEvents.length === 0) {
     list.innerHTML = '<p class="notification-empty">Nenhuma notificação recente.</p>';
     return;
   }
@@ -883,13 +883,36 @@ async function renderNotificationList() {
     `;
   };
 
+  const renderRegistrationCard = (event) => {
+    const username = event?.reference || event?.created_by || '';
+    const isPending = pendingSet.has(username);
+    const title = escapeHtml(event?.title || 'Novo cadastro');
+    const message = escapeHtml(event?.message || '');
+    const obs = escapeHtml(event?.obs || '');
+    const created = event?.created_at ? new Date(event.created_at).toLocaleString() : '-';
+    const safeUser = escapeHtml(username);
+
+    return `
+      <div class="notification-item">
+        <p><strong>${title}</strong></p>
+        ${obs ? `<p><em>OBS: ${obs}</em></p>` : ''}
+        ${message ? `<p>${message}</p>` : ''}
+        <p class="notification-meta">${created}</p>
+        ${isPending ? `
+          <div class="notification-actions">
+            <button class="approve" onclick="approveUser('${safeUser}', 'admin')">Aprovar (Admin)</button>
+            <button class="approve-alt" onclick="approveUser('${safeUser}', 'viewer')">Aprovar (Visualização)</button>
+            <button class="deny" onclick="denyUser('${safeUser}')">Rejeitar</button>
+          </div>
+        ` : `<p class="notification-meta" style="color:#16a34a">✓ Acesso processado</p>`}
+      </div>
+    `;
+  };
+
   const parts = [];
 
-  if (hasLocal || hasServer) {
-    parts.push('<p class="notification-section-title">Solicitações pendentes</p>');
-  }
-
   if (hasLocal) {
+    parts.push('<p class="notification-section-title">Solicitações locais pendentes</p>');
     parts.push(pendings.map(u => {
       const created = u.createdAt ? new Date(u.createdAt).toLocaleString() : "-";
       return `
@@ -906,26 +929,9 @@ async function renderNotificationList() {
     }).join(""));
   }
 
-  if (hasServer) {
-    parts.push(serverPendings.map(u => {
-      const created = u.created_at ? new Date(u.created_at).toLocaleString() : "-";
-      return `
-        <div class="notification-item">
-          <p><strong>${escapeHtml(u.name || u.username)}</strong> <span style="opacity:.7">(${escapeHtml(u.username)})</span></p>
-          <p class="notification-meta">${escapeHtml(u.email || 'sem e-mail')} • ${created}</p>
-          <div class="notification-actions">
-            <button class="approve" onclick="approveUser('${u.username}', 'admin')">Aprovar (Admin)</button>
-            <button class="approve-alt" onclick="approveUser('${u.username}', 'viewer')">Aprovar (Visualização)</button>
-            <button class="deny" onclick="denyUser('${u.username}')">Rejeitar</button>
-          </div>
-        </div>
-      `;
-    }).join(""));
-  }
-
   if (registrationEvents.length > 0) {
-    parts.push('<p class="notification-section-title">Cadastros recentes</p>');
-    parts.push(registrationEvents.map(renderFeedCard).join(""));
+    parts.push('<p class="notification-section-title">Cadastros</p>');
+    parts.push(registrationEvents.map(renderRegistrationCard).join(""));
   }
 
   if (noteEvents.length > 0) {
@@ -1063,6 +1069,20 @@ window.addEventListener("DOMContentLoaded", async () => {
   updateNotificationBadge();
   applyAccessControl();
   await carregarDadosCompartilhados();
+
+  // Pré-carregar Projeto F para todos os usuários logados
+  if (window.location.protocol.startsWith('http')) {
+    fetch('/api/projeto_f_dataset', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(payload => {
+        const items = payload?.items;
+        if (Array.isArray(items) && items.length && !(dadosPorCategoria['projeto-f']?.length)) {
+          applyDatasetToState('projeto-f', items);
+          cacheDatasetLocally('projeto-f', items, { source: 'api-projeto-f' });
+          atualizarContadores();
+        }
+      }).catch(() => {});
+  }
 
   // Inicializar componentes de interface
   initHeaderSearch();
