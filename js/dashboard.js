@@ -116,6 +116,22 @@ function getPreferredDataset(categoriaId) {
 
 function applyDatasetToState(categoria, items) {
   const safeItems = Array.isArray(items) ? items : [];
+
+  // Protecao: nao deixar sincronizacoes vazias apagarem dados do card Empresarial.
+  if (categoria === "empresarial" && safeItems.length === 0) {
+    const atual = Array.isArray(dadosPorCategoria[categoria]) ? dadosPorCategoria[categoria] : [];
+    if (atual.length) {
+      return;
+    }
+
+    const localSnapshot = getLocalDatasetCache()?.[categoria];
+    const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
+    if (localItems.length) {
+      dadosPorCategoria[categoria] = localItems;
+      return;
+    }
+  }
+
   dadosPorCategoria[categoria] = safeItems;
 
   if (categoria === "backlog") {
@@ -392,6 +408,15 @@ async function carregarDadosCompartilhados() {
 async function persistirDadosCompartilhados(categoria, items, meta = {}) {
   if (!categoria || !Array.isArray(items)) {
     return;
+  }
+
+  // Evita sobrescrever o snapshot do Empresarial com payload vazio em sync automatico.
+  if (categoria === "empresarial" && items.length === 0) {
+    const localSnapshot = getLocalDatasetCache()?.[categoria];
+    const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
+    if (localItems.length) {
+      return;
+    }
   }
 
   cacheDatasetLocally(categoria, items, meta);
