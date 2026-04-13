@@ -1208,14 +1208,14 @@ function parseGenericCsvRows(csv, delimiter = ';') {
     delimiter = ',';
   }
 
-  const cabecalho = cabecalhoRaw.split(delimiter).map(c => c.replace(/^\uFEFF/, '').trim());
+  const cabecalho = _splitCsvLine(cabecalhoRaw, delimiter).map(c => c.replace(/^\uFEFF/, '').trim());
   const parsed = [];
 
   for (let i = 1; i < linhas.length; i++) {
     const linha = linhas[i];
     if (!linha || !linha.trim()) continue;
 
-    const cols = linha.split(delimiter);
+    const cols = _splitCsvLine(linha, delimiter);
     const item = {};
 
     cabecalho.forEach((c, j) => {
@@ -1233,6 +1233,26 @@ function parseGenericCsvRows(csv, delimiter = ';') {
   }
 
   return parsed;
+}
+
+function _splitCsvLine(line, delimiter) {
+  const cols = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === delimiter && !inQuotes) {
+      cols.push(cur.trim());
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  cols.push(cur.trim());
+  return cols;
 }
 
 function importarCSV() {
@@ -4998,7 +5018,6 @@ async function visualizarNovoEntrante(index) {
         ${renderModalInfoCard('TIPO_REDE', tipoRede, { featured: true })}
         ${renderModalInfoCard('DADOS_CLIENTE', dadosCliente)}
         ${renderModalInfoCard('CONTATO', contato)}
-        ${renderModalInfoCard('OBS', obsOriginal)}
         ${renderModalInfoCard('SOLICITANTE', solicitante)}
         ${renderModalInfoCard('RESPONSÁVEL DO ACEITE', responsavelAceite)}
         ${renderModalInfoCard('ACEITO EM', aceiteEm)}
