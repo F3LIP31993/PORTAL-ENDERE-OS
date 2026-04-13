@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="portal-api-base" content="">
+  <title>Painel MDU</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <h2>MDU</h2>
+
+    <nav class="sidebar-menu">
+      <button onclick="mostrarSecao('inicio')" class="menu-btn">🏠 Página Inicial</button>
+      <button onclick="mostrarSecao('historico')" class="menu-btn" data-admin-only="true">🕒 Histórico</button>
+      <button onclick="mostrarSecao('pesquisa')" class="menu-btn">📈 Visão Gerência</button>
+      <button onclick="mostrarSecao('relatorios')" class="menu-btn" data-admin-only="true">📊 Relatórios</button>
+    </nav>
+
+    <button class="sair" onclick="logout()">Sair</button>
+  </aside>
+
+  <!-- CONTEÚDO -->
+  <main class="main">
+
+    <!-- TOPBAR COM PERFIL -->
+    <div class="topbar">
+      <div class="topbar-user">
+        <div class="user-profile">
+          <img id="profileImage" src="" alt="Foto de perfil" class="profile-photo">
+          <label for="fotoPerfil" class="photo-upload-label" title="Clique para adicionar foto">
+            <input type="file" id="fotoPerfil" accept="image/*" style="display: none;">
+            <span class="upload-icon">📷</span>
+          </label>
+        </div>
+        <div class="user-info">
+          <p class="user-name">MAURO</p>
+          <p class="user-role">Administrador</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="notification-btn" title="Notificações" onclick="toggleNotifications()">
+          🔔 <span id="notificationBadge" class="notification-badge hidden"></span>
+        </button>
+        <button class="settings-btn" title="Configurações" onclick="toggleSettings()">⚙️</button>
+      </div>
+    </div>
+
+    <div id="notificationPanel" class="notification-panel hidden" aria-live="polite">
+      <div class="notification-header">
+        <h3>Notificações</h3>
+        <button class="close-notifications" onclick="toggleNotifications()">✕</button>
+      </div>
+      <div id="notificationList" class="notification-list">
+        <p class="notification-empty">Nenhuma solicitação pendente.</p>
+      </div>
+    </div>
+
+    <div id="settingsPanel" class="settings-panel hidden" aria-live="polite">
+      <div class="settings-header">
+        <h3>Configurações</h3>
+        <button class="close-settings" onclick="toggleSettings()">✕</button>
+      </div>
+      <div class="settings-actions">
+        <div class="settings-section">
+          <label for="columnDensitySelect">Ajustar colunas</label>
+          <select id="columnDensitySelect" class="settings-select" onchange="setColumnDensity(this.value)">
+            <option value="compact">Compacta</option>
+            <option value="default">Padrão</option>
+            <option value="wide">Ampla</option>
+          </select>
+        </div>
+        <button class="settings-option" onclick="openChangePassword()">Alterar senha</button>
+        <button class="settings-option" onclick="openEditProfile()">Alterar cadastro</button>
+        <button class="settings-option logout" onclick="logout()">Sair</button>
+      </div>
+    </div>
+
+    <!-- PÁGINA INICIAL -->
+    <section id="inicio" class="secao ativa">
+      <h1>PORTAL MDU</h1>
+
+      <!-- CARDS CLICÁVEIS - CATEGORIAS -->
+      <div class="categorias-grid">
+        <div class="categoria-card" onclick="abrirCategoria('pendente-autorizacao')">
+          <div class="categoria-icon">📋</div>
+          <h3 class="categoria-titulo">Pendente Autorização</h3>
+          <p class="categoria-subtitulo">MDU/SAR</p>
+          <p class="categoria-acao">Clique para abrir</p>
+        </div>
+
+        <div class="categoria-card" onclick="abrirCategoria('ongoing')">
+          <div class="categoria-icon">⏳</div>
+          <h3 class="categoria-titulo">Ongoing</h3>
+          <p class="categoria-subtitulo">Demandas em Progresso</p>
+          <p class="categoria-acao">Clique para abrir</p>
+        </div>
+
+        <div class="categoria-card" onclick="abrirCategoria('projeto-f')">
+          <div class="categoria-icon">📡</div>
+          <h3 class="categoria-titulo">projeto f</h3>
+          <p class="categoria-subtitulo">Novos Projetos</p>
+          <p class="categoria-acao">Clique para abrir</p>
+        </div>
+
+        <div class="categoria-card" onclick="abrirCategoria('empresarial')">
+          <div class="categoria-icon">🏢</div>
+          <h3 class="categoria-titulo">Empresarial</h3>
+          <p class="categoria-subtitulo">Clientes Corporativos</p>
+          <p class="categoria-acao">Clique para abrir</p>
+        </div>
+
+        <div class="categoria-card" onclick="abrirCategoria('sar-rede')">
+          <div class="categoria-icon">🔗</div>
+          <h3 class="categoria-titulo">SAR Rede</h3>
+          <p class="categoria-subtitulo">Rede SAR</p>
+          <p class="categoria-acao">Clique para abrir</p>
+        </div>
+
+        <div class="categoria-card" onclick="abrirCategoria('mdu-ongoing')">
+          <div class="categoria-icon">📡</div>
+          <h3 class="categoria-titulo">MDU Ongoing</h3>
+          <p class="categoria-subtitulo">MDU em Progresso</p>
+          <p class="categoria-acao">Clique para abrir</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- IMPORTAÇÃO DE ARQUIVO (disponível nas categorias) -->
+    <div id="global-import-section" class="card import-section" style="display:none;">
+      <div class="import-header import-toolbar" style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;">
+        <div class="import-target-wrap">
+          <span id="import-target-label" class="import-target-label">Importar para: <span id="import-target-name">-</span></span>
+        </div>
+        <div class="import-mode premium-toggle" style="display:flex; gap:6px;">
+          <button type="button" class="import-mode-btn active" data-mode="local" onclick="setImportMode('local')">📄 Arquivo</button>
+          <button type="button" class="import-mode-btn" data-mode="network" onclick="setImportMode('network')">📁 Rede</button>
+          <button type="button" class="import-mode-btn" data-mode="web" onclick="setImportMode('web')">🌐 Web</button>
+        </div>
+      </div>
+
+      <div id="import-local" class="import-controls">
+        <label for="arquivoCSV" class="file-label">
+          <span>📁 Escolher arquivo</span>
+          <input type="file" id="arquivoCSV" accept=".csv">
+        </label>
+        <button onclick="importarCSV()" class="btn-primary">Importar CSV</button>
+        <button onclick="exportarPaginaInicial()" class="btn-primary">📥 Exportar Planilha</button>
+        <span id="file-name" class="file-name"></span>
+        <div id="import-status" class="import-status-line" style="margin-top:6px; font-size:13px; opacity:.8;"></div>
+      </div>
+
+      <div id="import-network" class="import-controls" style="display:none; margin-top: 12px; gap: 10px;">
+        <input type="text" id="networkPath" placeholder="\\\\servidor\\pasta\\arquivo.csv" class="header-search-input" style="flex:1;" />
+        <button onclick="importarDoCaminhoRede()" class="btn-primary">📂 Carregar de rede</button>
+      </div>
+
+      <div id="import-web" class="import-controls" style="display:none; margin-top: 12px; gap: 10px;">
+        <input type="text" id="sheetUrl" placeholder="https://... (Google Sheets/OneDrive)" class="header-search-input" style="flex:1;" />
+        <button onclick="importarDeUrl()" class="btn-primary">🌐 Carregar da Web</button>
+      </div>
+    </div>
+
+    <!-- HISTÓRICO DE SOLICITAÇÕES -->
+    <section id="historico" class="secao">
+      <div class="categoria-header">
+        <h1>Histórico de solicitações</h1>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Usuário</th>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Solicitado em</th>
+              <th>Decisão em</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-historico">
+            <tr>
+              <td colspan="6" style="text-align:center">
+                Nenhuma solicitação registrada.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PESQUISA / VISÃO GERÊNCIA -->
+    <section id="pesquisa" class="secao">
+      <h1>Visão Gerência</h1>
+      <p class="visao-gerencia-intro">Painel executivo com leitura rápida dos indicadores de ONGOING e Projeto F, destacando resultados por período, EPO e status.</p>
+
+      <div id="visao-gerencia-analytics" class="visao-gerencia-analytics"></div>
+    </section>
+
+    <!-- SEÇÃO: PENDENTE AUTORIZAÇÃO -->
+    <section id="pendente-autorizacao" class="secao categoria-secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>📋 Pendente Autorização - MDU/SAR</h1>
+      </div>
+
+      <div class="pendente-tabs">
+        <button id="tab-vistoria" class="btn-primary pendente-tab-btn" style="flex:1;" onclick="setPendenteTab('vistoria')">PENDENTE VISTORIA</button>
+        <button id="tab-backbone" class="btn-primary pendente-tab-btn" style="flex:1;" onclick="setPendenteTab('backbone')">PENDENTE BACKBONE</button>
+      </div>
+
+      <div id="card-pendente-vistoria" class="card">
+        <h2 style="margin-top:0;">Pendente Vistoria</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Cidade</th>
+              <th>AGE</th>
+              <th>Status</th>
+              <th>Motivo</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-pendente-vistoria">
+            <tr>
+              <td colspan="7" style="text-align:center">Nenhum dado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="card-pendente-backbone" class="card" style="display:none;">
+        <h2 style="margin-top:0;">Pendente Backbone</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Cidade</th>
+              <th>AGE</th>
+              <th>Status</th>
+              <th>Motivo</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-pendente-backbone">
+            <tr>
+              <td colspan="7" style="text-align:center">Nenhum dado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div id="modal-obs" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header modal-header-professional">
+          <div>
+            <p class="modal-kicker">Visualização detalhada</p>
+            <h2>Detalhes Pendente Autorização</h2>
+          </div>
+          <button class="btn-voltar modal-close-professional" onclick="fecharModalObs()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-section-title">Informações Gerais</div>
+          <div class="modal-row highlighted">
+            <label>Código</label>
+            <p id="modal-codigo" class="modal-value">-</p>
+          </div>
+          <div class="modal-row full-width highlighted">
+            <label>Endereço</label>
+            <p id="modal-endereco" class="modal-value">-</p>
+          </div>
+          <div class="modal-row">
+            <label>Bairro</label>
+            <p id="modal-bairro" class="modal-value">-</p>
+          </div>
+          <div class="modal-row">
+            <label>Cidade</label>
+            <p id="modal-cidade" class="modal-value">-</p>
+          </div>
+          <div class="modal-row">
+            <label>EPO</label>
+            <p id="modal-epo" class="modal-value">-</p>
+          </div>
+          <div class="modal-section-title">Status e Contexto</div>
+          <div class="modal-row">
+            <label>Status Geral</label>
+            <p id="modal-status" class="modal-value">-</p>
+          </div>
+          <div class="modal-row">
+            <label>Motivo Geral</label>
+            <p id="modal-motivo" class="modal-value">-</p>
+          </div>
+          <div class="modal-row full-width highlighted">
+            <label>OBS original</label>
+            <p id="modal-obs-original" class="modal-value modal-obs-box">-</p>
+          </div>
+          <div class="modal-section-title">Interações</div>
+          <div class="modal-row full-width">
+            <label>Observações adicionais</label>
+            <textarea id="modal-obs-adicional" class="modal-textarea" rows="4"></textarea>
+          </div>
+          <div class="modal-row full-width">
+            <label>Anexos</label>
+            <input id="modal-anexo" type="file" style="display:none;" />
+            <button id="modal-anexo-button" class="btn-primary" type="button" onclick="document.getElementById('modal-anexo').click()">Escolher arquivo</button>
+            <p id="modal-anexo-helper" class="modal-helper"></p>
+            <ul id="modal-anexos" class="modal-list"></ul>
+          </div>
+          <div class="modal-row full-width">
+            <label>Histórico de OBS</label>
+            <ul id="modal-notes" class="modal-list"></ul>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" type="button" onclick="fecharModalObs()">Voltar</button>
+          <button class="btn-primary" type="button" onclick="salvarObsModal()">Salvar OBS</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEÇÃO: PROJETO F -->
+    <section id="projeto-f" class="secao categoria-secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>📡 Projeto F</h1>
+      </div>
+
+      <div class="card">
+        <div class="filtros-projeto-f">
+          <div class="filtro-item">
+            <label for="filtro-cidade-projeto-f">Filtrar Cidade:</label>
+            <select id="filtro-cidade-projeto-f" onchange="aplicarFiltrosProjetoF()">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <div class="filtro-item">
+            <label for="filtro-endereco-projeto-f">Buscar Endereço:</label>
+            <input type="text" id="filtro-endereco-projeto-f" placeholder="Digite parte do endereço..." oninput="aplicarFiltrosProjetoF()" />
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Cidade</th>
+              <th>Bloco</th>
+              <th>Cód. GED</th>
+              <th>Endereço</th>
+              <th>Qtde Blocos</th>
+              <th>Status MDU</th>
+              <th>Status Liberação</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-projeto-f">
+            <tr>
+              <td colspan="8" style="text-align:center">Nenhum dado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SEÇÃO: EMPRESARIAL -->
+    <section id="empresarial" class="secao categoria-secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>🏢 Empresarial</h1>
+      </div>
+
+
+      <div class="card">
+        <div class="filtros-empresarial">
+          <div class="filtro-item">
+            <label for="filtro-status-empresarial">Filtrar Status:</label>
+            <select id="filtro-status-empresarial" onchange="aplicarFiltrosEmpresarial()">
+              <option value="">Todos os Status</option>
+            </select>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Número</th>
+              <th>Bairro</th>
+              <th>Cidade</th>
+              <th>EPO</th>
+              <th>Solicitante</th>
+              <th>Status Geral</th>
+              <th>Motivo Geral</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-empresarial">
+            <tr>
+              <td colspan="10" style="text-align:center">Nenhum dado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SEÇÃO: SAR REDE -->
+    <section id="sar-rede" class="secao categoria-secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>🔗 SAR Rede</h1>
+      </div>
+
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Cidade</th>
+              <th>Status</th>
+              <th>AGE</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-sar-rede">
+            <tr>
+              <td colspan="6" style="text-align:center">Nenhum dado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SEÇÃO: MDU ONGOING -->
+    <section id="mdu-ongoing" class="secao categoria-secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>📡 MDU Ongoing</h1>
+      </div>
+
+
+      <div class="card">
+        <div class="filtro-status">
+          <label for="status-filter-mdu">Filtrar Status Geral:</label>
+          <select id="status-filter-mdu" onchange="atualizarFiltroStatusMdu()">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Número</th>
+              <th>Bairro</th>
+              <th>Cidade</th>
+              <th>EPO</th>
+              <th>Solicitante</th>
+              <th>Status Geral</th>
+              <th>Motivo Geral</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-mdu-ongoing">
+            <tr>
+              <td colspan="10" style="text-align:center">Nenhum dado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ONGOING -->
+    <section id="ongoing" class="secao categoria-secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>⏳ ONGOING</h1>
+      </div>
+
+      <!-- ESTATÍSTICAS NO TOPO -->
+      <div class="stats-grid-ongoing">
+        <div class="stat-card">
+          <p class="stat-label">Total de Endereços</p>
+          <p class="stat-value" id="total-enderecos-ongoing">0</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Dentro SLA</p>
+          <p class="stat-value" id="dentro-sla">0</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Fora SLA</p>
+          <p class="stat-value" id="fora-sla">0</p>
+        </div>
+        <div class="stat-card search-card">
+          <input type="text" id="buscarIDOngoing" placeholder="🔍 Buscar por ID..." class="search-input-ongoing">
+          <button onclick="buscarPorIDOngoing()" class="btn-search-ongoing">Buscar</button>
+        </div>
+      </div>
+
+
+      <div class="card">
+        <h2>Dados ONGOING</h2>
+        
+        <!-- Botões de Filtro por Fila -->
+        <div class="filtro-fila">
+          <button class="fila-btn ativo" data-fila="todos" onclick="filtrarPorFila('todos')">📊 Todos</button>
+          <button class="fila-btn" data-fila="vistoria" onclick="filtrarPorFila('vistoria')">👁️ VISTORIA</button>
+          <button class="fila-btn" data-fila="backbone" onclick="filtrarPorFila('backbone')">🔗 BACKBONE</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>ID Demanda</th>
+              <th>Fila</th>
+              <th>Tipo</th>
+              <th>Endereço</th>
+              <th>EPO / Cluster</th>
+              <th>Aging</th>
+              <th>SLA Fase / Tudo</th>
+              <th>Status</th>
+              <th>Motivo</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-ongoing">
+            <tr>
+              <td colspan="9" style="text-align:center">
+                Nenhum dado carregado
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- DETALHES DO REGISTRO ONGOING -->
+    <section id="detalhes-ongoing" class="secao detalhes-ongoing-page">
+      <div class="card detalhes-card-premium">
+        <div class="detalhes-header detalhes-header-premium">
+          <button onclick="voltarOngoing()" class="btn-voltar">&#8592; Voltar</button>
+          <div class="detalhes-titulo-wrap">
+            <p class="detalhes-kicker">Visualização detalhada</p>
+            <h2>Detalhes do Registro</h2>
+          </div>
+        </div>
+
+        <div class="detalhes-grid detalhes-grid-premium">
+          <div class="detalhe-item detalhe-hero">
+            <label>ID Demanda</label>
+            <p id="detalhe-iddemanda">-</p>
+          </div>
+          <div class="detalhe-item detalhe-highlight">
+            <label>Fila</label>
+            <p id="detalhe-fila">-</p>
+          </div>
+          <div class="detalhe-item detalhe-highlight">
+            <label>Tipo</label>
+            <p id="detalhe-tipo">-</p>
+          </div>
+          <div class="detalhe-item detalhe-endereco detalhe-full">
+            <label>Endereço</label>
+            <p id="detalhe-endereco">-</p>
+          </div>
+          <div class="detalhe-item detalhe-metric">
+            <label>Aging</label>
+            <p id="detalhe-aging">-</p>
+          </div>
+          <div class="detalhe-item detalhe-metric">
+            <label>SLA TUDO</label>
+            <p id="detalhe-sla">-</p>
+          </div>
+          <div class="detalhe-item">
+            <label>Status Geral</label>
+            <p id="detalhe-status">-</p>
+          </div>
+          <div class="detalhe-item">
+            <label>Motivo Geral</label>
+            <p id="detalhe-motivo">-</p>
+          </div>
+          <div class="detalhe-item detalhe-full detalhe-obs-card">
+            <label>Observações (OBS)</label>
+            <div class="obs-box obs-box-premium">
+              <p id="detalhe-obs">-</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RELÓRIOS -->
+    <section id="relatorios" class="secao">
+      <div class="relatorio-header">
+        <h1>Dashboard de Acompanhamento</h1>
+        <!-- Card de Total de Registros no topo -->
+        <div class="total-registros-card">
+          <p class="total-label">TOTAL DE REGISTROS</p>
+          <p class="total-numero" id="totalRegistrosTop">104</p>
+        </div>
+      </div>
+
+      <!-- GRID DE GRÁFICOS - NOVA ORGANIZAÇÃO -->
+      <div class="dashboard-grid-novo">
+        <!-- Gráfico de Pizza (Pequeno à esquerda) -->
+        <div class="chart-card chart-pizza-container">
+          <div class="chart-wrapper-pizza">
+            <canvas id="chartPizza"></canvas>
+            <div class="chart-center">
+              <p class="chart-total" id="totalEnderecos">0</p>
+              <p class="chart-label">Endereços</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gráfico de Linha - AGE (Largo à direita) -->
+        <div class="chart-card chart-age-container">
+          <h3 class="chart-title-small">AGE</h3>
+          <canvas id="chartAge"></canvas>
+        </div>
+      </div>
+
+      <!-- Gráfico DDD (Abaixo, full-width) -->
+      <div class="chart-card chart-ddd-container">
+        <h3 class="chart-title-small">AGE</h3>
+        <canvas id="chartDDD"></canvas>
+      </div>
+
+      <!-- TABELA DE DADOS -->
+      <div class="card table-card">
+        <div class="table-header">
+          <h3>Detalhes dos Endereços</h3>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Cidade</th>
+              <th>Status</th>
+              <th>AGE</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-relatorios">
+            <tr>
+              <td colspan="6" style="text-align:center">
+                Nenhum dado carregado
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="js/api-config.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
