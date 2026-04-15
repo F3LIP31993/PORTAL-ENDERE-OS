@@ -72,13 +72,81 @@ function cacheDatasetLocally(categoria, items, meta = {}) {
   if (!categoria || !Array.isArray(items)) return;
   const cache = getLocalDatasetCache();
   const previous = cache[categoria] || {};
+  const currentUser = getCurrentUser();
+  const inferredUpdatedBy = currentUser?.username || currentUser?.name || '';
   cache[categoria] = {
     items,
     updatedAt: meta.updatedAt || new Date().toISOString(),
     source: meta.source || previous.source || 'shared',
     locked: typeof meta.locked === 'boolean' ? meta.locked : Boolean(previous.locked),
+    updatedBy: meta.updatedBy || meta.updated_by || previous.updatedBy || inferredUpdatedBy,
   };
   saveLocalDatasetCache(cache);
+
+  if (categoria === categoriaAtualParaImport) {
+    updateImportLockInfo(categoria);
+  }
+}
+
+function formatDateTimeBr(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleString('pt-BR');
+}
+
+function getOrCreateImportLockInfoElement() {
+  let lockInfoEl = document.getElementById('import-lock-info');
+  if (lockInfoEl) return lockInfoEl;
+
+  const statusEl = document.getElementById('import-status');
+  if (!statusEl || !statusEl.parentElement) return null;
+
+  lockInfoEl = document.createElement('div');
+  lockInfoEl.id = 'import-lock-info';
+  lockInfoEl.className = 'import-status-line';
+  lockInfoEl.style.marginTop = '4px';
+  lockInfoEl.style.fontSize = '12px';
+  lockInfoEl.style.opacity = '.85';
+  statusEl.insertAdjacentElement('afterend', lockInfoEl);
+
+  return lockInfoEl;
+}
+
+function updateImportLockInfo(categoriaId = categoriaAtualParaImport) {
+  const lockInfoEl = getOrCreateImportLockInfoElement();
+  if (!lockInfoEl) return;
+
+  lockInfoEl.style.display = 'flex';
+  lockInfoEl.style.flexBasis = '100%';
+  lockInfoEl.style.width = '100%';
+  lockInfoEl.style.whiteSpace = 'normal';
+
+  if (!categoriaId) {
+    lockInfoEl.textContent = '';
+    return;
+  }
+
+  const snapshot = getLocalDatasetCache()?.[categoriaId] || {};
+  const items = Array.isArray(snapshot.items) ? snapshot.items : [];
+  const updatedAtText = formatDateTimeBr(snapshot.updatedAt);
+  const updatedByText = snapshot.updatedBy || '';
+  const sourceText = snapshot.source || 'local';
+
+  if (!items.length && !updatedAtText) {
+    lockInfoEl.textContent = '';
+    return;
+  }
+
+  const details = [
+    `📌 Base ativa: ${items.length} registro(s)`,
+    updatedAtText ? `atualizado em ${updatedAtText}` : '',
+    updatedByText ? `por ${updatedByText}` : '',
+    snapshot.locked ? 'travado' : 'não travado',
+    sourceText ? `origem ${sourceText}` : '',
+  ].filter(Boolean).join(' • ');
+
+  lockInfoEl.textContent = details;
 }
 
 function hasLockedDataset(categoria) {
@@ -320,6 +388,7 @@ async function carregarDadosCompartilhados() {
     if (secaoAtiva) {
       carregarDadosCategoria(secaoAtiva);
     }
+    updateImportLockInfo();
     agendarRenderVisaoGerencia(true);
     return;
   }
@@ -337,7 +406,7 @@ async function carregarDadosCompartilhados() {
       const existingItems = Array.isArray(dadosPorCategoria[categoria]) ? dadosPorCategoria[categoria] : [];
       const localSnapshot = localCache?.[categoria] || {};
       const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
-      const shouldKeepLockedLocal = ['empresarial', 'mdu-ongoing'].includes(categoria)
+      const shouldKeepLockedLocal = ['empresarial', 'mdu-ongoing', 'projeto-f'].includes(categoria)
         && Boolean(localSnapshot?.locked)
         && localItems.length;
 
@@ -354,6 +423,7 @@ async function carregarDadosCompartilhados() {
           cacheDatasetLocally(categoria, items, {
             source: snapshot?.source || 'shared',
             updatedAt: snapshot?.updated_at || snapshot?.updatedAt || new Date().toISOString(),
+            updatedBy: snapshot?.updated_by || snapshot?.updatedBy || '',
             locked: true,
           });
         }
@@ -399,9 +469,11 @@ async function carregarDadosCompartilhados() {
       carregarDadosCategoria(secaoAtiva);
     }
 
+    updateImportLockInfo();
     agendarRenderVisaoGerencia(true);
   } catch (error) {
     console.warn("Não foi possível carregar os dados compartilhados do portal.", error);
+    updateImportLockInfo();
   }
 }
 
@@ -409,6 +481,13 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
   if (!categoria || !Array.isArray(items)) {
     return;
   }
+
+  const user = getCurrentUser();
+  const metaWithUser = {
+    ...meta,
+    updatedBy: meta.updatedBy || meta.updated_by || user?.username || user?.name || '',
+    updatedAt: meta.updatedAt || new Date().toISOString(),
+  };
 
   // Evita sobrescrever snapshot local não-vazio com payload vazio em sync automático.
   if (items.length === 0) {
@@ -419,9 +498,8 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
     }
   }
 
-  cacheDatasetLocally(categoria, items, meta);
+  cacheDatasetLocally(categoria, items, metaWithUser);
 
-  const user = getCurrentUser();
   const isAdmin = user?.role === "admin";
 
   if (!window.location.protocol.startsWith("http") || !isAdmin) {
@@ -462,10 +540,31 @@ function updateUserProfileInfo() {
     if (user.role === "admin") {
       roleEl.textContent = "Administrador";
     } else if (user.role === "viewer") {
-      roleEl.textContent = "Visualização";
+      roleEl.textContent = "Acompanhamento";
     } else {
       roleEl.textContent = "Solicitante";
     }
+  }
+}
+
+async function loadViewerUserProfileData() {
+  const user = getCurrentUser();
+  if (!user || user.role !== "viewer") return;
+
+  try {
+    const res = await fetch("/api/user_profile", { credentials: "include" });
+    if (!res.ok) return;
+
+    const profile = await res.json();
+    
+    if (profile.registration_obs) {
+      // Armazena obs do cadastro no localStorage para referência
+      const key = `viewer_profile_${user.username}`;
+      localStorage.setItem(key, JSON.stringify(profile));
+      console.log(`✅ Perfil de acompanhamento carregado para ${user.username}`);
+    }
+  } catch (error) {
+    console.warn("Não foi possível carregar perfil do usuário de acompanhamento", error);
   }
 }
 
@@ -497,6 +596,10 @@ function applyAccessControl() {
   if (importSection && !isAdmin) {
     importSection.style.display = "none";
   }
+
+  document.querySelectorAll('.epo-clip-upload').forEach((btn) => {
+    btn.style.display = isAdmin ? 'inline-flex' : 'none';
+  });
 
   if (!isAdmin && ["historico", "relatorios"].includes(document.querySelector(".secao.ativa")?.id || "")) {
     mostrarSecao("inicio");
@@ -1069,20 +1172,14 @@ window.addEventListener("DOMContentLoaded", async () => {
   updateNotificationBadge();
   applyAccessControl();
   await carregarDadosCompartilhados();
+  await carregarEpoNovosCompartilhado();
 
-  // Pré-carregar Projeto F para todos os usuários logados
-  if (window.location.protocol.startsWith('http')) {
-    fetch('/api/projeto_f_dataset', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then(payload => {
-        const items = payload?.items;
-        if (Array.isArray(items) && items.length && !(dadosPorCategoria['projeto-f']?.length)) {
-          applyDatasetToState('projeto-f', items);
-          cacheDatasetLocally('projeto-f', items, { source: 'api-projeto-f' });
-          atualizarContadores();
-        }
-      }).catch(() => {});
-  }
+  // Preenche os cards/tabelas principais ja na entrada para evitar tela vazia.
+  ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede', 'projeto-f'].forEach(carregarDadosCategoria);
+  atualizarContadores();
+  
+  // Carregar dados específicos de usuário de acompanhamento
+  await loadViewerUserProfileData();
 
   // Inicializar componentes de interface
   initHeaderSearch();
@@ -1171,6 +1268,7 @@ function updateImportTargetLabel() {
   const label = document.getElementById("import-target-name");
   if (!label) return;
   label.textContent = categoriaAtualParaImport ? getCategoriaNome(categoriaAtualParaImport) : "-";
+  updateImportLockInfo(categoriaAtualParaImport);
 }
 
 function setImportMode(mode) {
@@ -1316,6 +1414,7 @@ function importarCSV() {
 
   const input = document.getElementById("arquivoCSV");
   if (!input || !input.files.length) return alert("Selecione o CSV");
+  const file = input.files[0];
 
   const statusEl = document.getElementById('import-status');
   if (statusEl) {
@@ -1452,7 +1551,7 @@ function importarCSV() {
         const linha = linhas[linhaAtual];
         if (!linha || !linha.trim()) continue;
 
-        const cols = linha.split(delimiter);
+        const cols = _splitCsvLine(linha, delimiter);
 
         if (isPendente) {
           // Construir apenas o suficiente para avaliar o status e armazenar dados mínimos
@@ -1518,6 +1617,24 @@ function importarCSV() {
       if (linhaAtual < linhas.length) {
         setTimeout(processBatch, 0);
       } else {
+        if (categoria === 'empresarial') {
+          parsed.forEach(item => {
+            const hasSolicitante = Boolean(getField(item, 'SOLICITANTE', 'solicitante'));
+            if (!hasSolicitante) {
+              item.SOLICITANTE = 'EMPRESARIAL';
+              item.solicitante = 'EMPRESARIAL';
+            }
+          });
+        }
+
+        parsed.forEach(item => {
+          const obsValue = getField(item, 'OBS', 'obs', 'OBSERVACAO', 'observacao', 'STATUS OBS', 'status_obs');
+          if (obsValue && !item.OBS) {
+            item.OBS = obsValue;
+            item.obs = obsValue;
+          }
+        });
+
         dadosPorCategoria[categoria] = parsed;
 
         const looksLikeBacklog = cabecalho.some(coluna => {
@@ -1552,7 +1669,7 @@ function importarCSV() {
     processBatch();
   };
 
-  reader.readAsText(input.files[0], "ISO-8859-1");
+  reader.readAsText(file, "ISO-8859-1");
 }
 
 // IMPORTAR CSV a partir de caminho no servidor (rede)
@@ -1693,18 +1810,18 @@ function renderTabelaEmpresarial(id, lista) {
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  const dadosEmpresariais = (lista || []).filter(item => {
-    const solicitante = (getField(item, "SOLICITANTE", "solicitante") || "").toLowerCase().trim();
-    return solicitante.includes("empresarial");
-  });
+  const dadosEmpresariais = Array.isArray(lista) ? lista : [];
 
   if (!dadosEmpresariais.length) {
+    window.__empresarialRowsSnapshot = [];
     tbody.innerHTML = `<tr><td colspan="10">Nenhum registro</td></tr>`;
     popularFiltrosEmpresarial(dadosEmpresariais);
     return;
   }
 
-  const rows = dadosEmpresariais.map(i => {
+  window.__empresarialRowsSnapshot = dadosEmpresariais;
+
+  const rows = dadosEmpresariais.map((i, index) => {
     const codigo = getField(i, "COD-MDUGO", "cod-mdugo", "codmdugo") || "-";
     const endereco = getField(i, "ENDEREÇO", "ENDERECO", "endereco", "endereco_entrada") || "-";
     const numero = getField(i, "NUMERO", "numero") || "-";
@@ -1718,7 +1835,7 @@ function renderTabelaEmpresarial(id, lista) {
     return `
       <tr>
         <td>${codigo}</td>
-        <td>${endereco}</td>
+        <td><span class="table-address-cell" title="${escapeHtml(endereco)}">${escapeHtml(endereco)}</span></td>
         <td>${numero}</td>
         <td>${bairro}</td>
         <td>${cidade}</td>
@@ -1726,7 +1843,7 @@ function renderTabelaEmpresarial(id, lista) {
         <td>${solicitante}</td>
         <td>${statusGeral}</td>
         <td>${motivoGeral}</td>
-        <td><button type="button" onclick="visualizarEmpresarial('${codigo}')" class="btn-visualizar">Visualizar</button></td>
+        <td><button type="button" onclick="visualizarEmpresarialPorIndice(${index})" class="btn-visualizar">Visualizar</button></td>
       </tr>`;
   });
 
@@ -1759,7 +1876,7 @@ function renderTabelaMduOngoing(id, lista) {
     return `
       <tr>
         <td>${codigo}</td>
-        <td>${endereco}</td>
+        <td><span class="table-address-cell" title="${escapeHtml(endereco || '-')}">${escapeHtml(endereco || '-')}</span></td>
         <td>${numero}</td>
         <td>${bairro}</td>
         <td>${cidade}</td>
@@ -1951,11 +2068,7 @@ function popularFiltrosEmpresarial(listaBase = null) {
   if (!selectStatus) return;
 
   const valorAtual = selectStatus.value || '';
-  const origem = Array.isArray(listaBase) ? listaBase : (dadosPorCategoria['empresarial'] || []);
-  const dados = origem.filter(item => {
-    const solicitante = (getField(item, 'SOLICITANTE', 'solicitante') || '').toLowerCase().trim();
-    return solicitante.includes('empresarial');
-  });
+  const dados = Array.isArray(listaBase) ? listaBase : (dadosPorCategoria['empresarial'] || []);
 
   const statusUnicos = [...new Set(dados
     .map(item => (getField(item, 'STATUS_GERAL', 'status_geral', 'status') || '').trim())
@@ -1980,10 +2093,7 @@ function popularFiltrosEmpresarial(listaBase = null) {
 
 function aplicarFiltrosEmpresarial() {
   const filtroStatus = document.getElementById('filtro-status-empresarial')?.value?.toLowerCase().trim() || '';
-  const dados = (dadosPorCategoria['empresarial'] || []).filter(item => {
-    const solicitante = (getField(item, 'SOLICITANTE', 'solicitante') || '').toLowerCase().trim();
-    return solicitante.includes('empresarial');
-  });
+  const dados = dadosPorCategoria['empresarial'] || [];
 
   let dadosFiltrados = dados;
 
@@ -2000,10 +2110,7 @@ function aplicarFiltrosEmpresarial() {
 (function() {
   const originalRenderTabelaEmpresarial = window.renderTabelaEmpresarial;
   window.renderTabelaEmpresarial = function(id, lista) {
-    const filteredLista = (lista || []).filter(item => {
-      const solicitante = (getField(item, 'SOLICITANTE', 'solicitante') || '').toLowerCase();
-      return solicitante.includes('empresarial');
-    });
+    const filteredLista = Array.isArray(lista) ? lista : [];
 
     if (typeof originalRenderTabelaEmpresarial === 'function') {
       originalRenderTabelaEmpresarial(id, filteredLista);
@@ -4607,6 +4714,55 @@ function saveEpoNovosStore(store) {
   localStorage.setItem(STORAGE_EPO_NOVOS_KEY, JSON.stringify(store || {}));
 }
 
+function flattenEpoNovosStore(store = {}) {
+  const linhas = [];
+  Object.entries(store || {}).forEach(([epo, itens]) => {
+    (Array.isArray(itens) ? itens : []).forEach(item => {
+      linhas.push({ ...item, __epoBucket: epo });
+    });
+  });
+  return linhas;
+}
+
+function buildEpoNovosStoreFromRows(rows = []) {
+  const byEpo = {};
+  (Array.isArray(rows) ? rows : []).forEach(item => {
+    const key = String(item?.__epoBucket || _resolverEpoDaLinha(item) || '').trim().toUpperCase();
+    if (!key) return;
+    if (!byEpo[key]) byEpo[key] = [];
+    byEpo[key].push(item);
+  });
+  return byEpo;
+}
+
+async function carregarEpoNovosCompartilhado() {
+  if (!window.location.protocol.startsWith('http')) return;
+
+  try {
+    const res = await fetch('/api/shared_datasets', { credentials: 'include' });
+    if (!res.ok) return;
+
+    const payload = await res.json().catch(() => ({}));
+    const rows = payload?.datasets?.['epo-novos']?.items;
+    if (!Array.isArray(rows) || !rows.length) {
+      const user = getCurrentUser();
+      const localStore = getEpoNovosStore();
+      const localRows = flattenEpoNovosStore(localStore);
+      if (user?.role === 'admin' && localRows.length) {
+        persistirDadosCompartilhados('epo-novos', localRows, { source: 'manual', locked: true });
+      }
+      return;
+    }
+
+    const store = buildEpoNovosStoreFromRows(rows);
+    saveEpoNovosStore(store);
+    atualizarCountPillsEpo();
+    atualizarContadores();
+  } catch {
+    // Sem bloqueio: mantém cache/local.
+  }
+}
+
 function getEpoNovosParaEpo(nomeEpo) {
   const store = getEpoNovosStore();
   return Array.isArray(store[nomeEpo]) ? store[nomeEpo] : [];
@@ -4653,6 +4809,8 @@ function importarPlanilhaEpoNovos() {
 
     saveEpoNovosStore(byEpo);
     atualizarCountPillsEpo();
+    atualizarContadores();
+    persistirDadosCompartilhados('epo-novos', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
 
     const total = vistorias.length;
     const epoCount = Object.keys(byEpo).length;
@@ -5600,20 +5758,20 @@ async function carregarAnexosPendente(codigo) {
   const anexoInput = document.getElementById('modal-anexo');
   const helper = document.getElementById('modal-anexo-helper');
   if (anexoInput) {
-    const allow = useApi && Boolean(user);
+    const allow = useApi && Boolean(user) && user.role === 'admin';
     anexoInput.style.display = allow ? 'block' : 'none';
   }
   const anexoButton = document.getElementById('modal-anexo-button');
   if (anexoButton) {
-    const allow = useApi && Boolean(user);
+    const allow = useApi && Boolean(user) && user.role === 'admin';
     anexoButton.style.display = allow ? 'inline-flex' : 'none';
   }
   if (helper) {
     helper.textContent = !useApi
       ? 'Recursos offline: anexos não estão disponíveis. Use o servidor para salvar anexos.'
-      : user
+      : user?.role === 'admin'
       ? 'Anexe arquivos para este endereço sempre que necessário.'
-      : 'Faça login para anexar arquivos.';
+      : 'Acompanhamento não pode anexar arquivos. Apenas administrador pode anexar.';
   }
 
   if (useApi) {
@@ -5649,6 +5807,11 @@ async function uploadAnexoPendente(codigo, file) {
   const useApi = window.location.protocol.startsWith('http');
   const user = getCurrentUser();
   const reference = encodeURIComponent(String(codigo));
+
+  if (user?.role !== 'admin') {
+    alert('⚠️ Apenas administrador pode anexar arquivos.');
+    return;
+  }
 
   if (useApi && user) {
     const form = new FormData();
@@ -5747,12 +5910,6 @@ function carregarDaBacklog(categoriaId) {
       return response.json();
     })
     .then(dados => {
-      if (categoriaId === 'empresarial') {
-        dados = dados.filter(item => {
-          const solicitante = (getField(item, 'SOLICITANTE', 'solicitante') || '').toLowerCase().trim();
-          return solicitante.includes('empresarial');
-        });
-      }
 
       applyDatasetToState(categoriaId, dados);
       if (['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede'].includes(categoriaId)) {
@@ -5852,30 +6009,16 @@ function carregarDadosCategoria(categoriaId) {
       }
     } else if (categoriaId === 'projeto-f') {
       if ((!dados || dados.length === 0) && window.location.protocol.startsWith('http')) {
-        fetch('/api/projeto_f_dataset', { credentials: 'include' })
-          .then(response => response.ok ? response.json() : null)
-          .then(payload => {
-            const itensProjetoF = payload?.items;
-            if (Array.isArray(itensProjetoF) && itensProjetoF.length) {
-              applyDatasetToState('projeto-f', itensProjetoF);
-              cacheDatasetLocally('projeto-f', itensProjetoF, { source: 'api-projeto-f' });
-              renderTabelaProjetoF(tabelaId, itensProjetoF);
+        fetch('/api/shared_datasets', { credentials: 'include' })
+          .then(resp => resp.ok ? resp.json() : null)
+          .then(sharedPayload => {
+            const itensCompartilhados = sharedPayload?.datasets?.['projeto-f']?.items;
+            if (Array.isArray(itensCompartilhados) && itensCompartilhados.length) {
+              applyDatasetToState('projeto-f', itensCompartilhados);
+              cacheDatasetLocally('projeto-f', itensCompartilhados, { source: 'shared', locked: true });
+              renderTabelaProjetoF(tabelaId, itensCompartilhados);
               atualizarContadores();
-              return;
             }
-
-            // Fallback legado: tenta dataset compartilhado se a API dedicada retornar vazio.
-            return fetch('/api/shared_datasets', { credentials: 'include' })
-              .then(resp => resp.ok ? resp.json() : null)
-              .then(sharedPayload => {
-                const itensCompartilhados = sharedPayload?.datasets?.['projeto-f']?.items;
-                if (Array.isArray(itensCompartilhados) && itensCompartilhados.length) {
-                  applyDatasetToState('projeto-f', itensCompartilhados);
-                  cacheDatasetLocally('projeto-f', itensCompartilhados, { source: 'shared' });
-                  renderTabelaProjetoF(tabelaId, itensCompartilhados);
-                  atualizarContadores();
-                }
-              });
           })
           .catch(() => {});
       }
@@ -5980,13 +6123,20 @@ function buscarEmCategoria(categoriaId) {
 let currentPendenteCodigo = null;
 
 function atualizarContadores() {
+  const totalProjetoF = getPreferredDataset('projeto-f').length;
+  const epoStore = getEpoNovosStore();
+  const totalEpo = Object.values(epoStore || {}).reduce((acc, lista) => {
+    return acc + (Array.isArray(lista) ? lista.length : 0);
+  }, 0);
+
   const contadores = {
     'pendente-autorizacao': (dadosPorCategoria['pendente-autorizacao'] || []).length,
     'ongoing': (dadosPorCategoria['ongoing'] || dadosCSVOngoing || []).length,
-    'novos-empreendimentos': (dadosPorCategoria['novos-empreendimentos'] || []).length,
+    'projeto-f': totalProjetoF,
     'empresarial': (dadosPorCategoria['empresarial'] || []).length,
     'sar-rede': (dadosPorCategoria['sar-rede'] || []).length,
-    'mdu-ongoing': (dadosPorCategoria['mdu-ongoing'] || []).length
+    'mdu-ongoing': (dadosPorCategoria['mdu-ongoing'] || []).length,
+    'epo': totalEpo,
   };
 
   for (const [categoria, count] of Object.entries(contadores)) {
@@ -6062,6 +6212,51 @@ function renderModalHeroPills(items = []) {
     .join('');
 }
 
+function renderModalAllFields(item) {
+  if (!item || typeof item !== 'object') return '';
+
+  const keys = Object.keys(item);
+  const hasOriginalForNormalized = new Set();
+
+  keys.forEach(key => {
+    const normalized = normalizeKey(key);
+    if (normalized && key !== normalized) {
+      hasOriginalForNormalized.add(normalized);
+    }
+  });
+
+  const rows = keys
+    .filter(key => {
+      const normalized = normalizeKey(key);
+      if (key === normalized && hasOriginalForNormalized.has(normalized)) {
+        return false;
+      }
+
+      const value = item[key];
+      return value !== undefined && value !== null && String(value).trim() !== '';
+    })
+    .map(key => `
+      <tr>
+        <td style="padding:6px 8px; border:1px solid #e2e8f0; font-weight:600; white-space:nowrap;">${escapeHtml(key)}</td>
+        <td style="padding:6px 8px; border:1px solid #e2e8f0;">${escapeHtml(item[key])}</td>
+      </tr>
+    `)
+    .join('');
+
+  if (!rows) return '';
+
+  return `
+    <details class="modal-extra" style="margin-top:12px;">
+      <summary style="cursor:pointer; font-weight:700; color:#1e3a8a;">Todos os campos da planilha</summary>
+      <div style="margin-top:10px; max-height:260px; overflow:auto; border:1px solid #e2e8f0; border-radius:8px;">
+        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </details>
+  `;
+}
+
 function applyModalContext({
   themeClass = '',
   title = 'Detalhes do Registro',
@@ -6112,7 +6307,7 @@ function applyModalContext({
 function visualizarEmpresarial(codigo) {
   currentPendenteCodigo = codigo;
   const dados = dadosPorCategoria['empresarial'] || [];
-  const item = dados.find(i => getField(i, "COD-MDUGO") === codigo);
+  const item = dados.find(i => getField(i, "COD-MDUGO", "cod-mdugo", "codmdugo") === codigo);
   if (!item) {
     alert('Registro não encontrado');
     return;
@@ -6123,9 +6318,9 @@ function visualizarEmpresarial(codigo) {
   const cidade = getField(item, "CIDADE") || '-';
   const epo = getField(item, "EPO", "cluster", "regional") || '-';
   const solicitante = getField(item, "SOLICITANTE", "solicitante") || '-';
-  const statusGeral = getField(item, "STATUS_GERAL") || '-';
-  const motivoGeral = getField(item, "MOTIVO_GERAL") || '-';
-  const obsOriginal = getField(item, "OBS") || '-';
+  const statusGeral = getField(item, "STATUS_GERAL", "status_geral", "status") || '-';
+  const motivoGeral = getField(item, "MOTIVO_GERAL", "motivo_geral", "motivo") || '-';
+  const obsOriginal = getField(item, "OBS", "obs", "OBSERVACAO", "observacao", "STATUS OBS", "status obs", "status_obs") || '-';
   const heroSubtitle = [cidade, bairro, epo].filter(value => value && value !== '-').join(' • ') || 'Registro empresarial selecionado';
 
   document.getElementById('modal-codigo').textContent = codigo;
@@ -6163,6 +6358,88 @@ function visualizarEmpresarial(codigo) {
         ${renderModalInfoCard('Bairro', bairro)}
         ${renderModalInfoCard('Cidade', cidade)}
       </div>
+      ${renderModalAllFields(item)}
+    `;
+    const obsRow = document.getElementById('modal-obs-original')?.closest('.modal-row');
+    if (obsRow) {
+      obsRow.insertAdjacentHTML('beforebegin', extraHtml);
+    }
+  }
+
+  carregarObservacoesPendente(codigo);
+  carregarAnexosPendente(codigo);
+
+  const modal = document.getElementById('modal-obs');
+  if (modal) modal.classList.remove('hidden');
+  const anexoInput = document.getElementById('modal-anexo');
+  if (anexoInput) {
+    anexoInput.value = "";
+    anexoInput.onchange = (evt) => {
+      const file = evt.target.files[0];
+      if (file) {
+        uploadAnexoPendente(codigo, file);
+      }
+    };
+  }
+}
+
+function visualizarEmpresarialPorIndice(index) {
+  const rows = Array.isArray(window.__empresarialRowsSnapshot) ? window.__empresarialRowsSnapshot : [];
+  const item = rows[index];
+  if (!item) {
+    alert('Registro não encontrado');
+    return;
+  }
+
+  const codigo = getField(item, "COD-MDUGO", "cod-mdugo", "codmdugo") || '-';
+  currentPendenteCodigo = codigo;
+
+  const enderecoCompleto = `${getField(item, "ENDEREÇO", "ENDERECO", "endereco", "endereco_entrada") || '-'} ${getField(item, "NUMERO", "numero") || ''}`.trim();
+  const bairro = getField(item, "BAIRRO", "bairro") || '-';
+  const cidade = getField(item, "CIDADE", "cidade") || '-';
+  const epo = getField(item, "EPO", "cluster", "regional") || '-';
+  const solicitante = getField(item, "SOLICITANTE", "solicitante") || '-';
+  const statusGeral = getField(item, "STATUS_GERAL", "status_geral", "status") || '-';
+  const motivoGeral = getField(item, "MOTIVO_GERAL", "motivo_geral", "motivo") || '-';
+  const obsOriginal = getField(item, "OBS", "obs", "OBSERVACAO", "observacao", "STATUS OBS", "status obs", "status_obs") || '-';
+  const heroSubtitle = [cidade, bairro, epo].filter(value => value && value !== '-').join(' • ') || 'Registro empresarial selecionado';
+
+  document.getElementById('modal-codigo').textContent = codigo;
+  document.getElementById('modal-endereco').textContent = enderecoCompleto;
+  document.getElementById('modal-bairro').textContent = bairro;
+  document.getElementById('modal-cidade').textContent = cidade;
+  document.getElementById('modal-epo').textContent = epo;
+  document.getElementById('modal-status').innerHTML = renderModalBadge(statusGeral);
+  document.getElementById('modal-motivo').innerHTML = renderModalBadge(motivoGeral);
+  document.getElementById('modal-obs-original').textContent = obsOriginal;
+  document.getElementById('modal-obs-adicional').value = "";
+
+  applyModalContext({
+    themeClass: 'empresarial-modal',
+    title: 'Detalhes Empresarial',
+    kicker: 'Painel executivo do atendimento empresarial',
+    heroChip: 'Empresarial',
+    heroTitle: enderecoCompleto || codigo,
+    heroSubtitle,
+    statusLabel: 'Status Geral',
+    motivoLabel: 'Motivo Geral',
+    heroPills: [
+      { label: 'Código', value: codigo },
+      { label: 'Status', value: statusGeral, badge: true },
+      { label: 'Motivo', value: motivoGeral, badge: true }
+    ]
+  });
+
+  const modalBody = document.querySelector('#modal-obs .modal-body');
+  if (modalBody) {
+    const extraHtml = `
+      <div class="modal-extra modal-extra-grid">
+        ${renderModalInfoCard('Solicitante', solicitante, { featured: true })}
+        ${renderModalInfoCard('EPO / Cluster', epo)}
+        ${renderModalInfoCard('Bairro', bairro)}
+        ${renderModalInfoCard('Cidade', cidade)}
+      </div>
+      ${renderModalAllFields(item)}
     `;
     const obsRow = document.getElementById('modal-obs-original')?.closest('.modal-row');
     if (obsRow) {
