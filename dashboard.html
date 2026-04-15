@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="portal-api-base" content="">
+  <meta name="portal-api-base" content="https://portal-enderecos-backend.onrender.com">
   <title>Painel MDU</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -91,6 +91,7 @@
           <div class="categoria-icon">📋</div>
           <h3 class="categoria-titulo">Pendente Autorização</h3>
           <p class="categoria-subtitulo">MDU/SAR</p>
+          <p class="categoria-info">Registros: <strong id="count-pendente-autorizacao">0</strong></p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
@@ -98,6 +99,7 @@
           <div class="categoria-icon">⏳</div>
           <h3 class="categoria-titulo">Ongoing</h3>
           <p class="categoria-subtitulo">Demandas em Progresso</p>
+          <p class="categoria-info">Registros: <strong id="count-ongoing">0</strong></p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
@@ -105,6 +107,7 @@
           <div class="categoria-icon">📡</div>
           <h3 class="categoria-titulo">projeto f</h3>
           <p class="categoria-subtitulo">Novos Projetos</p>
+          <p class="categoria-info">Registros: <strong id="count-projeto-f">0</strong></p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
@@ -112,6 +115,7 @@
           <div class="categoria-icon">🏢</div>
           <h3 class="categoria-titulo">Empresarial</h3>
           <p class="categoria-subtitulo">Clientes Corporativos</p>
+          <p class="categoria-info">Registros: <strong id="count-empresarial">0</strong></p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
@@ -119,6 +123,7 @@
           <div class="categoria-icon">🔗</div>
           <h3 class="categoria-titulo">SAR Rede</h3>
           <p class="categoria-subtitulo">Rede SAR</p>
+          <p class="categoria-info">Registros: <strong id="count-sar-rede">0</strong></p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
@@ -126,6 +131,7 @@
           <div class="categoria-icon">📡</div>
           <h3 class="categoria-titulo">MDU Ongoing</h3>
           <p class="categoria-subtitulo">MDU em Progresso</p>
+          <p class="categoria-info">Registros: <strong id="count-mdu-ongoing">0</strong></p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
@@ -133,6 +139,7 @@
           <div class="categoria-icon">👷</div>
           <h3 class="categoria-titulo">EPO</h3>
           <p class="categoria-subtitulo">Gestão por parceira</p>
+          <p class="categoria-info">Registros: <strong id="count-epo">0</strong></p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
@@ -167,6 +174,7 @@
         <button onclick="exportarPaginaInicial()" class="btn-primary">📥 Exportar Planilha</button>
         <span id="file-name" class="file-name"></span>
         <div id="import-status" class="import-status-line" style="margin-top:6px; font-size:13px; opacity:.8;"></div>
+        <div id="import-lock-info" class="import-status-line" style="margin-top:4px; font-size:12px; opacity:.85;"></div>
       </div>
 
       <div id="import-network" class="import-controls" style="display:none; margin-top: 12px; gap: 10px;">
