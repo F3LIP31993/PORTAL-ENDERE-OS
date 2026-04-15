@@ -88,7 +88,7 @@ function cacheDatasetLocally(categoria, items, meta = {}) {
   }
 }
 
-function formatDateTimeBr(value) {
+function formatDatasetTimestampBr(value) {
   if (!value) return '';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '';
@@ -128,10 +128,12 @@ function updateImportLockInfo(categoriaId = categoriaAtualParaImport) {
   }
 
   const snapshot = getLocalDatasetCache()?.[categoriaId] || {};
-  const items = Array.isArray(snapshot.items) ? snapshot.items : [];
-  const updatedAtText = formatDateTimeBr(snapshot.updatedAt);
+  const snapshotItems = Array.isArray(snapshot.items) ? snapshot.items : [];
+  const stateItems = Array.isArray(dadosPorCategoria?.[categoriaId]) ? dadosPorCategoria[categoriaId] : [];
+  const items = snapshotItems.length ? snapshotItems : stateItems;
+  const updatedAtText = formatDatasetTimestampBr(snapshot.updatedAt);
   const updatedByText = snapshot.updatedBy || '';
-  const sourceText = snapshot.source || 'local';
+  const sourceText = snapshot.source || (stateItems.length ? 'estado' : 'local');
 
   if (!items.length && !updatedAtText) {
     lockInfoEl.textContent = '';
@@ -142,11 +144,41 @@ function updateImportLockInfo(categoriaId = categoriaAtualParaImport) {
     `📌 Base ativa: ${items.length} registro(s)`,
     updatedAtText ? `atualizado em ${updatedAtText}` : '',
     updatedByText ? `por ${updatedByText}` : '',
-    snapshot.locked ? 'travado' : 'não travado',
+    (snapshot.locked || (categoriaId === 'projeto-f' && items.length > 0)) ? 'travado' : 'não travado',
     sourceText ? `origem ${sourceText}` : '',
   ].filter(Boolean).join(' • ');
 
   lockInfoEl.textContent = details;
+}
+
+function updateEpoLockInfo(extraText = '') {
+  const statusEl = document.getElementById('epo-novos-import-status');
+  if (!statusEl) return;
+
+  const snapshot = getLocalDatasetCache()?.['epo-novos'] || {};
+  const snapshotItems = Array.isArray(snapshot.items) ? snapshot.items : [];
+  const storeRows = flattenEpoNovosStore(getEpoNovosStore());
+  const items = snapshotItems.length ? snapshotItems : storeRows;
+  const updatedAtText = formatDatasetTimestampBr(snapshot.updatedAt);
+  const updatedByText = snapshot.updatedBy || '';
+  const sourceText = snapshot.source || (storeRows.length ? 'local' : 'shared');
+  const lockedText = (snapshot.locked || items.length > 0) ? 'travado' : 'não travado';
+
+  if (!items.length && !extraText) {
+    statusEl.textContent = '';
+    return;
+  }
+
+  const parts = [
+    extraText,
+    `${items.length} endereços em ${Object.keys(getEpoNovosStore()).length} EPOs`,
+    updatedAtText ? `atualizado em ${updatedAtText}` : '',
+    updatedByText ? `por ${updatedByText}` : '',
+    lockedText,
+    `origem ${sourceText}`,
+  ].filter(Boolean);
+
+  statusEl.textContent = `✅ ${parts.join(' • ')}`;
 }
 
 function hasLockedDataset(categoria) {
@@ -4743,23 +4775,44 @@ async function carregarEpoNovosCompartilhado() {
     if (!res.ok) return;
 
     const payload = await res.json().catch(() => ({}));
-    const rows = payload?.datasets?.['epo-novos']?.items;
+    const epoSnapshot = payload?.datasets?.['epo-novos'] || {};
+    const rows = epoSnapshot?.items;
+
+    const localSnapshot = getLocalDatasetCache()?.['epo-novos'] || {};
+    const localRows = flattenEpoNovosStore(getEpoNovosStore());
+    const localUpdatedAt = Date.parse(localSnapshot?.updatedAt || '') || 0;
+    const sharedUpdatedAt = Date.parse(epoSnapshot?.updated_at || epoSnapshot?.updatedAt || '') || 0;
+    const shouldKeepLockedLocal = Boolean(localSnapshot?.locked) && localRows.length && (!Array.isArray(rows) || !rows.length || localUpdatedAt >= sharedUpdatedAt);
+
+    if (shouldKeepLockedLocal) {
+      updateEpoLockInfo();
+      return;
+    }
+
     if (!Array.isArray(rows) || !rows.length) {
       const user = getCurrentUser();
-      const localStore = getEpoNovosStore();
-      const localRows = flattenEpoNovosStore(localStore);
       if (user?.role === 'admin' && localRows.length) {
         persistirDadosCompartilhados('epo-novos', localRows, { source: 'manual', locked: true });
       }
+      updateEpoLockInfo();
       return;
     }
+
+    cacheDatasetLocally('epo-novos', rows, {
+      source: 'shared',
+      updatedAt: epoSnapshot?.updated_at || epoSnapshot?.updatedAt || new Date().toISOString(),
+      updatedBy: epoSnapshot?.updated_by || epoSnapshot?.updatedBy || '',
+      locked: true,
+    });
 
     const store = buildEpoNovosStoreFromRows(rows);
     saveEpoNovosStore(store);
     atualizarCountPillsEpo();
     atualizarContadores();
+    updateEpoLockInfo();
   } catch {
     // Sem bloqueio: mantém cache/local.
+    updateEpoLockInfo();
   }
 }
 
@@ -4819,6 +4872,8 @@ function importarPlanilhaEpoNovos() {
     if (statusEl) statusEl.textContent = `✅ ${total} endereços em ${epoCount} EPOs`;
     const resultEl = document.getElementById('epo-action-result');
     if (resultEl) resultEl.textContent = `✅ Importado: ${resumo}`;
+
+    updateEpoLockInfo();
 
     if (epoAcaoAtual === 'novos' && epoSelecionadaAtual) renderNovosEntrantesEpo();
     if (input) input.value = '';
