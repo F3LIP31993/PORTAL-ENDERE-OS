@@ -2006,42 +2006,13 @@ function importarCSV() {
     if (isLiberados) {
       const dadosAtuais = getPreferredDataset('liberados');
       const estruturaAtual = getDadosLiberadosEstruturados(dadosAtuais || []);
-      const novosDadosImportados = parseLiberadosCsvRows(linhas, delimiter, liberadosAbaAtiva);
-      let estruturaImportada = getDadosLiberadosEstruturados(novosDadosImportados);
+      const abaDestino = normalizeLiberadosAba(liberadosAbaAtiva);
+      const novosDadosImportados = parseLiberadosCsvRows(linhas, delimiter, abaDestino)
+        .map((row) => ({ ...row, _aba_liberados: abaDestino }));
 
-      const totalImportado = novosDadosImportados.length;
-      const qtdProjetoF = (estruturaImportada['projeto-f'] || []).length;
-      const qtdAbaAtiva = (estruturaImportada[liberadosAbaAtiva] || []).length;
-      const abaAtivaNaoProjetoF = liberadosAbaAtiva !== 'projeto-f';
-      const tudoCaiuProjetoF = totalImportado > 0 && qtdProjetoF === totalImportado;
-
-      // Fallback prático: quando o arquivo não traz marcador explícito e tudo cai em PROJETO F,
-      // respeitar a aba ativa escolhida pelo usuário no momento da importação.
-      if (abaAtivaNaoProjetoF && tudoCaiuProjetoF && qtdAbaAtiva === 0) {
-        estruturaImportada = {
-          'projeto-f': [],
-          'gpon-hfc': [],
-          'greenfield': []
-        };
-        estruturaImportada[liberadosAbaAtiva] = novosDadosImportados.map((row) => ({
-          ...row,
-          _aba_liberados: liberadosAbaAtiva
-        }));
-      }
-
-      let abasAtualizadas = [];
-      LIBERADOS_ABAS.forEach((aba) => {
-        const rows = Array.isArray(estruturaImportada[aba]) ? estruturaImportada[aba] : [];
-        if (rows.length) {
-          estruturaAtual[aba] = rows;
-          abasAtualizadas.push(`${getLiberadosAbaLabel(aba)} (${rows.length})`);
-        }
-      });
-
-      if (!abasAtualizadas.length) {
-        estruturaAtual[liberadosAbaAtiva] = novosDadosImportados;
-        abasAtualizadas = [`${getLiberadosAbaLabel(liberadosAbaAtiva)} (${novosDadosImportados.length})`];
-      }
+      // Regra determinística: importação no LIBERADOS sempre atualiza a aba ativa selecionada.
+      estruturaAtual[abaDestino] = novosDadosImportados;
+      const abasAtualizadas = [`${getLiberadosAbaLabel(abaDestino)} (${novosDadosImportados.length})`];
 
       if (!(estruturaAtual[liberadosAbaAtiva] || []).length) {
         const primeiraAbaComDados = LIBERADOS_ABAS.find((aba) => (estruturaAtual[aba] || []).length > 0);
@@ -5654,7 +5625,12 @@ function getEpoRowsForEpo(actionKey = 'gpon-ongoing', nomeEpo = '') {
   const key = String(nomeEpo || '').trim().toUpperCase();
   if (!key) return [];
   const store = getEpoStore(actionKey);
-  return Array.isArray(store[key]) ? store[key] : [];
+  if (Array.isArray(store[key])) return store[key];
+
+  const normalizeBucket = (value = '') => normalizeText(String(value || '')).replace(/[^a-z0-9]/g, '');
+  const target = normalizeBucket(key);
+  const foundKey = Object.keys(store || {}).find((k) => normalizeBucket(k) === target);
+  return foundKey && Array.isArray(store[foundKey]) ? store[foundKey] : [];
 }
 
 function updateEpoImportStatus(actionKey = 'gpon-ongoing', extraText = '') {
@@ -5760,12 +5736,21 @@ function abrirImportEpoProjetoF() {
 }
 
 function _resolverEpoDaLinha(item) {
-  const EPO_KEYS = ['EPO','epo','PARCEIRA','parceira','CLUSTER','cluster','EPO / Cluster','epo / cluster'];
+  const EPO_KEYS = ['EPO', 'epo', 'EPO/CLUSTER', 'EPO / Cluster', 'EPO_CLUSTER', 'epo_cluster', 'PARCEIRA', 'parceira', 'PARCEIRO', 'parceiro', 'CLUSTER', 'cluster'];
   const raw = (getField(item, ...EPO_KEYS) || '').toString().trim().toUpperCase();
   if (!raw) return null;
+  const normalizeBucket = (value = '') => normalizeText(String(value || '')).replace(/[^a-z0-9]/g, '');
+
   const exact = EPO_PILLS.find(p => p === raw);
   if (exact) return exact;
-  return EPO_PILLS.find(p => raw.includes(p) || p.includes(raw)) || raw;
+
+  const rawNorm = normalizeBucket(raw);
+  const byNormalized = EPO_PILLS.find((p) => {
+    const pNorm = normalizeBucket(p);
+    return rawNorm === pNorm || rawNorm.includes(pNorm) || pNorm.includes(rawNorm);
+  });
+
+  return byNormalized || raw;
 }
 
 function importarPlanilhaEpoGponOngoing() {
@@ -5780,13 +5765,12 @@ function importarPlanilhaEpoGponOngoing() {
     const delimiter = (textClean.split(/\r?\n/)[0] || '').includes(';') ? ';' : ',';
     const linhas = parseGenericCsvRows(textClean, delimiter);
 
-    const vistorias = linhas.filter(item => {
-      const s = (getField(item, 'STATUS_GERAL', 'STATUS', 'status') || '').toString().trim();
-      return s === '1.VISTORIA' || normalizeText(s) === '1.vistoria';
-    });
-
     const byEpo = {};
-    vistorias.forEach(item => {
+    linhas.forEach(item => {
+      const codigo = getField(item, 'COD-MDUGO', 'CODIGO', 'CÓDIGO', 'COD', 'ID', 'id');
+      const endereco = getField(item, 'ENDEREÇO', 'ENDERECO', 'endereco');
+      if (!String(codigo || '').trim() && !String(endereco || '').trim()) return;
+
       const key = _resolverEpoDaLinha(item);
       if (!key) return;
       if (!byEpo[key]) byEpo[key] = [];
@@ -5799,11 +5783,11 @@ function importarPlanilhaEpoGponOngoing() {
     persistirDadosCompartilhados('epo-gpon-ongoing', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
     cacheDatasetLocally('epo-gpon-ongoing', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
 
-    const total = vistorias.length;
+    const total = linhas.length;
     const epoCount = Object.keys(byEpo).length;
     const resumo = Object.entries(byEpo).map(([k, v]) => `${k}:${v.length}`).join(' | ');
 
-    if (statusEl) statusEl.textContent = `✅ ${total} endereços em ${epoCount} EPOs`;
+    if (statusEl) statusEl.textContent = `✅ ${total} linhas processadas • ${epoCount} EPOs`;
     const resultEl = document.getElementById('epo-action-result');
     if (resultEl) resultEl.textContent = `✅ Importado: ${resumo}`;
 
@@ -6143,47 +6127,34 @@ function renderGponOngoingEpo(customRows = null) {
     return;
   }
 
-  const aceitesStore = getEpoAceitesStore();
-  const listaAceites = normalizeListaAceitesEpo(aceitesStore?.[epoSelecionadaAtual]);
-  const aceites = new Map(listaAceites.map((item) => [String(item.codigo), item]));
   window.__epoGponRows = dados;
 
   const rows = dados.map((item, idx) => {
-    const codigo = String(getField(item, 'COD-MDUGO', 'cod-mdugo', 'codmdugo') || `LINHA-${idx + 1}`);
-    const tipoRede = getField(item, 'TIPO_REDE', 'tipo_rede', 'TIPO DE REDE') || '-';
+    const codigo = String(getField(item, 'COD-MDUGO', 'CODIGO', 'CÓDIGO', 'cod-mdugo', 'codmdugo') || `LINHA-${idx + 1}`);
     const enderecoBase = getField(item, 'ENDEREÇO', 'ENDERECO', 'endereco') || '-';
     const numero = getField(item, 'NUMERO', 'numero', 'num') || '-';
     const bairro = getField(item, 'BAIRRO', 'bairro') || '-';
     const cidade = getField(item, 'CIDADE', 'cidade') || '-';
+    const epo = getField(item, 'EPO', 'epo', 'CLUSTER', 'cluster', 'PARCEIRA', 'parceira') || epoSelecionadaAtual || '-';
     const solicitante = getField(item, 'SOLICITANTE', 'solicitante') || '-';
-    const status = getField(item, 'STATUS_GERAL', 'STATUS', 'status') || '-';
-    const motivo = getField(item, 'MOTIVO_GERAL', 'MOTIVO', 'motivo') || '-';
-    const aceiteInfo = aceites.get(codigo);
-    const aceito = Boolean(aceiteInfo);
-    const responsavel = aceiteInfo?.responsavel || '-';
-    const destaqueRecente = Boolean(
-      aceito && epoUltimoAceite
-      && epoUltimoAceite.epo === epoSelecionadaAtual
-      && epoUltimoAceite.codigo === codigo
-      && (Date.now() - Number(epoUltimoAceite.at || 0) <= 15000)
-    );
+    const status = getField(item, 'STATUS_GERAL', 'STATUS', 'status', 'Status Geral') || '-';
+    const motivo = getField(item, 'MOTIVO_GERAL', 'MOTIVO', 'motivo', 'Motivo Geral') || '-';
 
     return `
-      <tr class="${aceito ? 'epo-row-aceita' : ''} ${destaqueRecente ? 'epo-row-aceita-recente' : ''}">
+      <tr>
         <td>${escapeHtml(codigo)}</td>
-        <td>${escapeHtml(tipoRede)}</td>
         <td>${escapeHtml(enderecoBase)}</td>
         <td>${escapeHtml(numero)}</td>
         <td>${escapeHtml(bairro)}</td>
         <td>${escapeHtml(cidade)}</td>
+        <td>${escapeHtml(epo)}</td>
         <td>${escapeHtml(solicitante)}</td>
         <td>${escapeHtml(status)}</td>
+        <td>${escapeHtml(motivo)}</td>
         <td>
           <div class="epo-inline-actions">
             <button type="button" class="btn-secondary" onclick="visualizarNovoEntrante(${idx})">Visualizar</button>
-            <button type="button" class="btn-primary ${aceito ? `epo-btn-aceito ${destaqueRecente ? 'pulse' : ''}` : ''}" ${aceito ? 'disabled' : ''} onclick="aceitarNovoEntrante(${idx})">${aceito ? 'Aceito' : 'Aceite'}</button>
           </div>
-          ${aceito ? `<p class="epo-aceite-owner">Responsável: ${escapeHtml(responsavel)}</p>` : ''}
         </td>
       </tr>
     `;
@@ -6195,15 +6166,16 @@ function renderGponOngoingEpo(customRows = null) {
       <table class="epo-table">
         <thead>
           <tr>
-            <th>COD-MDUGO</th>
-            <th>TIPO_REDE</th>
-            <th>ENDEREÇO</th>
-            <th>NUMERO</th>
-            <th>BAIRRO</th>
-            <th>CIDADE</th>
-            <th>SOLICITANTE</th>
-            <th>STATUS_GERAL</th>
-            <th>Ações</th>
+            <th>Código</th>
+            <th>Endereço</th>
+            <th>Número</th>
+            <th>Bairro</th>
+            <th>Cidade</th>
+            <th>EPO</th>
+            <th>Solicitante</th>
+            <th>Status Geral</th>
+            <th>Motivo Geral</th>
+            <th>Ação</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -6292,26 +6264,21 @@ async function visualizarNovoEntrante(index) {
   const item = window.__epoGponRows?.[index];
   if (!item) return;
 
-  const codigo = String(getField(item, 'COD-MDUGO', 'cod-mdugo', 'codmdugo') || `LINHA-${index + 1}`);
+  const codigo = String(getField(item, 'COD-MDUGO', 'CODIGO', 'CÓDIGO', 'cod-mdugo', 'codmdugo') || `LINHA-${index + 1}`);
   const enderecoBase = getField(item, 'ENDEREÇO', 'ENDERECO', 'endereco') || '-';
   const numero = getField(item, 'NUMERO', 'numero', 'num') || '-';
   const enderecoCompleto = numero && numero !== '-' ? `${enderecoBase}, ${numero}` : enderecoBase || '-';
   const bairro = getField(item, 'BAIRRO', 'bairro') || '-';
   const cidade = getField(item, 'CIDADE', 'cidade') || '-';
-  const tipoRede = getField(item, 'TIPO_REDE', 'tipo_rede', 'TIPO DE REDE') || '-';
+  const tipoRede = getField(item, 'TIPO_REDE', 'tipo_rede', 'TIPO DE REDE', 'REDE') || '-';
   const contato = getField(item, 'CONTATO', 'contato', 'TELEFONE') || '-';
-  const status = getField(item, 'STATUS_GERAL', 'STATUS', 'status') || '-';
-  const motivo = getField(item, 'MOTIVO_GERAL', 'MOTIVO', 'motivo') || '-';
+  const status = getField(item, 'STATUS_GERAL', 'STATUS', 'status', 'Status Geral') || '-';
+  const motivo = getField(item, 'MOTIVO_GERAL', 'MOTIVO', 'motivo', 'Motivo Geral') || '-';
   const obsOriginal = getField(item, 'OBS', 'OBSERVACAO', 'observacao') || '-';
   const nodeAreaTecnica = getField(item, 'NODE&ÁREA TÉCNICA', 'NODE&AREA TECNICA', 'NODE_AREA_TECNICA', 'NODE', 'node') || '-';
   const dadosCliente = getField(item, 'DADOS_CLIENTE', 'DADOS CLIENTE', 'dados_cliente') || '-';
   const solicitante = getField(item, 'SOLICITANTE', 'solicitante') || '-';
-
-  const aceitesStore = getEpoAceitesStore();
-  const listaAceites = normalizeListaAceitesEpo(aceitesStore?.[epoSelecionadaAtual]);
-  const aceiteInfo = listaAceites.find((entry) => String(entry.codigo) === codigo) || null;
-  const responsavelAceite = aceiteInfo?.responsavel || 'Sem responsável';
-  const aceiteEm = formatDateTimeBr(aceiteInfo?.aceitoEm);
+  const epo = getField(item, 'EPO', 'epo', 'CLUSTER', 'cluster', 'PARCEIRA', 'parceira') || epoSelecionadaAtual || '-';
 
   const referencia = `${epoSelecionadaAtual || 'EPO'}::${codigo}`;
   currentPendenteCodigo = referencia;
@@ -6320,7 +6287,7 @@ async function visualizarNovoEntrante(index) {
   document.getElementById('modal-endereco').textContent = enderecoCompleto;
   document.getElementById('modal-bairro').textContent = bairro;
   document.getElementById('modal-cidade').textContent = cidade;
-  document.getElementById('modal-epo').textContent = epoSelecionadaAtual || '-';
+  document.getElementById('modal-epo').textContent = epo;
   document.getElementById('modal-status').innerHTML = renderModalBadge(status);
   document.getElementById('modal-motivo').innerHTML = renderModalBadge(motivo);
   document.getElementById('modal-obs-original').textContent = obsOriginal;
@@ -6332,7 +6299,7 @@ async function visualizarNovoEntrante(index) {
     kicker: 'Painel executivo de novos entrantes',
     heroChip: 'EPO',
     heroTitle: enderecoCompleto || codigo,
-    heroSubtitle: [cidade, bairro, epoSelecionadaAtual].filter(v => v && v !== '-').join(' • ') || 'Visualização detalhada do entrante selecionado.',
+    heroSubtitle: [cidade, bairro, epo].filter(v => v && v !== '-').join(' • ') || 'Visualização detalhada do entrante selecionado.',
     statusLabel: 'Status Geral',
     motivoLabel: 'Motivo Geral',
     heroPills: [
@@ -6355,8 +6322,7 @@ async function visualizarNovoEntrante(index) {
         ${renderModalInfoCard('DADOS_CLIENTE', dadosCliente)}
         ${renderModalInfoCard('CONTATO', contato)}
         ${renderModalInfoCard('SOLICITANTE', solicitante)}
-        ${renderModalInfoCard('RESPONSÁVEL DO ACEITE', responsavelAceite)}
-        ${renderModalInfoCard('ACEITO EM', aceiteEm)}
+        ${renderModalInfoCard('EPO', epo)}
       </div>
     `;
     const obsRow = document.getElementById('modal-obs-original')?.closest('.modal-row');
@@ -6375,16 +6341,6 @@ async function visualizarNovoEntrante(index) {
   if (footer) {
     const oldBtn = document.getElementById('modal-retirar-responsavel');
     if (oldBtn) oldBtn.remove();
-
-    if (aceiteInfo) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.id = 'modal-retirar-responsavel';
-      btn.className = 'btn-secondary';
-      btn.textContent = 'Retirar do responsável';
-      btn.onclick = () => retirarResponsavelNovoEntrante(index);
-      footer.insertBefore(btn, footer.querySelector('.btn-primary'));
-    }
   }
 
   const anexoInput = document.getElementById('modal-anexo');
