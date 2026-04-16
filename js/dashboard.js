@@ -1706,9 +1706,12 @@ function importarCSV() {
 
     if (isSarRede) {
       const dados = [];
+      const sarHeaderLineIndex = linhas.length > 1 ? 1 : headerLineIndex;
+      const sarCabecalhoRaw = linhas[sarHeaderLineIndex] || cabecalhoRaw;
+      const sarCabecalho = _splitCsvLine(sarCabecalhoRaw, delimiter).map(c => c.replace(/^\uFEFF/, "").trim());
 
       // Usa o cabecalho detectado automaticamente para suportar planilhas com linhas iniciais de observacao.
-      for (let i = headerLineIndex + 1; i < linhas.length; i++) {
+      for (let i = sarHeaderLineIndex + 1; i < linhas.length; i++) {
         const linha = linhas[i];
         if (!linha || !linha.trim()) continue;
 
@@ -1716,7 +1719,7 @@ function importarCSV() {
         const item = {};
         let hasValue = false;
 
-        cabecalho.forEach((c, j) => {
+        sarCabecalho.forEach((c, j) => {
           const key = (c || '').trim();
           if (!key) return;
 
@@ -1732,7 +1735,7 @@ function importarCSV() {
         });
 
         if (hasValue) {
-          const v = cabecalho.map((_, idx) => (cols[idx] || '').trim());
+          const v = sarCabecalho.map((_, idx) => (cols[idx] || '').trim());
 
           const idProjeto = getField(item, 'ID Projeto', 'ID_PROJETO', 'id projeto', 'id_projeto', 'ID', 'id') || v[0] || '';
           const ddd = getField(item, 'DDD', 'ddd') || v[1] || '';
