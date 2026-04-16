@@ -133,7 +133,7 @@ function updateImportLockInfo(categoriaId = categoriaAtualParaImport) {
   const items = snapshotItems.length ? snapshotItems : stateItems;
   const sourceText = snapshot.source || (stateItems.length ? 'estado' : 'local');
 
-  if (!items.length && !updatedAtText) {
+  if (!items.length) {
     lockInfoEl.textContent = '';
     return;
   }
