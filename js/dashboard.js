@@ -272,7 +272,7 @@ function syncDerivedCategoriesFromBacklog(sourceRows = [], persistToServer = fal
 
   ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede'].forEach(categoriaId => {
     const shouldPreserveManualImport = ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede'].includes(categoriaId)
-      && (hasLockedDataset(categoriaId) || (dadosPorCategoria[categoriaId] || []).length > 0);
+      && hasLockedDataset(categoriaId);
 
     if (shouldPreserveManualImport) {
       return;
@@ -1781,6 +1781,26 @@ function importarCSV() {
             item.obs = obsValue;
           }
         });
+
+        if (categoria === 'sar-rede') {
+          // Em SAR REDE, a importacao manual precisa prevalecer sobre qualquer base derivada.
+          applyDatasetToState('sar-rede', parsed);
+          cacheDatasetLocally('sar-rede', parsed, { source: 'manual', locked: true });
+          persistirDadosCompartilhados('sar-rede', parsed, { source: 'manual', locked: true });
+
+          if (statusEl) {
+            if (truncado) {
+              statusEl.textContent = `✅ Importado ${parsed.length}+ registros (limite atingido, há mais linhas no arquivo)`;
+            } else {
+              statusEl.textContent = `✅ Importado ${parsed.length} registro(s)`;
+            }
+          }
+
+          renderTabelaSarRede('tabela-sar-rede', parsed);
+          popularFiltroStatusSarRede(parsed);
+          atualizarSeccaoAtivaComDados();
+          return;
+        }
 
         dadosPorCategoria[categoria] = parsed;
 
