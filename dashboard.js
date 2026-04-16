@@ -377,6 +377,27 @@ function updateUserProfileInfo() {
   }
 }
 
+async function loadViewerUserProfileData() {
+  const user = getCurrentUser();
+  if (!user || user.role !== "viewer") return;
+
+  try {
+    const res = await fetch("/api/user_profile", { credentials: "include" });
+    if (!res.ok) return;
+
+    const profile = await res.json();
+    
+    if (profile.registration_obs) {
+      // Armazena obs do cadastro no localStorage para referência
+      const key = `viewer_profile_${user.username}`;
+      localStorage.setItem(key, JSON.stringify(profile));
+      console.log(`✅ Perfil de acompanhamento carregado para ${user.username}`);
+    }
+  } catch (error) {
+    console.warn("Não foi possível carregar perfil do usuário de acompanhamento", error);
+  }
+}
+
 function applyAccessControl() {
   const user = getCurrentUser();
   if (!user) return;
@@ -971,6 +992,9 @@ window.addEventListener("DOMContentLoaded", async () => {
   updateNotificationBadge();
   applyAccessControl();
   await carregarDadosCompartilhados();
+  
+  // Carregar dados específicos de usuário de acompanhamento
+  await loadViewerUserProfileData();
 
   // Inicializar componentes de interface
   initHeaderSearch();

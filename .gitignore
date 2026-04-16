@@ -3,3 +3,12 @@ __pycache__/
 *.pyc
 .env
 portal.db
+portal.local.db
+*.local.db
+*.sqlite
+*.sqlite3
+.vscode/
+
+# Arquivos de log/estado da automacao local
+.autosync.state
+

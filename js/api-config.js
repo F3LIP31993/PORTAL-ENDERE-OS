@@ -32,9 +32,23 @@
     saveApiBase(queryApiBase.replace(/\/+$/, ""));
   }
 
-  const fallbackApiBase = window.location.protocol === "file:" ? "http://localhost:5000" : "";
   const runtimeOrigin = window.location.protocol.startsWith("http") ? window.location.origin : "";
-  const apiBase = [queryApiBase, globalApiBase, metaApiBase, runtimeOrigin, getSavedApiBase(), fallbackApiBase].find(Boolean) || "";
+  const savedApiBase = getSavedApiBase();
+  const isGithubPages = /github\.io$/i.test(window.location.hostname || "");
+  const renderDefaultBase = "https://portal-enderecos-backend.onrender.com";
+  const fallbackApiBase = window.location.protocol === "file:"
+    ? "http://localhost:5000"
+    : (isGithubPages ? renderDefaultBase : "");
+
+  // Ordem importante: usa query/global/meta/salvo primeiro para nao cair no dominio estatico sem API.
+  const apiBase = [
+    queryApiBase,
+    globalApiBase,
+    metaApiBase,
+    savedApiBase,
+    !isGithubPages ? runtimeOrigin : "",
+    fallbackApiBase,
+  ].find(Boolean) || "";
   const normalizedBase = apiBase.replace(/\/+$/, "");
 
   window.PORTAL_API_BASE_URL = normalizedBase;

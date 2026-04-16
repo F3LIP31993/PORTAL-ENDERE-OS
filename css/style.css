@@ -1928,8 +1928,11 @@ td {
   padding: var(--portal-table-cell-padding-y) var(--portal-table-cell-padding-x);
   color: #334155;
   word-wrap: break-word;
+  word-break: break-word;
   line-height: 1.3;
   font-size: var(--portal-table-font-size);
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 td:first-child {
@@ -2367,6 +2370,7 @@ td:first-child {
   min-width: 34px;
   text-align: center;
 }
+.aging-badge.level-0 { background: #dcfce7; color: #166534; }
 .aging-badge.level-1 { background: #fff1f2; color: #7f1d1d; }
 .aging-badge.level-2 { background: #ffe4e6; color: #7f1d1d; }
 .aging-badge.level-3 { background: #fecaca; color: #6b0219; }
@@ -3493,8 +3497,8 @@ td:first-child {
 
 .categoria-secao .card table {
   width: 100%;
-  min-width: 100%;
-  table-layout: fixed;
+  min-width: 1120px;
+  table-layout: auto;
 }
 
 .categoria-secao table {
@@ -3538,8 +3542,38 @@ td:first-child {
 #ongoing table td:nth-child(4),
 #projeto-f table th:nth-child(4),
 #projeto-f table td:nth-child(4) {
-  min-width: var(--portal-address-col-min);
-  max-width: var(--portal-address-col-max);
+  min-width: 260px;
+  max-width: 420px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Aumentar espaço para endereço em MDU ONGOING */
+#mdu-ongoing table th:nth-child(2),
+#mdu-ongoing table td:nth-child(2) {
+  min-width: 300px !important;
+  max-width: 460px !important;
+}
+
+#mdu-ongoing .card,
+#empresarial .card {
+  overflow-x: auto;
+}
+
+.table-address-cell {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.categoria-info {
+  margin: 4px 0 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1d4ed8;
 }
 
 #pendente-autorizacao table th:nth-child(6),
