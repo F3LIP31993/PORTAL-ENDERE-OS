@@ -1673,7 +1673,37 @@ function importarCSV() {
     }
 
     if (isSarRede) {
-      const dados = parseGenericCsvRows(text, delimiter);
+      const dados = [];
+
+      // Usa o cabecalho detectado automaticamente para suportar planilhas com linhas iniciais de observacao.
+      for (let i = headerLineIndex + 1; i < linhas.length; i++) {
+        const linha = linhas[i];
+        if (!linha || !linha.trim()) continue;
+
+        const cols = _splitCsvLine(linha, delimiter);
+        const item = {};
+        let hasValue = false;
+
+        cabecalho.forEach((c, j) => {
+          const key = (c || '').trim();
+          if (!key) return;
+
+          const value = (cols[j] || '').trim();
+          item[key] = value;
+
+          const normalizedKey = normalizeText(key).replace(/[^a-z0-9]/g, '_');
+          if (normalizedKey && item[normalizedKey] === undefined) {
+            item[normalizedKey] = value;
+          }
+
+          if (value) hasValue = true;
+        });
+
+        if (hasValue) {
+          dados.push(item);
+        }
+      }
+
       applyDatasetToState('sar-rede', dados);
       cacheDatasetLocally('sar-rede', dados, { source: 'manual', locked: true });
       persistirDadosCompartilhados('sar-rede', dados, { source: 'manual', locked: true });
