@@ -1597,6 +1597,7 @@ function importarCSV() {
     const isOngoing = categoria === 'ongoing';
     const isMduOngoing = categoria === 'mdu-ongoing';
     const isProjetoF = categoria === 'projeto-f';
+    const isSarRede = categoria === 'sar-rede';
 
     if (isOngoing) {
       const dados = processarCSVOngoingCompartilhado(text, delimiter);
@@ -1661,6 +1662,28 @@ function importarCSV() {
       persistirDadosCompartilhados('projeto-f', dados, { source: 'manual', locked: true });
       invalidateVisaoGerenciaCache();
       agendarRenderVisaoGerencia();
+      if (statusEl) {
+        statusEl.textContent = `✅ Importado ${dados.length} registro(s)`;
+      }
+      const fileNameDisplay = document.getElementById('file-name');
+      if (fileNameDisplay) {
+        fileNameDisplay.textContent = file.name ? `📄 ${file.name}` : '';
+      }
+      return;
+    }
+
+    if (isSarRede) {
+      const dados = parseGenericCsvRows(text, delimiter);
+      applyDatasetToState('sar-rede', dados);
+      cacheDatasetLocally('sar-rede', dados, { source: 'manual', locked: true });
+      persistirDadosCompartilhados('sar-rede', dados, { source: 'manual', locked: true });
+
+      renderTabelaSarRede('tabela-sar-rede', dados);
+      popularFiltroStatusSarRede(dados);
+      atualizarContadores();
+      invalidateVisaoGerenciaCache();
+      agendarRenderVisaoGerencia();
+
       if (statusEl) {
         statusEl.textContent = `✅ Importado ${dados.length} registro(s)`;
       }
