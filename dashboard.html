@@ -17,9 +17,9 @@
     <nav class="sidebar-menu">
       <button onclick="mostrarSecao('inicio')" class="menu-btn">🏠 Página Inicial</button>
       <button onclick="mostrarSecao('historico')" class="menu-btn" data-admin-only="true">🕒 Histórico</button>
-      <button onclick="mostrarSecao('pesquisa')" class="menu-btn">📈 Visão Gerência</button>
+      <button onclick="mostrarSecao('pesquisa')" class="menu-btn" data-admin-only="true">📈 Visão Gerência</button>
       <button onclick="mostrarSecao('relatorios')" class="menu-btn" data-admin-only="true">📊 Relatórios</button>
-      <button onclick="mostrarSecao('reuniao')" class="menu-btn">🗓️ Reunião</button>
+      <button onclick="mostrarSecao('reuniao')" class="menu-btn" data-admin-only="true">🗓️ Reunião</button>
     </nav>
 
     <button class="sair" onclick="logout()">Sair</button>
@@ -91,7 +91,6 @@
           <div class="categoria-icon">📋</div>
           <h3 class="categoria-titulo">Pendente Autorização</h3>
           <p class="categoria-subtitulo">MDU/SAR</p>
-          <p class="categoria-info">Registros: <strong id="count-pendente-autorizacao">0</strong></p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
@@ -99,7 +98,6 @@
           <div class="categoria-icon">⏳</div>
           <h3 class="categoria-titulo">Ongoing</h3>
           <p class="categoria-subtitulo">Demandas em Progresso</p>
-          <p class="categoria-info">Registros: <strong id="count-ongoing">0</strong></p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
@@ -107,31 +105,34 @@
           <div class="categoria-icon">📡</div>
           <h3 class="categoria-titulo">projeto f</h3>
           <p class="categoria-subtitulo">Novos Projetos</p>
-          <p class="categoria-info">Registros: <strong id="count-projeto-f">0</strong></p>
+          <p class="categoria-acao">Clique para abrir</p>
+        </div>
+
+        <div class="categoria-card" onclick="abrirCategoria('liberados')">
+          <div class="categoria-icon">✅</div>
+          <h3 class="categoria-titulo">LIBERADOS</h3>
+          <p class="categoria-subtitulo">Projeto F liberado</p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
         <div class="categoria-card" onclick="abrirCategoria('empresarial')">
           <div class="categoria-icon">🏢</div>
-          <h3 class="categoria-titulo">Empresarial</h3>
+          <h3 class="categoria-titulo">EMPRESARIAL</h3>
           <p class="categoria-subtitulo">Clientes Corporativos</p>
-          <p class="categoria-info">Registros: <strong id="count-empresarial">0</strong></p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
         <div class="categoria-card" onclick="abrirCategoria('sar-rede')">
           <div class="categoria-icon">🔗</div>
-          <h3 class="categoria-titulo">SAR Rede</h3>
+          <h3 class="categoria-titulo">SAR REDE</h3>
           <p class="categoria-subtitulo">Rede SAR</p>
-          <p class="categoria-info">Registros: <strong id="count-sar-rede">0</strong></p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
         <div class="categoria-card" onclick="abrirCategoria('mdu-ongoing')">
           <div class="categoria-icon">📡</div>
-          <h3 class="categoria-titulo">MDU Ongoing</h3>
+          <h3 class="categoria-titulo">MDU ONGOING</h3>
           <p class="categoria-subtitulo">MDU em Progresso</p>
-          <p class="categoria-info">Registros: <strong id="count-mdu-ongoing">0</strong></p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
@@ -139,11 +140,10 @@
           <div class="categoria-icon">👷</div>
           <h3 class="categoria-titulo">EPO</h3>
           <p class="categoria-subtitulo">Gestão por parceira</p>
-          <p class="categoria-info">Registros: <strong id="count-epo">0</strong></p>
           <p class="categoria-acao">Clique para abrir</p>
         </div>
 
-        <div class="categoria-card" onclick="abrirCategoria('financeiro')">
+        <div class="categoria-card" onclick="abrirCategoria('financeiro')" data-admin-only="true">
           <div class="categoria-icon">💰</div>
           <h3 class="categoria-titulo">Financeiro</h3>
           <p class="categoria-subtitulo">Acompanhamento financeiro</p>
@@ -233,10 +233,19 @@
       <div class="card epo-premium-card">
         <div class="epo-heading-wrap" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <h2 class="epo-heading">EPO</h2>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <input id="epo-novos-import-file" type="file" accept=".csv,.txt,.xlsx" style="display:none;" onchange="importarPlanilhaEpoNovos()" />
-            <button type="button" class="btn-secondary epo-clip-upload" onclick="abrirImportEpoNovos()" title="Importar planilha de endereços (1.VISTORIA)">📎</button>
-            <span id="epo-novos-import-status" style="font-size:11px;color:#64748b;font-weight:600;"></span>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <input id="epo-gpon-import-file" type="file" accept=".csv,.txt,.xlsx" style="display:none;" onchange="importarPlanilhaEpoGponOngoing()" />
+              <button type="button" class="btn-secondary epo-clip-upload" onclick="abrirImportEpoGponOngoing()" title="Importar planilha do backlog ONGOING (GPON)">📎</button>
+              <span style="font-size:11px;font-weight:700;color:#334155;">GPON ONGOING</span>
+              <span id="epo-gpon-import-status" style="font-size:11px;color:#64748b;font-weight:600;"></span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <input id="epo-projetof-import-file" type="file" accept=".csv,.txt,.xlsx" style="display:none;" onchange="importarPlanilhaEpoProjetoF()" />
+              <button type="button" class="btn-secondary epo-clip-upload" onclick="abrirImportEpoProjetoF()" title="Importar planilha de CONSTRUÇÃO MDU PROJETO_F">📎</button>
+              <span style="font-size:11px;font-weight:700;color:#334155;">PROJETO F</span>
+              <span id="epo-projetof-import-status" style="font-size:11px;color:#64748b;font-weight:600;"></span>
+            </div>
           </div>
         </div>
 
@@ -258,7 +267,8 @@
           <p class="epo-action-title">EPO selecionada: <strong id="epo-selected-name">-</strong></p>
           <div class="epo-action-buttons">
             <button type="button" class="btn-primary epo-action-trigger" data-action="equipes" onclick="executarAcaoEpo('equipes')">LISTA DE EQUIPES</button>
-            <button type="button" class="btn-secondary epo-action-trigger" data-action="novos" onclick="executarAcaoEpo('novos')">NOVOS ENTRANTES</button>
+            <button type="button" class="btn-secondary epo-action-trigger" data-action="gpon-ongoing" onclick="executarAcaoEpo('gpon-ongoing')">GPON ONGOING</button>
+            <button type="button" class="btn-secondary epo-action-trigger" data-action="projeto-f" onclick="executarAcaoEpo('projeto-f')">PROJETO F</button>
           </div>
           <div id="epo-action-content" class="epo-action-content"></div>
           <div id="epo-action-result" class="epo-action-result">Selecione uma EPO para habilitar as opções.</div>
@@ -267,7 +277,7 @@
 
     </section>
 
-    <section id="financeiro" class="secao">
+    <section id="financeiro" class="secao" data-admin-only="true">
       <div class="categoria-header">
         <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
         <h1>💰 Financeiro</h1>
@@ -446,6 +456,36 @@
       </div>
     </section>
 
+    <section id="liberados" class="secao">
+      <div class="categoria-header">
+        <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+        <h1>✅ LIBERADOS</h1>
+      </div>
+
+      <div class="card">
+        <h2 style="margin-top:0;">Registros Liberados</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Cidade</th>
+              <th>Bloco</th>
+              <th>Cód. GED</th>
+              <th>Endereço</th>
+              <th>Qtde Blocos</th>
+              <th>Status MDU</th>
+              <th>Status Liberação</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-liberados">
+            <tr>
+              <td colspan="8" style="text-align:center">Nenhum dado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- SEÇÃO: EMPRESARIAL -->
     <section id="empresarial" class="secao categoria-secao">
       <div class="categoria-header">
@@ -491,25 +531,35 @@
     <section id="sar-rede" class="secao categoria-secao">
       <div class="categoria-header">
         <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
-        <h1>🔗 SAR Rede</h1>
+        <h1>🔗 SAR REDE</h1>
       </div>
 
 
       <div class="card">
+        <div class="filtro-status">
+          <label for="status-filter-sar">Filtrar Status Projeto Real:</label>
+          <select id="status-filter-sar" onchange="atualizarFiltroStatusSarRede()">
+            <option value="">Todos</option>
+          </select>
+        </div>
         <table>
           <thead>
             <tr>
-              <th>Código</th>
-              <th>Endereço</th>
+              <th>ID Projeto</th>
+              <th>DDD</th>
               <th>Cidade</th>
-              <th>Status</th>
-              <th>AGE</th>
-              <th>Motivo</th>
+              <th>Cliente</th>
+              <th>Projetado</th>
+              <th>Age Geral</th>
+              <th>Enviado</th>
+              <th>Previsão</th>
+              <th>Status Projeto Real</th>
+              <th>Ação</th>
             </tr>
           </thead>
           <tbody id="tabela-sar-rede">
             <tr>
-              <td colspan="6" style="text-align:center">Nenhum dado</td>
+              <td colspan="10" style="text-align:center">Nenhum dado</td>
             </tr>
           </tbody>
         </table>
@@ -520,7 +570,7 @@
     <section id="mdu-ongoing" class="secao categoria-secao">
       <div class="categoria-header">
         <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
-        <h1>📡 MDU Ongoing</h1>
+        <h1>📡 MDU ONGOING</h1>
       </div>
 
 
