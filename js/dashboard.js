@@ -127,6 +127,12 @@ function updateImportLockInfo(categoriaId = categoriaAtualParaImport) {
     return;
   }
 
+  if (categoriaId === 'sar-rede') {
+    lockInfoEl.textContent = '';
+    lockInfoEl.style.display = 'none';
+    return;
+  }
+
   const snapshot = getLocalDatasetCache()?.[categoriaId] || {};
   const snapshotItems = Array.isArray(snapshot.items) ? snapshot.items : [];
   const stateItems = Array.isArray(dadosPorCategoria?.[categoriaId]) ? dadosPorCategoria[categoriaId] : [];
@@ -1581,6 +1587,75 @@ function detectarMelhorDelimitadorCSV(linhas = []) {
   return melhor;
 }
 
+function parseSarRedeCsvRows(linhas = [], fallbackDelimiter = ';') {
+  if (!Array.isArray(linhas) || !linhas.length) return [];
+
+  const headerIndex = linhas.length > 1 ? 1 : 0;
+  const headerLine = (linhas[headerIndex] || '').trim();
+  if (!headerLine) return [];
+
+  const delimiters = [';', ',', '\t', '|'];
+  let delimiter = fallbackDelimiter;
+  let bestCount = -1;
+
+  delimiters.forEach((d) => {
+    const count = _splitCsvLine(headerLine, d).length;
+    if (count > bestCount) {
+      bestCount = count;
+      delimiter = d;
+    }
+  });
+
+  const rows = [];
+  for (let i = headerIndex + 1; i < linhas.length; i++) {
+    const line = linhas[i];
+    if (!line || !line.trim()) continue;
+
+    let cols = _splitCsvLine(line, delimiter).map(v => String(v || '').trim());
+    if (cols.length <= 1) {
+      let localBest = cols;
+      delimiters.forEach((d) => {
+        const attempt = _splitCsvLine(line, d).map(v => String(v || '').trim());
+        if (attempt.length > localBest.length) {
+          localBest = attempt;
+        }
+      });
+      cols = localBest;
+    }
+
+    const row = {
+      'ID Projeto': cols[0] || '',
+      'DDD': cols[1] || '',
+      'Cidade': cols[2] || '',
+      'Projeto': cols[3] || '',
+      'BLOCOS': cols[4] || '',
+      'HPS': cols[5] || '',
+      'Área': cols[6] || '',
+      'Cliente': cols[7] || '',
+      'PROJETADO': cols[8] || '',
+      'AGE GERAL': cols[9] || '',
+      'FAIXA AGE': cols[10] || '',
+      'ENVIADO': cols[11] || '',
+      'PREVISÃO': cols[12] || '',
+      'PREVISAO': cols[12] || '',
+      'AGE': cols[13] || '',
+      'EPO': cols[15] || '',
+      'Status Projeto Real': cols[16] || '',
+      'STATUS PROJETO REAL': cols[16] || ''
+    };
+
+    const hasMainData = [
+      row['ID Projeto'], row['Cidade'], row['Cliente'], row['AGE GERAL'], row['Status Projeto Real']
+    ].some(v => String(v || '').trim() !== '');
+
+    if (hasMainData) {
+      rows.push(row);
+    }
+  }
+
+  return rows;
+}
+
 function importarCSV() {
   const categoria = categoriaAtualParaImport || document.querySelector('.secao.ativa')?.id;
   if (!categoria) {
@@ -1705,69 +1780,7 @@ function importarCSV() {
     }
 
     if (isSarRede) {
-      const dados = [];
-      const sarHeaderLineIndex = linhas.length > 1 ? 1 : headerLineIndex;
-      const sarCabecalhoRaw = linhas[sarHeaderLineIndex] || cabecalhoRaw;
-      const sarCabecalho = _splitCsvLine(sarCabecalhoRaw, delimiter).map(c => c.replace(/^\uFEFF/, "").trim());
-
-      // Usa o cabecalho detectado automaticamente para suportar planilhas com linhas iniciais de observacao.
-      for (let i = sarHeaderLineIndex + 1; i < linhas.length; i++) {
-        const linha = linhas[i];
-        if (!linha || !linha.trim()) continue;
-
-        const cols = _splitCsvLine(linha, delimiter);
-        const item = {};
-        let hasValue = false;
-
-        sarCabecalho.forEach((c, j) => {
-          const key = (c || '').trim();
-          if (!key) return;
-
-          const value = (cols[j] || '').trim();
-          item[key] = value;
-
-          const normalizedKey = normalizeText(key).replace(/[^a-z0-9]/g, '_');
-          if (normalizedKey && item[normalizedKey] === undefined) {
-            item[normalizedKey] = value;
-          }
-
-          if (value) hasValue = true;
-        });
-
-        if (hasValue) {
-          const v = sarCabecalho.map((_, idx) => (cols[idx] || '').trim());
-
-          const idProjeto = getField(item, 'ID Projeto', 'ID_PROJETO', 'id projeto', 'id_projeto', 'ID', 'id') || v[0] || '';
-          const ddd = getField(item, 'DDD', 'ddd') || v[1] || '';
-          const cidade = getField(item, 'Cidade', 'CIDADE', 'cidade') || v[2] || '';
-          const cliente = getField(item, 'Cliente', 'CLIENTE', 'cliente', 'ENDEREÇO', 'ENDERECO', 'endereco') || v[3] || '';
-          const projetado = getField(item, 'PROJETADO', 'projetado') || v[4] || '';
-          const ageGeral = getField(item, 'AGE GERAL', 'age geral', 'AGE_GERAL', 'age_geral', 'AGE', 'age') || v[5] || '';
-          const enviado = getField(item, 'ENVIADO', 'enviado') || v[6] || '';
-          const previsao = getField(item, 'PREVISÃO', 'PREVISAO', 'previsao', 'previsão') || v[7] || '';
-          const statusProjetoReal = getField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'status projeto real', 'status_projeto_real') || v[8] || '';
-
-          const normalizado = {
-            ...item,
-            'ID Projeto': idProjeto,
-            'DDD': ddd,
-            'Cidade': cidade,
-            'Cliente': cliente,
-            'PROJETADO': projetado,
-            'AGE GERAL': ageGeral,
-            'ENVIADO': enviado,
-            'PREVISÃO': previsao,
-            'Status Projeto Real': statusProjetoReal,
-          };
-
-          const temCamposPrincipais = [idProjeto, cidade, cliente, statusProjetoReal, previsao, ageGeral]
-            .some(valor => String(valor || '').trim() !== '');
-
-          if (temCamposPrincipais) {
-            dados.push(normalizado);
-          }
-        }
-      }
+      const dados = parseSarRedeCsvRows(linhas, delimiter);
 
       applyDatasetToState('sar-rede', dados);
       cacheDatasetLocally('sar-rede', dados, { source: 'manual', locked: true });
