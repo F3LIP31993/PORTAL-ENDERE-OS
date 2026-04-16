@@ -1548,6 +1548,39 @@ function detectarLinhaCabecalhoCSV(linhas = [], delimiter = ';') {
   return melhorIndice;
 }
 
+function detectarMelhorDelimitadorCSV(linhas = []) {
+  const candidatos = [';', ',', '\t', '|'];
+  let melhor = ';';
+  let melhorScore = -1;
+
+  candidatos.forEach((delimiter) => {
+    const headerIdx = detectarLinhaCabecalhoCSV(linhas, delimiter);
+    const linhaHeader = (linhas[headerIdx] || '').trim();
+    if (!linhaHeader) return;
+
+    const colunas = _splitCsvLine(linhaHeader, delimiter);
+    const naoVazias = colunas.filter(c => String(c || '').trim() !== '').length;
+
+    const tokensCabecalho = [
+      'status', 'cidade', 'cliente', 'projeto', 'cod', 'id', 'endereco', 'ddd', 'obs', 'epo',
+      'previs', 'age', 'enviado'
+    ];
+
+    const scoreTokens = colunas.reduce((acc, col) => {
+      const key = normalizeText(col);
+      return acc + (tokensCabecalho.some(token => key.includes(token)) ? 1 : 0);
+    }, 0);
+
+    const score = (naoVazias * 2) + (scoreTokens * 4);
+    if (score > melhorScore) {
+      melhorScore = score;
+      melhor = delimiter;
+    }
+  });
+
+  return melhor;
+}
+
 function importarCSV() {
   const categoria = categoriaAtualParaImport || document.querySelector('.secao.ativa')?.id;
   if (!categoria) {
@@ -1574,8 +1607,7 @@ function importarCSV() {
       return;
     }
 
-    const primeiraLinhaValida = linhas.find(l => (l || '').trim()) || '';
-    const delimiter = primeiraLinhaValida.includes(';') ? ';' : (primeiraLinhaValida.includes(',') ? ',' : ';');
+    const delimiter = detectarMelhorDelimitadorCSV(linhas);
     const headerLineIndex = detectarLinhaCabecalhoCSV(linhas, delimiter);
     const cabecalhoRaw = linhas[headerLineIndex] || "";
     const cabecalho = _splitCsvLine(cabecalhoRaw, delimiter).map(c => c.replace(/^\uFEFF/, "").trim());
@@ -1700,7 +1732,37 @@ function importarCSV() {
         });
 
         if (hasValue) {
-          dados.push(item);
+          const v = cabecalho.map((_, idx) => (cols[idx] || '').trim());
+
+          const idProjeto = getField(item, 'ID Projeto', 'ID_PROJETO', 'id projeto', 'id_projeto', 'ID', 'id') || v[0] || '';
+          const ddd = getField(item, 'DDD', 'ddd') || v[1] || '';
+          const cidade = getField(item, 'Cidade', 'CIDADE', 'cidade') || v[2] || '';
+          const cliente = getField(item, 'Cliente', 'CLIENTE', 'cliente', 'ENDEREÇO', 'ENDERECO', 'endereco') || v[3] || '';
+          const projetado = getField(item, 'PROJETADO', 'projetado') || v[4] || '';
+          const ageGeral = getField(item, 'AGE GERAL', 'age geral', 'AGE_GERAL', 'age_geral', 'AGE', 'age') || v[5] || '';
+          const enviado = getField(item, 'ENVIADO', 'enviado') || v[6] || '';
+          const previsao = getField(item, 'PREVISÃO', 'PREVISAO', 'previsao', 'previsão') || v[7] || '';
+          const statusProjetoReal = getField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'status projeto real', 'status_projeto_real') || v[8] || '';
+
+          const normalizado = {
+            ...item,
+            'ID Projeto': idProjeto,
+            'DDD': ddd,
+            'Cidade': cidade,
+            'Cliente': cliente,
+            'PROJETADO': projetado,
+            'AGE GERAL': ageGeral,
+            'ENVIADO': enviado,
+            'PREVISÃO': previsao,
+            'Status Projeto Real': statusProjetoReal,
+          };
+
+          const temCamposPrincipais = [idProjeto, cidade, cliente, statusProjetoReal, previsao, ageGeral]
+            .some(valor => String(valor || '').trim() !== '');
+
+          if (temCamposPrincipais) {
+            dados.push(normalizado);
+          }
         }
       }
 
