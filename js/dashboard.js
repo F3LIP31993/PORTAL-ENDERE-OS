@@ -131,8 +131,6 @@ function updateImportLockInfo(categoriaId = categoriaAtualParaImport) {
   const snapshotItems = Array.isArray(snapshot.items) ? snapshot.items : [];
   const stateItems = Array.isArray(dadosPorCategoria?.[categoriaId]) ? dadosPorCategoria[categoriaId] : [];
   const items = snapshotItems.length ? snapshotItems : stateItems;
-  const updatedAtText = formatDatasetTimestampBr(snapshot.updatedAt);
-  const updatedByText = snapshot.updatedBy || '';
   const sourceText = snapshot.source || (stateItems.length ? 'estado' : 'local');
 
   if (!items.length && !updatedAtText) {
@@ -142,8 +140,6 @@ function updateImportLockInfo(categoriaId = categoriaAtualParaImport) {
 
   const details = [
     `📌 Base ativa: ${items.length} registro(s)`,
-    updatedAtText ? `atualizado em ${updatedAtText}` : '',
-    updatedByText ? `por ${updatedByText}` : '',
     (snapshot.locked || (categoriaId === 'projeto-f' && items.length > 0)) ? 'travado' : 'não travado',
     sourceText ? `origem ${sourceText}` : '',
   ].filter(Boolean).join(' • ');
@@ -159,8 +155,6 @@ function updateEpoLockInfo(extraText = '') {
   const snapshotItems = Array.isArray(snapshot.items) ? snapshot.items : [];
   const storeRows = flattenEpoNovosStore(getEpoNovosStore());
   const items = snapshotItems.length ? snapshotItems : storeRows;
-  const updatedAtText = formatDatasetTimestampBr(snapshot.updatedAt);
-  const updatedByText = snapshot.updatedBy || '';
   const sourceText = snapshot.source || (storeRows.length ? 'local' : 'shared');
   const lockedText = (snapshot.locked || items.length > 0) ? 'travado' : 'não travado';
 
@@ -172,8 +166,6 @@ function updateEpoLockInfo(extraText = '') {
   const parts = [
     extraText,
     `${items.length} endereços em ${Object.keys(getEpoNovosStore()).length} EPOs`,
-    updatedAtText ? `atualizado em ${updatedAtText}` : '',
-    updatedByText ? `por ${updatedByText}` : '',
     lockedText,
     `origem ${sourceText}`,
   ].filter(Boolean);
@@ -302,7 +294,7 @@ function syncDerivedCategoriesFromBacklog(sourceRows = [], persistToServer = fal
   if (!Array.isArray(sourceRows) || !sourceRows.length) return;
 
   ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede'].forEach(categoriaId => {
-    const shouldPreserveManualImport = ['empresarial', 'mdu-ongoing'].includes(categoriaId)
+    const shouldPreserveManualImport = ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede'].includes(categoriaId)
       && (hasLockedDataset(categoriaId) || (dadosPorCategoria[categoriaId] || []).length > 0);
 
     if (shouldPreserveManualImport) {
@@ -438,7 +430,7 @@ async function carregarDadosCompartilhados() {
       const existingItems = Array.isArray(dadosPorCategoria[categoria]) ? dadosPorCategoria[categoria] : [];
       const localSnapshot = localCache?.[categoria] || {};
       const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
-      const shouldKeepLockedLocal = ['empresarial', 'mdu-ongoing', 'projeto-f'].includes(categoria)
+      const shouldKeepLockedLocal = ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'projeto-f', 'sar-rede', 'ongoing'].includes(categoria)
         && Boolean(localSnapshot?.locked)
         && localItems.length;
 
@@ -1487,7 +1479,7 @@ function importarCSV() {
     const isProjetoF = categoria === 'projeto-f';
 
     if (isOngoing) {
-      const dados = processarCSVOngoing(text, delimiter);
+      const dados = processarCSVOngoingCompartilhado(text, delimiter);
       dadosCSVOngoing = dados;
       dadosCSVOngoingOriginal = dados;
       dadosPorCategoria['ongoing'] = dados;
@@ -3339,7 +3331,7 @@ function renderVisaoGerencia() {
   }
 }
 
-function processarCSVOngoing(csv, delimiter = ";") {
+function processarCSVOngoingCompartilhado(csv, delimiter = ";") {
   const linhas = csv.split(/\r?\n/);
   if (linhas.length < 2) return [];
 
@@ -5938,7 +5930,7 @@ function renderAnexosLista(codigo, anexos) {
 function carregarDaBacklog(categoriaId) {
   const localSnapshot = getLocalDatasetCache()?.[categoriaId];
   const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
-  const shouldPreserveManualImport = ['empresarial', 'mdu-ongoing'].includes(categoriaId)
+  const shouldPreserveManualImport = ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede'].includes(categoriaId)
     && Boolean(localSnapshot?.locked)
     && localItems.length;
 
@@ -5970,7 +5962,7 @@ function carregarDaBacklog(categoriaId) {
       if (['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede'].includes(categoriaId)) {
         persistirDadosCompartilhados(categoriaId, dados, {
           source: 'shared',
-          locked: categoriaId === 'empresarial',
+          locked: ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede'].includes(categoriaId),
         });
       }
       
