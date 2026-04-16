@@ -1677,14 +1677,22 @@ function normalizeLiberadosAba(aba = '') {
 }
 
 function inferirAbaLiberadosPorRegistro(item = {}, abaPadrao = 'projeto-f') {
+  const tipoRede = normalizeText(getField(item, 'TIPO_REDE', 'TIPO REDE', 'tipo_rede'));
+  if (tipoRede.includes('greenfield') || tipoRede.includes('green field')) return 'greenfield';
+  if (tipoRede.includes('gpon') || tipoRede.includes('hfc')) return 'gpon-hfc';
+  if (tipoRede.includes('projeto f') || tipoRede.includes('projetof')) return 'projeto-f';
+
   const texto = normalizeText([
+    getField(item, 'TIPO_REDE', 'TIPO REDE', 'tipo_rede'),
+    getField(item, 'STATUS', 'STATUS_GERAL', 'status'),
+    getField(item, 'SOLICITANTE', 'solicitante'),
     getField(item, 'Projeto', 'PROJETO', 'projeto'),
     getField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'status projeto real'),
     getField(item, 'EPO', 'epo'),
     getField(item, 'Observações Gerais', 'Observacoes Gerais', 'OBSERVACOES GERAIS', 'obs_gerais')
   ].join(' '));
 
-  if (texto.includes('greenfield')) return 'greenfield';
+  if (texto.includes('greenfield') || texto.includes('green field')) return 'greenfield';
   if (texto.includes('gpon') || texto.includes('hfc')) return 'gpon-hfc';
   if (texto.includes('projeto f') || texto.includes('projeto_f')) return 'projeto-f';
   return normalizeLiberadosAba(abaPadrao);
@@ -1783,7 +1791,7 @@ function parseLiberadosCsvRows(linhas = [], fallbackDelimiter = ';', abaPadrao =
         raw[col.key] = getByAliases(cols, col.aliases);
       });
 
-      const row = formatFromExactObject(raw, abaPadrao);
+      const row = formatFromExactObject(raw, inferirAbaLiberadosPorRegistro(raw, abaPadrao));
       const hasData = colunasLiberados.some((col) => String(row[col.key] || '').trim() !== '');
       if (hasData) parsedRows.push(row);
     }
@@ -1998,25 +2006,48 @@ function importarCSV() {
     if (isLiberados) {
       const dadosAtuais = getPreferredDataset('liberados');
       const estruturaAtual = getDadosLiberadosEstruturados(dadosAtuais || []);
-      const novosDadosAba = parseLiberadosCsvRows(linhas, delimiter, liberadosAbaAtiva);
+      const novosDadosImportados = parseLiberadosCsvRows(linhas, delimiter, liberadosAbaAtiva);
+      const estruturaImportada = getDadosLiberadosEstruturados(novosDadosImportados);
 
-      estruturaAtual[liberadosAbaAtiva] = novosDadosAba;
+      let abasAtualizadas = [];
+      LIBERADOS_ABAS.forEach((aba) => {
+        const rows = Array.isArray(estruturaImportada[aba]) ? estruturaImportada[aba] : [];
+        if (rows.length) {
+          estruturaAtual[aba] = rows;
+          abasAtualizadas.push(`${getLiberadosAbaLabel(aba)} (${rows.length})`);
+        }
+      });
+
+      if (!abasAtualizadas.length) {
+        estruturaAtual[liberadosAbaAtiva] = novosDadosImportados;
+        abasAtualizadas = [`${getLiberadosAbaLabel(liberadosAbaAtiva)} (${novosDadosImportados.length})`];
+      }
+
+      if (!(estruturaAtual[liberadosAbaAtiva] || []).length) {
+        const primeiraAbaComDados = LIBERADOS_ABAS.find((aba) => (estruturaAtual[aba] || []).length > 0);
+        if (primeiraAbaComDados) {
+          liberadosAbaAtiva = primeiraAbaComDados;
+          atualizarBotoesAbaLiberados();
+        }
+      }
+
+      const dadosAbaAtiva = estruturaAtual[liberadosAbaAtiva] || [];
       const consolidados = flattenDadosLiberadosEstruturados(estruturaAtual);
 
       applyDatasetToState('liberados', consolidados);
       cacheDatasetLocally('liberados', consolidados, { source: 'manual', locked: true });
       persistirDadosCompartilhados('liberados', consolidados, { source: 'manual', locked: true });
 
-      renderTabelaLiberados('tabela-liberados', novosDadosAba);
+      renderTabelaLiberados('tabela-liberados', dadosAbaAtiva);
       atualizarContadores();
 
       const infoEl = document.getElementById('liberados-aba-info');
       if (infoEl) {
-        infoEl.textContent = `Aba ativa: ${getLiberadosAbaLabel(liberadosAbaAtiva)} • ${novosDadosAba.length} registro(s)`;
+        infoEl.textContent = `Aba ativa: ${getLiberadosAbaLabel(liberadosAbaAtiva)} • ${dadosAbaAtiva.length} registro(s)`;
       }
 
       if (statusEl) {
-        statusEl.textContent = `✅ Importado ${novosDadosAba.length} registro(s) em ${getLiberadosAbaLabel(liberadosAbaAtiva)}`;
+        statusEl.textContent = `✅ Importado ${novosDadosImportados.length} registro(s) • ${abasAtualizadas.join(' | ')}`;
       }
       const fileNameDisplay = document.getElementById('file-name');
       if (fileNameDisplay) {
