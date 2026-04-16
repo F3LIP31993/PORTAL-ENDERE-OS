@@ -1691,14 +1691,110 @@ function inferirAbaLiberadosPorRegistro(item = {}, abaPadrao = 'projeto-f') {
 }
 
 function parseLiberadosCsvRows(linhas = [], fallbackDelimiter = ';', abaPadrao = 'projeto-f') {
-  const baseRows = parseSarRedeCsvRows(linhas, fallbackDelimiter);
-  return baseRows.map((row) => {
-    const aba = inferirAbaLiberadosPorRegistro(row, abaPadrao);
-    return {
-      ...row,
-      '_aba_liberados': aba
-    };
+  const sourceLines = Array.isArray(linhas) ? linhas : [];
+  const delimiters = Array.from(new Set([fallbackDelimiter, ';', '\t', ',', '|'].filter(Boolean)));
+  const normalizeHeader = (value = '') => normalizeText(String(value || '')).replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  const splitBest = (line = '') => {
+    let best = [String(line || '')];
+    delimiters.forEach((d) => {
+      const cols = _splitCsvLine(String(line || ''), d);
+      if (cols.length > best.length) best = cols;
+    });
+    return best.map((v) => String(v || '').trim());
+  };
+
+  const colunasLiberados = [
+    { key: 'TIPO_REDE', aliases: ['TIPO_REDE', 'TIPO REDE', 'TIPO-REDE'] },
+    { key: 'SOLICITANTE', aliases: ['SOLICITANTE'] },
+    { key: 'DDD', aliases: ['DDD'] },
+    { key: 'CIDADE', aliases: ['CIDADE'] },
+    { key: 'ENDEREÇO', aliases: ['ENDEREÇO', 'ENDERECO'] },
+    { key: 'BLOCOS', aliases: ['BLOCOS', 'BLOCO'] },
+    { key: 'HP', aliases: ['HP', 'HPS'] },
+    { key: 'STATUS', aliases: ['STATUS', 'STATUS_GERAL'] },
+    { key: 'DT_CONCLUIDO', aliases: ['DT_CONCLUIDO', 'DT CONCLUIDO', 'DT-CONCLUIDO', 'DATA_CONCLUIDO', 'DATA CONCLUIDO'] },
+    { key: 'COD_IMOVEL', aliases: ['COD_IMOVEL', 'COD IMOVEL', 'COD-IMOVEL', 'ID IMOVEL'] }
+  ];
+
+  const buildHeaderMap = (cols = []) => {
+    const map = {};
+    cols.forEach((col, idx) => {
+      const normalized = normalizeHeader(col);
+      if (normalized && map[normalized] === undefined) {
+        map[normalized] = idx;
+      }
+    });
+    return map;
+  };
+
+  let headerLineIndex = -1;
+  let headerMap = {};
+  for (let i = 0; i < Math.min(sourceLines.length, 20); i += 1) {
+    const cols = splitBest(sourceLines[i]);
+    if (!cols.some((c) => String(c || '').trim() !== '')) continue;
+
+    const candidateMap = buildHeaderMap(cols);
+    const score = colunasLiberados.reduce((acc, col) => {
+      const exists = col.aliases.some((alias) => candidateMap[normalizeHeader(alias)] !== undefined);
+      return acc + (exists ? 1 : 0);
+    }, 0);
+
+    if (score >= 5) {
+      headerLineIndex = i;
+      headerMap = candidateMap;
+      if (score === colunasLiberados.length) break;
+    }
+  }
+
+  const getByAliases = (cols = [], aliases = []) => {
+    for (const alias of aliases) {
+      const idx = headerMap[normalizeHeader(alias)];
+      if (idx !== undefined && idx < cols.length) {
+        const value = String(cols[idx] || '').trim();
+        if (value !== '') return value;
+      }
+    }
+    return '';
+  };
+
+  const formatFromExactObject = (obj = {}, aba = abaPadrao) => ({
+    'TIPO_REDE': String(getField(obj, 'TIPO_REDE', 'TIPO REDE') || '').trim(),
+    'SOLICITANTE': String(getField(obj, 'SOLICITANTE') || '').trim(),
+    'DDD': String(getField(obj, 'DDD') || '').trim(),
+    'CIDADE': String(getField(obj, 'CIDADE', 'Cidade') || '').trim(),
+    'ENDEREÇO': String(getField(obj, 'ENDEREÇO', 'ENDERECO', 'Cliente', 'ENDERECO_ENTRADA') || '').trim(),
+    'BLOCOS': String(getField(obj, 'BLOCOS', 'BLOCO', 'Qtde Blocos', 'QTDE_BLOCOS') || '').trim(),
+    'HP': String(getField(obj, 'HP', 'HPS') || '').trim(),
+    'STATUS': String(getField(obj, 'STATUS', 'STATUS_GERAL', 'Status Projeto Real', 'STATUS PROJETO REAL') || '').trim(),
+    'DT_CONCLUIDO': String(getField(obj, 'DT_CONCLUIDO', 'DT CONCLUIDO', 'DATA_CONCLUIDO', 'PREVISÃO', 'PREVISAO') || '').trim(),
+    'COD_IMOVEL': String(getField(obj, 'COD_IMOVEL', 'COD IMOVEL', 'COD_GED', 'CÓD. GED', 'ID Projeto', 'ID_PROJETO') || '').trim(),
+    '_aba_liberados': normalizeLiberadosAba(aba)
   });
+
+  if (headerLineIndex >= 0) {
+    const parsedRows = [];
+    for (let i = headerLineIndex + 1; i < sourceLines.length; i += 1) {
+      const cols = splitBest(sourceLines[i]);
+      if (!cols.some((c) => String(c || '').trim() !== '')) continue;
+
+      const raw = {};
+      colunasLiberados.forEach((col) => {
+        raw[col.key] = getByAliases(cols, col.aliases);
+      });
+
+      const row = formatFromExactObject(raw, abaPadrao);
+      const hasData = colunasLiberados.some((col) => String(row[col.key] || '').trim() !== '');
+      if (hasData) parsedRows.push(row);
+    }
+
+    if (parsedRows.length) return parsedRows;
+  }
+
+  const baseRows = parseSarRedeCsvRows(sourceLines, fallbackDelimiter);
+  return baseRows
+    .map((row) => formatFromExactObject(row, inferirAbaLiberadosPorRegistro(row, abaPadrao)))
+    .filter((row) => colunasLiberados.some((col) => String(row[col.key] || '').trim() !== ''));
 }
 
 function getDadosLiberadosEstruturados(base = []) {
@@ -2520,34 +2616,54 @@ function renderTabelaLiberados(id, lista) {
   const dados = Array.isArray(lista) ? lista : [];
   window.__liberadosModalData = dados;
 
+  const tableEl = tbody.closest('table');
+  if (tableEl) {
+    const headHtml = `
+      <tr>
+        <th>TIPO_REDE</th>
+        <th>SOLICITANTE</th>
+        <th>DDD</th>
+        <th>CIDADE</th>
+        <th>ENDEREÇO</th>
+        <th>BLOCOS</th>
+        <th>HP</th>
+        <th>STATUS</th>
+        <th>DT_CONCLUIDO</th>
+        <th>COD_IMOVEL</th>
+      </tr>`;
+    const thead = tableEl.querySelector('thead');
+    if (thead) thead.innerHTML = headHtml;
+  }
+
   if (!dados.length) {
     tbody.innerHTML = `<tr><td colspan="10">Nenhum registro liberado</td></tr>`;
     return;
   }
 
-  const rows = dados.map((i, index) => {
-    const idProjeto = getField(i, 'ID Projeto', 'ID_PROJETO', 'id projeto', 'id_projeto', 'ID', 'id') || '-';
-    const ddd = getField(i, 'DDD', 'ddd') || '-';
-    const cidade = getField(i, "CIDADE", "cidade");
-    const cliente = getField(i, 'Cliente', 'CLIENTE', 'cliente', 'ENDEREÇO', 'ENDERECO', 'endereco') || '-';
-    const projetado = getField(i, 'PROJETADO', 'projetado') || '-';
-    const ageGeral = getField(i, 'AGE GERAL', 'age geral', 'AGE_GERAL', 'age_geral', 'AGE', 'age') || '-';
-    const enviado = getField(i, 'ENVIADO', 'enviado') || '-';
-    const previsao = getField(i, 'PREVISÃO', 'PREVISAO', 'previsao', 'previsão') || '-';
-    const statusProjetoReal = getField(i, 'Status Projeto Real', 'STATUS PROJETO REAL', 'status projeto real', 'status_projeto_real') || '-';
+  const rows = dados.map((i) => {
+    const tipoRede = getField(i, 'TIPO_REDE', 'TIPO REDE') || '-';
+    const solicitante = getField(i, 'SOLICITANTE') || '-';
+    const ddd = getField(i, 'DDD') || '-';
+    const cidade = getField(i, 'CIDADE', 'Cidade', 'cidade') || '-';
+    const endereco = getField(i, 'ENDEREÇO', 'ENDERECO', 'Cliente', 'CLIENTE', 'endereco') || '-';
+    const blocos = getField(i, 'BLOCOS', 'BLOCO', 'Qtde Blocos', 'QTDE_BLOCOS') || '-';
+    const hp = getField(i, 'HP', 'HPS') || '-';
+    const status = getField(i, 'STATUS', 'STATUS_GERAL', 'Status Projeto Real', 'STATUS PROJETO REAL') || '-';
+    const dtConcluido = getField(i, 'DT_CONCLUIDO', 'DT CONCLUIDO', 'DATA_CONCLUIDO', 'PREVISÃO', 'PREVISAO') || '-';
+    const codImovel = getField(i, 'COD_IMOVEL', 'COD IMOVEL', 'COD_GED', 'CÓD. GED', 'ID Projeto', 'ID_PROJETO') || '-';
 
     return `
       <tr>
-        <td>${escapeHtml(idProjeto || '-')}</td>
+        <td>${escapeHtml(tipoRede || '-')}</td>
+        <td>${escapeHtml(solicitante || '-')}</td>
         <td>${escapeHtml(ddd || '-')}</td>
         <td>${escapeHtml(cidade || '-')}</td>
-        <td><span class="table-address-cell" title="${escapeHtml(cliente || '-')}">${escapeHtml(cliente || '-')}</span></td>
-        <td>${escapeHtml(projetado || '-')}</td>
-        <td>${escapeHtml(ageGeral || '-')}</td>
-        <td>${escapeHtml(enviado || '-')}</td>
-        <td>${escapeHtml(previsao || '-')}</td>
-        <td>${escapeHtml(statusProjetoReal || '-')}</td>
-        <td><button type="button" class="btn-visualizar" onclick="visualizarLiberado(${index})">VISUALIZAR</button></td>
+        <td><span class="table-address-cell" title="${escapeHtml(endereco || '-')}">${escapeHtml(endereco || '-')}</span></td>
+        <td>${escapeHtml(blocos || '-')}</td>
+        <td>${escapeHtml(hp || '-')}</td>
+        <td>${escapeHtml(status || '-')}</td>
+        <td>${escapeHtml(dtConcluido || '-')}</td>
+        <td>${escapeHtml(codImovel || '-')}</td>
       </tr>`;
   }).join('');
 
@@ -2562,11 +2678,11 @@ function visualizarLiberado(index) {
     return;
   }
 
-  const idProjeto = getField(item, 'ID Projeto', 'ID_PROJETO', 'id projeto', 'id_projeto', 'ID', 'id') || '-';
+  const idProjeto = getField(item, 'ID Projeto', 'ID_PROJETO', 'id projeto', 'id_projeto', 'ID', 'id', 'CÓD. GED', 'Cód. GED', 'COD_GED', 'cod_ged') || '-';
   const cidade = getField(item, 'Cidade', 'CIDADE', 'cidade') || '-';
   const cliente = getField(item, 'Cliente', 'CLIENTE', 'cliente', 'ENDEREÇO', 'ENDERECO', 'endereco') || '-';
-  const statusProjetoReal = getField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'status projeto real', 'status_projeto_real') || '-';
-  const previsao = getField(item, 'PREVISÃO', 'PREVISAO', 'previsao', 'previsão') || '-';
+  const statusProjetoReal = getField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'status projeto real', 'status_projeto_real', 'STATUS LIBERAÇÃO', 'STATUS_LIBERACAO', 'Status Liberação') || '-';
+  const previsao = getField(item, 'PREVISÃO', 'PREVISAO', 'previsao', 'previsão', 'Status MDU', 'STATUS_MDU', 'STATUS MDU') || '-';
   const ddd = getField(item, 'DDD', 'ddd') || '-';
   const ageGeral = getField(item, 'AGE GERAL', 'age geral', 'AGE_GERAL', 'age_geral', 'AGE', 'age') || '-';
   const projetado = getField(item, 'PROJETADO', 'projetado') || '-';
@@ -7165,10 +7281,10 @@ function buscarEmCategoria(categoriaId) {
   } else if (categoriaId === 'liberados') {
     const dadosAba = getDadosLiberadosDaAba(getPreferredDataset('liberados') || [], liberadosAbaAtiva);
     resultado = dadosAba.filter(item => {
-      const idProjeto = String(getField(item, 'ID Projeto', 'ID_PROJETO', 'id projeto', 'id_projeto', 'ID', 'id') || '').toLowerCase();
-      const cliente = String(getField(item, 'Cliente', 'CLIENTE', 'cliente', 'ENDEREÇO', 'ENDERECO', 'endereco') || '').toLowerCase();
+      const codImovel = String(getField(item, 'COD_IMOVEL', 'COD IMOVEL', 'COD_GED', 'CÓD. GED', 'ID Projeto', 'ID_PROJETO') || '').toLowerCase();
+      const solicitante = String(getField(item, 'SOLICITANTE') || '').toLowerCase();
       const endereco = String(getField(item, 'ENDEREÇO', 'ENDERECO', 'endereco') || '').toLowerCase();
-      return idProjeto.includes(termoBusca) || cliente.includes(termoBusca) || endereco.includes(termoBusca);
+      return codImovel.includes(termoBusca) || solicitante.includes(termoBusca) || endereco.includes(termoBusca);
     });
 
     if (resultado.length === 0) {
