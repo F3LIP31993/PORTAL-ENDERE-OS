@@ -299,7 +299,6 @@ def api_load_csv_url():
 
 
 @app.route("/api/backlog/<categoria>", methods=["GET"])
-@require_login
 def api_backlog_categoria(categoria):
     backlog_path = os.path.join(BASE_DIR, "BACKLOG_MDU_SPINTERIOR.csv")
     if not os.path.exists(backlog_path):
@@ -521,6 +520,10 @@ def api_download_projeto_f_attachment(codged, att_id):
 @app.route("/api/projeto_f/<codged>/attachments", methods=["POST"])
 @require_login
 def api_upload_projeto_f_attachment(codged):
+    user = get_current_user() or {}
+    if user.get("role") != "admin":
+        return jsonify({"error": "Apenas administrador pode anexar arquivos"}), 403
+
     if "file" not in request.files:
         return jsonify({"error": "Nenhum arquivo enviado"}), 400
 
@@ -534,7 +537,7 @@ def api_upload_projeto_f_attachment(codged):
         filename=secure_filename(file.filename),
         content_type=file.content_type,
         data=data,
-        created_by=get_current_user().get("username") or "",
+        created_by=user.get("username") or "",
         created_at=datetime.datetime.utcnow(),
     )
     db.session.add(attachment)
@@ -545,6 +548,10 @@ def api_upload_projeto_f_attachment(codged):
 @app.route("/api/pendente/<cod>/attachments", methods=["POST"])
 @require_login
 def api_upload_pendente_attachment(cod):
+    user = get_current_user() or {}
+    if user.get("role") != "admin":
+        return jsonify({"error": "Apenas administrador pode anexar arquivos"}), 403
+
     if "file" not in request.files:
         return jsonify({"error": "Nenhum arquivo enviado"}), 400
 
@@ -558,7 +565,7 @@ def api_upload_pendente_attachment(cod):
         filename=secure_filename(file.filename),
         content_type=file.content_type,
         data=data,
-        created_by=get_current_user().get("username") or "",
+        created_by=user.get("username") or "",
         created_at=datetime.datetime.utcnow(),
     )
     db.session.add(attachment)
@@ -601,6 +608,7 @@ def build_notifications_feed(limit: int = 30):
 
         events.append({
             "type": "cadastro",
+            "entity": "cadastro",
             "source": "Cadastro",
             "title": f"{u.name or u.username} fez o cadastro. O que será permitido?",
             "subtitle": f"Usuário: {u.username}",
@@ -631,6 +639,7 @@ def build_notifications_feed(limit: int = 30):
 
         events.append({
             "type": "observacao",
+            "entity": "pendente",
             "source": "Endereço / acompanhamento",
             "title": f"Nova OBS no endereço {n.cod_mdugo}",
             "subtitle": f"Código: {n.cod_mdugo}",
@@ -647,6 +656,7 @@ def build_notifications_feed(limit: int = 30):
 
         events.append({
             "type": "observacao",
+            "entity": "projeto_f",
             "source": "Projeto F",
             "title": f"Nova OBS no Projeto F {n.codged}",
             "subtitle": f"Código: {n.codged}",
@@ -787,6 +797,25 @@ def api_pending():
     ])
 
 
+@app.route("/api/user_profile", methods=["GET"])
+@require_login
+def api_user_profile():
+    """Retorna informações do usuário logado, incluindo dados de cadastro."""
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Não autenticado"}), 401
+
+    return jsonify({
+        "username": user.get("username"),
+        "name": user.get("name"),
+        "email": user.get("email"),
+        "role": user.get("role"),
+        "registration_obs": user.get("registration_obs"),
+        "created_at": user.get("created_at"),
+        "approved_at": user.get("approved_at"),
+    })
+
+
 @app.route("/api/history", methods=["GET"])
 @require_admin
 def api_history():
@@ -872,7 +901,6 @@ def api_config():
 
 
 @app.route("/api/shared_datasets", methods=["GET"])
-@require_login
 def api_get_shared_datasets():
     rows = SharedDataset.query.order_by(SharedDataset.category.asc()).all()
     datasets = {}
@@ -915,7 +943,6 @@ def api_save_shared_dataset(categoria):
 
 
 @app.route("/api/projeto_f_dataset", methods=["GET"])
-@require_login
 def api_projeto_f_dataset():
     """Retorna dados do Projeto F para qualquer usuario autenticado."""
     try:
