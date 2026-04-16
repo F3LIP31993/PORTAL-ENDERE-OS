@@ -12,6 +12,9 @@ let pendenteActiveTab = 'vistoria';
 
 let currentUser = null;
 
+const LIBERADOS_ABAS = ['projeto-f', 'gpon-hfc', 'greenfield'];
+let liberadosAbaAtiva = 'projeto-f';
+
 const STORAGE_USERS_KEY = "portalUsers";
 const STORAGE_CURRENT_USER_KEY = "portalCurrentUser";
 const STORAGE_COLUMN_DENSITY_KEY = "portalColumnDensity";
@@ -127,7 +130,8 @@ function updateImportLockInfo(categoriaId = categoriaAtualParaImport) {
     return;
   }
 
-  if (categoriaId === 'sar-rede') {
+  const categoriaNorm = normalizeText(categoriaId || '').replace(/[^a-z0-9]/g, '-');
+  if (categoriaId === 'sar-rede' || categoriaNorm === 'sar-rede' || categoriaNorm.includes('sar') && categoriaNorm.includes('rede')) {
     lockInfoEl.textContent = '';
     lockInfoEl.style.display = 'none';
     return;
@@ -1656,11 +1660,87 @@ function parseSarRedeCsvRows(linhas = [], fallbackDelimiter = ';') {
   return rows;
 }
 
+function getLiberadosAbaLabel(aba = 'projeto-f') {
+  const mapping = {
+    'projeto-f': 'PROJETO F',
+    'gpon-hfc': 'GPON E HFC',
+    'greenfield': 'GREENFIELD'
+  };
+  return mapping[aba] || 'PROJETO F';
+}
+
+function normalizeLiberadosAba(aba = '') {
+  const norm = normalizeText(aba).replace(/[^a-z0-9]/g, '-');
+  if (norm.includes('greenfield')) return 'greenfield';
+  if (norm.includes('gpon') || norm.includes('hfc')) return 'gpon-hfc';
+  return 'projeto-f';
+}
+
+function inferirAbaLiberadosPorRegistro(item = {}, abaPadrao = 'projeto-f') {
+  const texto = normalizeText([
+    getField(item, 'Projeto', 'PROJETO', 'projeto'),
+    getField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'status projeto real'),
+    getField(item, 'EPO', 'epo'),
+    getField(item, 'Observações Gerais', 'Observacoes Gerais', 'OBSERVACOES GERAIS', 'obs_gerais')
+  ].join(' '));
+
+  if (texto.includes('greenfield')) return 'greenfield';
+  if (texto.includes('gpon') || texto.includes('hfc')) return 'gpon-hfc';
+  if (texto.includes('projeto f') || texto.includes('projeto_f')) return 'projeto-f';
+  return normalizeLiberadosAba(abaPadrao);
+}
+
+function parseLiberadosCsvRows(linhas = [], fallbackDelimiter = ';', abaPadrao = 'projeto-f') {
+  const baseRows = parseSarRedeCsvRows(linhas, fallbackDelimiter);
+  return baseRows.map((row) => {
+    const aba = inferirAbaLiberadosPorRegistro(row, abaPadrao);
+    return {
+      ...row,
+      '_aba_liberados': aba
+    };
+  });
+}
+
+function getDadosLiberadosEstruturados(base = []) {
+  const estrutura = {
+    'projeto-f': [],
+    'gpon-hfc': [],
+    'greenfield': []
+  };
+
+  if (!Array.isArray(base)) return estrutura;
+
+  base.forEach((item) => {
+    const aba = normalizeLiberadosAba(item?._aba_liberados || inferirAbaLiberadosPorRegistro(item, 'projeto-f'));
+    estrutura[aba].push(item);
+  });
+
+  return estrutura;
+}
+
+function flattenDadosLiberadosEstruturados(estrutura = {}) {
+  const merged = [];
+  LIBERADOS_ABAS.forEach((aba) => {
+    const rows = Array.isArray(estrutura?.[aba]) ? estrutura[aba] : [];
+    rows.forEach((row) => {
+      merged.push({ ...row, _aba_liberados: aba });
+    });
+  });
+  return merged;
+}
+
+function getDadosLiberadosDaAba(base = [], aba = liberadosAbaAtiva) {
+  const estrutura = getDadosLiberadosEstruturados(base);
+  return estrutura[normalizeLiberadosAba(aba)] || [];
+}
+
 function importarCSV() {
   const categoria = categoriaAtualParaImport || document.querySelector('.secao.ativa')?.id;
   if (!categoria) {
     return alert("Selecione uma categoria antes de importar.");
   }
+
+  const categoriaNorm = normalizeText(categoria || '').replace(/[^a-z0-9]/g, '-');
 
   const input = document.getElementById("arquivoCSV");
   if (!input || !input.files.length) return alert("Selecione o CSV");
@@ -1682,6 +1762,22 @@ function importarCSV() {
       return;
     }
 
+    const primeiraLinhaBruta = String(linhas[0] || '');
+    if (primeiraLinhaBruta.startsWith('PK')) {
+      alert('⚠️ Arquivo Excel (.xlsx/.xlsm) detectado. Para importar no portal, exporte a aba desejada em CSV e importe novamente.');
+      if (statusEl) statusEl.textContent = '⚠️ Importe um CSV exportado da aba desejada.';
+      return;
+    }
+
+    // Fail-safe: se o CSV tiver assinatura da aba ANALITICO SAR, usa parser dedicado sempre.
+    const linha2 = String(linhas[1] || '').trim();
+    const assinaturaSar = normalizeText(linha2);
+    const isSarByFileSignature = assinaturaSar.includes('id projeto')
+      && assinaturaSar.includes('ddd')
+      && assinaturaSar.includes('cidade')
+      && assinaturaSar.includes('cliente')
+      && assinaturaSar.includes('status projeto real');
+
     const delimiter = detectarMelhorDelimitadorCSV(linhas);
     const headerLineIndex = detectarLinhaCabecalhoCSV(linhas, delimiter);
     const cabecalhoRaw = linhas[headerLineIndex] || "";
@@ -1700,11 +1796,35 @@ function importarCSV() {
       .filter(([k]) => k.includes('status'))
       .map(([, idx]) => idx);
 
-    const isPendente = categoria === 'pendente-autorizacao';
-    const isOngoing = categoria === 'ongoing';
-    const isMduOngoing = categoria === 'mdu-ongoing';
-    const isProjetoF = categoria === 'projeto-f';
-    const isSarRede = categoria === 'sar-rede';
+    const isPendente = categoria === 'pendente-autorizacao' || categoriaNorm === 'pendente-autorizacao';
+    const isOngoing = categoria === 'ongoing' || categoriaNorm === 'ongoing';
+    const isMduOngoing = categoria === 'mdu-ongoing' || categoriaNorm === 'mdu-ongoing';
+    const isProjetoF = categoria === 'projeto-f' || categoriaNorm === 'projeto-f';
+    const isLiberados = categoria === 'liberados' || categoriaNorm === 'liberados';
+    const isSarRede = categoria === 'sar-rede' || categoriaNorm === 'sar-rede' || (categoriaNorm.includes('sar') && categoriaNorm.includes('rede'));
+
+    if (isSarByFileSignature || isSarRede) {
+      const dados = parseSarRedeCsvRows(linhas, delimiter);
+
+      applyDatasetToState('sar-rede', dados);
+      cacheDatasetLocally('sar-rede', dados, { source: 'manual', locked: true });
+      persistirDadosCompartilhados('sar-rede', dados, { source: 'manual', locked: true });
+
+      renderTabelaSarRede('tabela-sar-rede', dados);
+      popularFiltroStatusSarRede(dados);
+      atualizarContadores();
+      invalidateVisaoGerenciaCache();
+      agendarRenderVisaoGerencia();
+
+      if (statusEl) {
+        statusEl.textContent = `✅ Importado ${dados.length} registro(s)`;
+      }
+      const fileNameDisplay = document.getElementById('file-name');
+      if (fileNameDisplay) {
+        fileNameDisplay.textContent = file.name ? `📄 ${file.name}` : '';
+      }
+      return;
+    }
 
     if (isOngoing) {
       const dados = processarCSVOngoingCompartilhado(text, delimiter);
@@ -1779,21 +1899,28 @@ function importarCSV() {
       return;
     }
 
-    if (isSarRede) {
-      const dados = parseSarRedeCsvRows(linhas, delimiter);
+    if (isLiberados) {
+      const dadosAtuais = getPreferredDataset('liberados');
+      const estruturaAtual = getDadosLiberadosEstruturados(dadosAtuais || []);
+      const novosDadosAba = parseLiberadosCsvRows(linhas, delimiter, liberadosAbaAtiva);
 
-      applyDatasetToState('sar-rede', dados);
-      cacheDatasetLocally('sar-rede', dados, { source: 'manual', locked: true });
-      persistirDadosCompartilhados('sar-rede', dados, { source: 'manual', locked: true });
+      estruturaAtual[liberadosAbaAtiva] = novosDadosAba;
+      const consolidados = flattenDadosLiberadosEstruturados(estruturaAtual);
 
-      renderTabelaSarRede('tabela-sar-rede', dados);
-      popularFiltroStatusSarRede(dados);
+      applyDatasetToState('liberados', consolidados);
+      cacheDatasetLocally('liberados', consolidados, { source: 'manual', locked: true });
+      persistirDadosCompartilhados('liberados', consolidados, { source: 'manual', locked: true });
+
+      renderTabelaLiberados('tabela-liberados', novosDadosAba);
       atualizarContadores();
-      invalidateVisaoGerenciaCache();
-      agendarRenderVisaoGerencia();
+
+      const infoEl = document.getElementById('liberados-aba-info');
+      if (infoEl) {
+        infoEl.textContent = `Aba ativa: ${getLiberadosAbaLabel(liberadosAbaAtiva)} • ${novosDadosAba.length} registro(s)`;
+      }
 
       if (statusEl) {
-        statusEl.textContent = `✅ Importado ${dados.length} registro(s)`;
+        statusEl.textContent = `✅ Importado ${novosDadosAba.length} registro(s) em ${getLiberadosAbaLabel(liberadosAbaAtiva)}`;
       }
       const fileNameDisplay = document.getElementById('file-name');
       if (fileNameDisplay) {
@@ -2184,7 +2311,13 @@ function renderTabelaSarRede(id, lista) {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  const dados = Array.isArray(lista) ? lista : [];
+  const dados = (Array.isArray(lista) ? lista : []).filter((item) => {
+    const idProjeto = String(getSarRedeIdProjeto(item) || '').trim();
+    const cidade = String(getField(item, 'Cidade', 'CIDADE', 'cidade') || _getFieldByKeyHint(item, 'cidade') || '').trim();
+    const cliente = String(getSarRedeCliente(item) || '').trim();
+    const status = String(getSarRedeStatusProjetoReal(item) || '').trim();
+    return Boolean(idProjeto || cidade || cliente || status);
+  });
   if (!dados.length) {
     window.__sarRedeRowsSnapshot = [];
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center">Nenhum registro</td></tr>';
@@ -2358,6 +2491,27 @@ function getDadosLiberadosProjetoF(base = []) {
   return dados.filter(isStatusLiberadoProjetoF);
 }
 
+function atualizarBotoesAbaLiberados() {
+  const map = {
+    'projeto-f': document.getElementById('liberados-aba-projeto-f'),
+    'gpon-hfc': document.getElementById('liberados-aba-gpon-hfc'),
+    'greenfield': document.getElementById('liberados-aba-greenfield')
+  };
+
+  Object.entries(map).forEach(([aba, el]) => {
+    if (!el) return;
+    const ativa = aba === liberadosAbaAtiva;
+    el.classList.toggle('btn-primary', ativa);
+    el.classList.toggle('btn-secondary', !ativa);
+  });
+}
+
+function selecionarAbaLiberados(aba = 'projeto-f') {
+  liberadosAbaAtiva = normalizeLiberadosAba(aba);
+  atualizarBotoesAbaLiberados();
+  carregarDadosCategoria('liberados');
+}
+
 function renderTabelaLiberados(id, lista) {
   const tbody = document.getElementById(id);
   if (!tbody) return;
@@ -2367,28 +2521,32 @@ function renderTabelaLiberados(id, lista) {
   window.__liberadosModalData = dados;
 
   if (!dados.length) {
-    tbody.innerHTML = `<tr><td colspan="8">Nenhum registro liberado</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10">Nenhum registro liberado</td></tr>`;
     return;
   }
 
   const rows = dados.map((i, index) => {
-    const codged = getField(i, "CODGED", "codged", "cod_ged");
+    const idProjeto = getField(i, 'ID Projeto', 'ID_PROJETO', 'id projeto', 'id_projeto', 'ID', 'id') || '-';
+    const ddd = getField(i, 'DDD', 'ddd') || '-';
     const cidade = getField(i, "CIDADE", "cidade");
-    const bloco = getField(i, "BLOCO", "bloco");
-    const endereco = getField(i, "ENDEREÇO", "ENDERECO", "endereco", "endereco_entrada");
-    const qtdeBlocos = getField(i, "Qtde Blocos", "QTDE_BLOCOS", "qtd_blocos");
-    const statusMdu = getField(i, "STATUS MDU", "STATUS_MDU", "status_mdu");
-    const statusLiberacao = getField(i, "STATUS LIBERAÇÃO", "STATUS_LIBERACAO", "status_liberacao", "Liberação concluida?", "Liberacao Concluida?");
+    const cliente = getField(i, 'Cliente', 'CLIENTE', 'cliente', 'ENDEREÇO', 'ENDERECO', 'endereco') || '-';
+    const projetado = getField(i, 'PROJETADO', 'projetado') || '-';
+    const ageGeral = getField(i, 'AGE GERAL', 'age geral', 'AGE_GERAL', 'age_geral', 'AGE', 'age') || '-';
+    const enviado = getField(i, 'ENVIADO', 'enviado') || '-';
+    const previsao = getField(i, 'PREVISÃO', 'PREVISAO', 'previsao', 'previsão') || '-';
+    const statusProjetoReal = getField(i, 'Status Projeto Real', 'STATUS PROJETO REAL', 'status projeto real', 'status_projeto_real') || '-';
 
     return `
       <tr>
+        <td>${escapeHtml(idProjeto || '-')}</td>
+        <td>${escapeHtml(ddd || '-')}</td>
         <td>${escapeHtml(cidade || '-')}</td>
-        <td>${escapeHtml(bloco || '-')}</td>
-        <td>${escapeHtml(codged || '-')}</td>
-        <td>${escapeHtml(endereco || '-')}</td>
-        <td>${escapeHtml(qtdeBlocos || '-')}</td>
-        <td>${escapeHtml(statusMdu || '-')}</td>
-        <td>${escapeHtml(statusLiberacao || '-')}</td>
+        <td><span class="table-address-cell" title="${escapeHtml(cliente || '-')}">${escapeHtml(cliente || '-')}</span></td>
+        <td>${escapeHtml(projetado || '-')}</td>
+        <td>${escapeHtml(ageGeral || '-')}</td>
+        <td>${escapeHtml(enviado || '-')}</td>
+        <td>${escapeHtml(previsao || '-')}</td>
+        <td>${escapeHtml(statusProjetoReal || '-')}</td>
         <td><button type="button" class="btn-visualizar" onclick="visualizarLiberado(${index})">VISUALIZAR</button></td>
       </tr>`;
   }).join('');
@@ -2403,7 +2561,87 @@ function visualizarLiberado(index) {
     alert('Registro não encontrado');
     return;
   }
-  visualizarProjetoF(item);
+
+  const idProjeto = getField(item, 'ID Projeto', 'ID_PROJETO', 'id projeto', 'id_projeto', 'ID', 'id') || '-';
+  const cidade = getField(item, 'Cidade', 'CIDADE', 'cidade') || '-';
+  const cliente = getField(item, 'Cliente', 'CLIENTE', 'cliente', 'ENDEREÇO', 'ENDERECO', 'endereco') || '-';
+  const statusProjetoReal = getField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'status projeto real', 'status_projeto_real') || '-';
+  const previsao = getField(item, 'PREVISÃO', 'PREVISAO', 'previsao', 'previsão') || '-';
+  const ddd = getField(item, 'DDD', 'ddd') || '-';
+  const ageGeral = getField(item, 'AGE GERAL', 'age geral', 'AGE_GERAL', 'age_geral', 'AGE', 'age') || '-';
+  const projetado = getField(item, 'PROJETADO', 'projetado') || '-';
+  const epo = getField(item, 'EPO', 'epo') || '-';
+  const site = getField(item, 'SITE', 'site') || '-';
+  const caboFo = getField(item, 'CABO FO', 'CABO_FO', 'cabo_fo', 'cabo fo') || '-';
+  const observacoesGerais = getField(item, 'Observações Gerais', 'Observacoes Gerais', 'OBSERVACOES GERAIS', 'obs_gerais', 'OBS') || '-';
+  const blocos = getField(item, 'BLOCOS', 'blocos') || '-';
+  const hps = getField(item, 'HPS', 'hps') || '-';
+  const area = getField(item, 'Área', 'Area', 'AREA', 'área') || '-';
+
+  currentPendenteCodigo = String(idProjeto || `liberados-${index}`);
+
+  document.getElementById('modal-codigo').textContent = idProjeto;
+  document.getElementById('modal-endereco').textContent = cliente;
+  document.getElementById('modal-bairro').textContent = '-';
+  document.getElementById('modal-cidade').textContent = cidade;
+  document.getElementById('modal-epo').textContent = epo;
+  document.getElementById('modal-status').innerHTML = renderModalBadge(statusProjetoReal);
+  document.getElementById('modal-motivo').innerHTML = renderModalBadge(previsao);
+  document.getElementById('modal-obs-original').textContent = observacoesGerais;
+  document.getElementById('modal-obs-adicional').value = '';
+
+  applyModalContext({
+    themeClass: 'mdu-ongoing-modal',
+    title: `Detalhes LIBERADOS • ${getLiberadosAbaLabel(liberadosAbaAtiva)}`,
+    kicker: 'Painel analítico de liberados',
+    heroChip: getLiberadosAbaLabel(liberadosAbaAtiva),
+    heroTitle: cliente || idProjeto,
+    heroSubtitle: [cidade, epo].filter(v => v && v !== '-').join(' • ') || 'Registro liberado selecionado',
+    statusLabel: 'Status Projeto Real',
+    motivoLabel: 'Previsão',
+    heroPills: [
+      { label: 'ID Projeto', value: idProjeto },
+      { label: 'DDD', value: ddd },
+      { label: 'Age Geral', value: ageGeral }
+    ]
+  });
+
+  const modalBody = document.querySelector('#modal-obs .modal-body');
+  if (modalBody) {
+    const extraHtml = `
+      <div class="modal-extra modal-extra-grid">
+        ${renderModalInfoCard('EPO', epo, { featured: true })}
+        ${renderModalInfoCard('SITE', site)}
+        ${renderModalInfoCard('CABO FO', caboFo)}
+        ${renderModalInfoCard('BLOCOS', blocos)}
+        ${renderModalInfoCard('HPS', hps)}
+        ${renderModalInfoCard('Área', area)}
+        ${renderModalInfoCard('Projetado', projetado)}
+      </div>
+      ${renderModalAllFields(item)}
+    `;
+    const obsRow = document.getElementById('modal-obs-original')?.closest('.modal-row');
+    if (obsRow) {
+      obsRow.insertAdjacentHTML('beforebegin', extraHtml);
+    }
+  }
+
+  carregarObservacoesPendente(currentPendenteCodigo);
+  carregarAnexosPendente(currentPendenteCodigo);
+
+  const modal = document.getElementById('modal-obs');
+  if (modal) modal.classList.remove('hidden');
+
+  const anexoInput = document.getElementById('modal-anexo');
+  if (anexoInput) {
+    anexoInput.value = '';
+    anexoInput.onchange = (evt) => {
+      const file = evt.target.files[0];
+      if (file) {
+        uploadAnexoPendente(currentPendenteCodigo, file);
+      }
+    };
+  }
 }
 
 function popularFiltroStatusMdu() {
@@ -4357,7 +4595,8 @@ function initHeaderSearch() {
     'empresarial',
     'sar-rede',
     'mdu-ongoing',
-    'epo'
+    'epo',
+    'liberados'
   ]);
 
   document.querySelectorAll('.categoria-header').forEach(header => {
@@ -4426,7 +4665,7 @@ function mostrarSecao(id) {
   section.classList.add("ativa");
 
   const globalImport = document.getElementById("global-import-section");
-  const isCategoria = section.classList.contains("categoria-secao");
+  const isCategoria = section.classList.contains("categoria-secao") || id === 'liberados';
   if (isCategoria) {
     categoriaAtualParaImport = id;
     updateImportTargetLabel();
@@ -6781,9 +7020,22 @@ function carregarDadosCategoria(categoriaId) {
   }
 
   if (categoriaId === 'liberados') {
-    const baseProjetoF = getPreferredDataset('projeto-f');
-    const liberados = getDadosLiberadosProjetoF(baseProjetoF || []);
-    renderTabelaLiberados('tabela-liberados', liberados);
+    const baseLiberados = getPreferredDataset('liberados');
+    let dadosAba = getDadosLiberadosDaAba(baseLiberados || [], liberadosAbaAtiva);
+
+    // Fallback de compatibilidade para bases antigas derivadas de Projeto F.
+    if ((!baseLiberados || !baseLiberados.length) && !dadosAba.length) {
+      const baseProjetoF = getPreferredDataset('projeto-f');
+      dadosAba = getDadosLiberadosProjetoF(baseProjetoF || []).map(item => ({ ...item, _aba_liberados: 'projeto-f' }));
+    }
+
+    atualizarBotoesAbaLiberados();
+    const infoEl = document.getElementById('liberados-aba-info');
+    if (infoEl) {
+      infoEl.textContent = `Aba ativa: ${getLiberadosAbaLabel(liberadosAbaAtiva)} • ${dadosAba.length} registro(s)`;
+    }
+
+    renderTabelaLiberados('tabela-liberados', dadosAba);
     atualizarContadores();
     return;
   }
@@ -6856,8 +7108,9 @@ function carregarDadosCategoria(categoriaId) {
       }
       renderTabelaProjetoF(tabelaId, dados || []);
     } else if (categoriaId === 'liberados') {
-      const baseProjetoF = getPreferredDataset('projeto-f');
-      renderTabelaLiberados(tabelaId, getDadosLiberadosProjetoF(baseProjetoF || []));
+      const baseLiberados = getPreferredDataset('liberados');
+      const dadosAba = getDadosLiberadosDaAba(baseLiberados || [], liberadosAbaAtiva);
+      renderTabelaLiberados(tabelaId, dadosAba);
     } else {
       renderTabela(tabelaId, dados || [], false);
     }
@@ -6909,6 +7162,23 @@ function buscarEmCategoria(categoriaId) {
 
       return idProjeto.includes(termoBusca) || cliente.includes(termoBusca) || endereco.includes(termoBusca);
     });
+  } else if (categoriaId === 'liberados') {
+    const dadosAba = getDadosLiberadosDaAba(getPreferredDataset('liberados') || [], liberadosAbaAtiva);
+    resultado = dadosAba.filter(item => {
+      const idProjeto = String(getField(item, 'ID Projeto', 'ID_PROJETO', 'id projeto', 'id_projeto', 'ID', 'id') || '').toLowerCase();
+      const cliente = String(getField(item, 'Cliente', 'CLIENTE', 'cliente', 'ENDEREÇO', 'ENDERECO', 'endereco') || '').toLowerCase();
+      const endereco = String(getField(item, 'ENDEREÇO', 'ENDERECO', 'endereco') || '').toLowerCase();
+      return idProjeto.includes(termoBusca) || cliente.includes(termoBusca) || endereco.includes(termoBusca);
+    });
+
+    if (resultado.length === 0) {
+      alert('❌ Nenhum resultado encontrado para: ' + termoBusca);
+      renderTabelaLiberados('tabela-liberados', dadosAba);
+    } else {
+      renderTabelaLiberados('tabela-liberados', resultado);
+      alert(`✅ ${resultado.length} resultado(s) encontrado(s)`);
+    }
+    return;
   } else if (categoriaId === 'epo') {
     if (!epoSelecionadaAtual) {
       alert('⚠️ Selecione uma EPO antes de buscar.');
@@ -7034,7 +7304,10 @@ let currentPendenteCodigo = null;
 
 function atualizarContadores() {
   const totalProjetoF = getPreferredDataset('projeto-f').length;
-  const totalLiberados = getDadosLiberadosProjetoF(getPreferredDataset('projeto-f')).length;
+  const liberadosBase = getPreferredDataset('liberados');
+  const totalLiberados = Array.isArray(liberadosBase) && liberadosBase.length
+    ? liberadosBase.length
+    : getDadosLiberadosProjetoF(getPreferredDataset('projeto-f')).length;
   const epoStoreGpon = getEpoStore('gpon-ongoing');
   const epoStoreProjetoF = getEpoStore('projeto-f');
   const totalEpo = [epoStoreGpon, epoStoreProjetoF].reduce((acc, store) => {
