@@ -1671,14 +1671,14 @@ function getLiberadosAbaLabel(aba = 'projeto-f') {
 
 function normalizeLiberadosAba(aba = '') {
   const norm = normalizeText(aba).replace(/[^a-z0-9]/g, '-');
-  if (norm.includes('greenfield')) return 'greenfield';
+  if (norm.includes('greenfield') || norm.includes('greenfild')) return 'greenfield';
   if (norm.includes('gpon') || norm.includes('hfc')) return 'gpon-hfc';
   return 'projeto-f';
 }
 
 function inferirAbaLiberadosPorRegistro(item = {}, abaPadrao = 'projeto-f') {
   const tipoRede = normalizeText(getField(item, 'TIPO_REDE', 'TIPO REDE', 'tipo_rede'));
-  if (tipoRede.includes('greenfield') || tipoRede.includes('green field')) return 'greenfield';
+  if (tipoRede.includes('greenfield') || tipoRede.includes('greenfild') || tipoRede.includes('green field')) return 'greenfield';
   if (tipoRede.includes('gpon') || tipoRede.includes('hfc')) return 'gpon-hfc';
   if (tipoRede.includes('projeto f') || tipoRede.includes('projetof')) return 'projeto-f';
 
@@ -1692,7 +1692,7 @@ function inferirAbaLiberadosPorRegistro(item = {}, abaPadrao = 'projeto-f') {
     getField(item, 'Observações Gerais', 'Observacoes Gerais', 'OBSERVACOES GERAIS', 'obs_gerais')
   ].join(' '));
 
-  if (texto.includes('greenfield') || texto.includes('green field')) return 'greenfield';
+  if (texto.includes('greenfield') || texto.includes('greenfild') || texto.includes('green field')) return 'greenfield';
   if (texto.includes('gpon') || texto.includes('hfc')) return 'gpon-hfc';
   if (texto.includes('projeto f') || texto.includes('projeto_f')) return 'projeto-f';
   return normalizeLiberadosAba(abaPadrao);
@@ -2007,7 +2007,27 @@ function importarCSV() {
       const dadosAtuais = getPreferredDataset('liberados');
       const estruturaAtual = getDadosLiberadosEstruturados(dadosAtuais || []);
       const novosDadosImportados = parseLiberadosCsvRows(linhas, delimiter, liberadosAbaAtiva);
-      const estruturaImportada = getDadosLiberadosEstruturados(novosDadosImportados);
+      let estruturaImportada = getDadosLiberadosEstruturados(novosDadosImportados);
+
+      const totalImportado = novosDadosImportados.length;
+      const qtdProjetoF = (estruturaImportada['projeto-f'] || []).length;
+      const qtdAbaAtiva = (estruturaImportada[liberadosAbaAtiva] || []).length;
+      const abaAtivaNaoProjetoF = liberadosAbaAtiva !== 'projeto-f';
+      const tudoCaiuProjetoF = totalImportado > 0 && qtdProjetoF === totalImportado;
+
+      // Fallback prático: quando o arquivo não traz marcador explícito e tudo cai em PROJETO F,
+      // respeitar a aba ativa escolhida pelo usuário no momento da importação.
+      if (abaAtivaNaoProjetoF && tudoCaiuProjetoF && qtdAbaAtiva === 0) {
+        estruturaImportada = {
+          'projeto-f': [],
+          'gpon-hfc': [],
+          'greenfield': []
+        };
+        estruturaImportada[liberadosAbaAtiva] = novosDadosImportados.map((row) => ({
+          ...row,
+          _aba_liberados: liberadosAbaAtiva
+        }));
+      }
 
       let abasAtualizadas = [];
       LIBERADOS_ABAS.forEach((aba) => {
