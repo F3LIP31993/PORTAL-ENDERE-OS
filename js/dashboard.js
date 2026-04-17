@@ -1838,6 +1838,19 @@ function getDadosLiberadosDaAba(base = [], aba = liberadosAbaAtiva) {
   return estrutura[normalizeLiberadosAba(aba)] || [];
 }
 
+function inferirAbaDestinoImportacaoLiberados(fileName = '', abaAtual = '') {
+  const nome = normalizeText(fileName || '');
+  if (nome.includes('greenfield') || nome.includes('greenfild')) return 'greenfield';
+  if (nome.includes('gpon') || nome.includes('hfc')) return 'gpon-hfc';
+  if (nome.includes('projeto f') || nome.includes('projetof') || nome.includes('projeto_f')) return 'projeto-f';
+
+  const atual = normalizeLiberadosAba(abaAtual || liberadosAbaAtiva);
+  if (atual === 'gpon-hfc') return 'gpon-hfc';
+
+  // Fallback solicitado: priorizar atualização da aba GPON E HFC ao anexar planilha no LIBERADOS.
+  return 'gpon-hfc';
+}
+
 function importarCSV() {
   const categoria = categoriaAtualParaImport || document.querySelector('.secao.ativa')?.id;
   if (!categoria) {
@@ -2006,7 +2019,7 @@ function importarCSV() {
     if (isLiberados) {
       const dadosAtuais = getPreferredDataset('liberados');
       const estruturaAtual = getDadosLiberadosEstruturados(dadosAtuais || []);
-      const abaDestino = normalizeLiberadosAba(liberadosAbaAtiva);
+      const abaDestino = inferirAbaDestinoImportacaoLiberados(file?.name || '', liberadosAbaAtiva);
       const novosDadosImportados = parseLiberadosCsvRows(linhas, delimiter, abaDestino)
         .map((row) => ({ ...row, _aba_liberados: abaDestino }));
 
