@@ -5767,9 +5767,24 @@ function importarPlanilhaEpoGponOngoing() {
   if (statusEl) statusEl.textContent = 'Importando...';
 
   const processarTexto = (text) => {
-    const textClean = text.replace(/^\uFEFF/, '');
-    const delimiter = (textClean.split(/\r?\n/)[0] || '').includes(';') ? ';' : ',';
-    const linhas = parseGenericCsvRows(textClean, delimiter);
+    const textClean = String(text || '').replace(/^\uFEFF/, '');
+    if (textClean.startsWith('PK')) {
+      if (statusEl) statusEl.textContent = '⚠️ Arquivo Excel detectado. Exporte a aba em CSV para importar.';
+      alert('⚠️ Arquivo Excel (.xlsx/.xlsm) detectado. Para importar no EPO, exporte a aba em CSV.');
+      return;
+    }
+
+    const linhasBrutas = textClean.split(/\r?\n/);
+    const delimiter = detectarMelhorDelimitadorCSV(linhasBrutas);
+    const headerIndex = detectarLinhaCabecalhoCSV(linhasBrutas, delimiter);
+    const csvNormalizado = linhasBrutas.slice(headerIndex).join('\n');
+    const linhas = parseGenericCsvRows(csvNormalizado, delimiter);
+
+    if (!linhas.length) {
+      if (statusEl) statusEl.textContent = '⚠️ Nenhuma linha válida encontrada. Verifique se a planilha foi exportada em CSV.';
+      alert('⚠️ Nenhuma linha válida encontrada para GPON ONGOING. Verifique cabeçalho e exporte em CSV.');
+      return;
+    }
 
     const byEpo = {};
     const naoClassificadas = [];
@@ -5845,9 +5860,24 @@ function importarPlanilhaEpoProjetoF() {
   if (statusEl) statusEl.textContent = 'Importando...';
 
   const processarTexto = (text) => {
-    const textClean = text.replace(/^\uFEFF/, '');
-    const delimiter = (textClean.split(/\r?\n/)[0] || '').includes(';') ? ';' : ',';
-    const linhas = parseGenericCsvRows(textClean, delimiter);
+    const textClean = String(text || '').replace(/^\uFEFF/, '');
+    if (textClean.startsWith('PK')) {
+      if (statusEl) statusEl.textContent = '⚠️ Arquivo Excel detectado. Exporte a aba em CSV para importar.';
+      alert('⚠️ Arquivo Excel (.xlsx/.xlsm) detectado. Para importar no EPO, exporte a aba em CSV.');
+      return;
+    }
+
+    const linhasBrutas = textClean.split(/\r?\n/);
+    const delimiter = detectarMelhorDelimitadorCSV(linhasBrutas);
+    const headerIndex = detectarLinhaCabecalhoCSV(linhasBrutas, delimiter);
+    const csvNormalizado = linhasBrutas.slice(headerIndex).join('\n');
+    const linhas = parseGenericCsvRows(csvNormalizado, delimiter);
+
+    if (!linhas.length) {
+      if (statusEl) statusEl.textContent = '⚠️ Nenhuma linha válida encontrada. Verifique se a planilha foi exportada em CSV.';
+      alert('⚠️ Nenhuma linha válida encontrada para PROJETO F. Verifique cabeçalho e exporte em CSV.');
+      return;
+    }
 
     const byEpo = {};
     const naoClassificadas = [];
