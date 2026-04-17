@@ -1838,17 +1838,52 @@ function getDadosLiberadosDaAba(base = [], aba = liberadosAbaAtiva) {
   return estrutura[normalizeLiberadosAba(aba)] || [];
 }
 
-function inferirAbaDestinoImportacaoLiberados(fileName = '', abaAtual = '') {
-  const nome = normalizeText(fileName || '');
-  if (nome.includes('greenfield') || nome.includes('greenfild')) return 'greenfield';
-  if (nome.includes('gpon') || nome.includes('hfc')) return 'gpon-hfc';
-  if (nome.includes('projeto f') || nome.includes('projetof') || nome.includes('projeto_f')) return 'projeto-f';
+function importarLiberadosPorAba(abaDestino = 'projeto-f', linhas = [], delimiter = ';', file = null, statusEl = null) {
+  const aba = normalizeLiberadosAba(abaDestino);
+  const dadosAtuais = getPreferredDataset('liberados');
+  const estruturaAtual = getDadosLiberadosEstruturados(dadosAtuais || []);
+  const novosDadosImportados = parseLiberadosCsvRows(linhas, delimiter, aba)
+    .map((row) => ({ ...row, _aba_liberados: aba }));
 
-  const atual = normalizeLiberadosAba(abaAtual || liberadosAbaAtiva);
-  if (atual === 'gpon-hfc') return 'gpon-hfc';
+  estruturaAtual[aba] = novosDadosImportados;
+  liberadosAbaAtiva = aba;
+  atualizarBotoesAbaLiberados();
 
-  // Fallback solicitado: priorizar atualização da aba GPON E HFC ao anexar planilha no LIBERADOS.
-  return 'gpon-hfc';
+  const dadosAbaAtiva = estruturaAtual[aba] || [];
+  const consolidados = flattenDadosLiberadosEstruturados(estruturaAtual);
+
+  applyDatasetToState('liberados', consolidados);
+  cacheDatasetLocally('liberados', consolidados, { source: 'manual', locked: true });
+  persistirDadosCompartilhados('liberados', consolidados, { source: 'manual', locked: true });
+
+  renderTabelaLiberados('tabela-liberados', dadosAbaAtiva);
+  atualizarContadores();
+
+  const infoEl = document.getElementById('liberados-aba-info');
+  if (infoEl) {
+    infoEl.textContent = `Aba ativa: ${getLiberadosAbaLabel(aba)} • ${dadosAbaAtiva.length} registro(s)`;
+  }
+
+  if (statusEl) {
+    statusEl.textContent = `✅ Importado ${novosDadosImportados.length} registro(s) em ${getLiberadosAbaLabel(aba)}`;
+  }
+
+  const fileNameDisplay = document.getElementById('file-name');
+  if (fileNameDisplay) {
+    fileNameDisplay.textContent = file?.name ? `📄 ${file.name}` : '';
+  }
+}
+
+function importarLiberadosProjetoF(linhas = [], delimiter = ';', file = null, statusEl = null) {
+  importarLiberadosPorAba('projeto-f', linhas, delimiter, file, statusEl);
+}
+
+function importarLiberadosGponHfc(linhas = [], delimiter = ';', file = null, statusEl = null) {
+  importarLiberadosPorAba('gpon-hfc', linhas, delimiter, file, statusEl);
+}
+
+function importarLiberadosGreenfield(linhas = [], delimiter = ';', file = null, statusEl = null) {
+  importarLiberadosPorAba('greenfield', linhas, delimiter, file, statusEl);
 }
 
 function importarCSV() {
@@ -2017,45 +2052,13 @@ function importarCSV() {
     }
 
     if (isLiberados) {
-      const dadosAtuais = getPreferredDataset('liberados');
-      const estruturaAtual = getDadosLiberadosEstruturados(dadosAtuais || []);
-      const abaDestino = inferirAbaDestinoImportacaoLiberados(file?.name || '', liberadosAbaAtiva);
-      const novosDadosImportados = parseLiberadosCsvRows(linhas, delimiter, abaDestino)
-        .map((row) => ({ ...row, _aba_liberados: abaDestino }));
-
-      // Regra determinística: importação no LIBERADOS sempre atualiza a aba ativa selecionada.
-      estruturaAtual[abaDestino] = novosDadosImportados;
-      const abasAtualizadas = [`${getLiberadosAbaLabel(abaDestino)} (${novosDadosImportados.length})`];
-
-      if (!(estruturaAtual[liberadosAbaAtiva] || []).length) {
-        const primeiraAbaComDados = LIBERADOS_ABAS.find((aba) => (estruturaAtual[aba] || []).length > 0);
-        if (primeiraAbaComDados) {
-          liberadosAbaAtiva = primeiraAbaComDados;
-          atualizarBotoesAbaLiberados();
-        }
-      }
-
-      const dadosAbaAtiva = estruturaAtual[liberadosAbaAtiva] || [];
-      const consolidados = flattenDadosLiberadosEstruturados(estruturaAtual);
-
-      applyDatasetToState('liberados', consolidados);
-      cacheDatasetLocally('liberados', consolidados, { source: 'manual', locked: true });
-      persistirDadosCompartilhados('liberados', consolidados, { source: 'manual', locked: true });
-
-      renderTabelaLiberados('tabela-liberados', dadosAbaAtiva);
-      atualizarContadores();
-
-      const infoEl = document.getElementById('liberados-aba-info');
-      if (infoEl) {
-        infoEl.textContent = `Aba ativa: ${getLiberadosAbaLabel(liberadosAbaAtiva)} • ${dadosAbaAtiva.length} registro(s)`;
-      }
-
-      if (statusEl) {
-        statusEl.textContent = `✅ Importado ${novosDadosImportados.length} registro(s) • ${abasAtualizadas.join(' | ')}`;
-      }
-      const fileNameDisplay = document.getElementById('file-name');
-      if (fileNameDisplay) {
-        fileNameDisplay.textContent = file.name ? `📄 ${file.name}` : '';
+      const abaSelecionada = normalizeLiberadosAba(liberadosAbaAtiva);
+      if (abaSelecionada === 'projeto-f') {
+        importarLiberadosProjetoF(linhas, delimiter, file, statusEl);
+      } else if (abaSelecionada === 'greenfield') {
+        importarLiberadosGreenfield(linhas, delimiter, file, statusEl);
+      } else {
+        importarLiberadosGponHfc(linhas, delimiter, file, statusEl);
       }
       return;
     }
