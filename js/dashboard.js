@@ -6123,7 +6123,33 @@ function renderGponOngoingEpo(customRows = null) {
 
   const dados = Array.isArray(customRows) ? customRows : getEpoRowsForEpo('gpon-ongoing', epoSelecionadaAtual);
   if (!dados.length) {
-    container.innerHTML = '<p class="epo-empty-state">Nenhum endereço encontrado para esta EPO. Use o 📎 de GPON ONGOING para importar a planilha do BACKLOG.</p>';
+    container.innerHTML = `
+      <p class="epo-section-title">${escapeHtml(epoSelecionadaAtual)} • GPON ONGOING (0)</p>
+      <div class="epo-table-wrap">
+        <table class="epo-table">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Endereço</th>
+              <th>Número</th>
+              <th>Bairro</th>
+              <th>Cidade</th>
+              <th>EPO</th>
+              <th>Solicitante</th>
+              <th>Status Geral</th>
+              <th>Motivo Geral</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="10" style="text-align:center">Nenhum registro para esta EPO</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="epo-empty-state">Use o 📎 de GPON ONGOING para importar a planilha do BACKLOG.</p>
+    `;
     return;
   }
 
@@ -6201,7 +6227,31 @@ function renderProjetoFEpo(customRows = null) {
 
   const dados = Array.isArray(customRows) ? customRows : getEpoRowsForEpo('projeto-f', epoSelecionadaAtual);
   if (!dados.length) {
-    container.innerHTML = '<p class="epo-empty-state">Nenhum registro de PROJETO F para esta EPO. Use o 📎 de PROJETO F para importar a planilha de construção.</p>';
+    container.innerHTML = `
+      <p class="epo-section-title">${escapeHtml(epoSelecionadaAtual)} • PROJETO F (0)</p>
+      <div class="epo-table-wrap">
+        <table class="epo-table">
+          <thead>
+            <tr>
+              <th>Cidade</th>
+              <th>Bloco</th>
+              <th>Cód. GED</th>
+              <th>Endereço</th>
+              <th>Qtde Blocos</th>
+              <th>Status MDU</th>
+              <th>Status Liberação</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="8" style="text-align:center">Nenhum registro para esta EPO</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="epo-empty-state">Use o 📎 de PROJETO F para importar a planilha de construção.</p>
+    `;
     return;
   }
 
