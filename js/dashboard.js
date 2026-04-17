@@ -5759,6 +5759,35 @@ function _resolverEpoDaLinha(item) {
   return byNormalized || raw;
 }
 
+function parseEpoImportRowsRobusto(text = '') {
+  const textClean = String(text || '').replace(/^\uFEFF/, '');
+  const linhasBrutas = textClean.split(/\r?\n/);
+
+  const delimCandidatos = [';', ',', '\t', '|'];
+  const headerCandidates = [];
+
+  const autoDelimiter = detectarMelhorDelimitadorCSV(linhasBrutas);
+  const autoHeader = detectarLinhaCabecalhoCSV(linhasBrutas, autoDelimiter);
+  headerCandidates.push(autoHeader);
+  for (let i = 0; i <= Math.min(8, Math.max(0, linhasBrutas.length - 1)); i += 1) {
+    if (!headerCandidates.includes(i)) headerCandidates.push(i);
+  }
+
+  let bestRows = [];
+
+  for (const delimiter of delimCandidatos) {
+    for (const headerIndex of headerCandidates) {
+      const slice = linhasBrutas.slice(headerIndex).join('\n');
+      const rows = parseGenericCsvRows(slice, delimiter);
+      if (rows.length > bestRows.length) {
+        bestRows = rows;
+      }
+    }
+  }
+
+  return bestRows;
+}
+
 function importarPlanilhaEpoGponOngoing() {
   const input = document.getElementById('epo-gpon-import-file');
   const statusEl = document.getElementById('epo-gpon-import-status');
@@ -5774,11 +5803,7 @@ function importarPlanilhaEpoGponOngoing() {
       return;
     }
 
-    const linhasBrutas = textClean.split(/\r?\n/);
-    const delimiter = detectarMelhorDelimitadorCSV(linhasBrutas);
-    const headerIndex = detectarLinhaCabecalhoCSV(linhasBrutas, delimiter);
-    const csvNormalizado = linhasBrutas.slice(headerIndex).join('\n');
-    const linhas = parseGenericCsvRows(csvNormalizado, delimiter);
+    const linhas = parseEpoImportRowsRobusto(textClean);
 
     if (!linhas.length) {
       if (statusEl) statusEl.textContent = '⚠️ Nenhuma linha válida encontrada. Verifique se a planilha foi exportada em CSV.';
@@ -5789,9 +5814,8 @@ function importarPlanilhaEpoGponOngoing() {
     const byEpo = {};
     const naoClassificadas = [];
     linhas.forEach(item => {
-      const codigo = getField(item, 'COD-MDUGO', 'CODIGO', 'CÓDIGO', 'COD', 'ID', 'id');
-      const endereco = getField(item, 'ENDEREÇO', 'ENDERECO', 'endereco');
-      if (!String(codigo || '').trim() && !String(endereco || '').trim()) return;
+      const hasAnyData = Object.values(item || {}).some((value) => String(value || '').trim() !== '');
+      if (!hasAnyData) return;
 
       const key = _resolverEpoDaLinha(item);
       if (!key) {
@@ -5867,11 +5891,7 @@ function importarPlanilhaEpoProjetoF() {
       return;
     }
 
-    const linhasBrutas = textClean.split(/\r?\n/);
-    const delimiter = detectarMelhorDelimitadorCSV(linhasBrutas);
-    const headerIndex = detectarLinhaCabecalhoCSV(linhasBrutas, delimiter);
-    const csvNormalizado = linhasBrutas.slice(headerIndex).join('\n');
-    const linhas = parseGenericCsvRows(csvNormalizado, delimiter);
+    const linhas = parseEpoImportRowsRobusto(textClean);
 
     if (!linhas.length) {
       if (statusEl) statusEl.textContent = '⚠️ Nenhuma linha válida encontrada. Verifique se a planilha foi exportada em CSV.';
