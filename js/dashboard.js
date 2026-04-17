@@ -2645,11 +2645,21 @@ function getDadosLiberadosProjetoF(base = []) {
 function atualizarLayoutLiberados() {
   const secaoLiberados = document.getElementById('liberados');
   const detalhesCard = document.getElementById('liberados-detalhes-card');
+  const gridCards = document.querySelector('#liberados .liberados-subcards-grid');
+  const botaoTrocar = document.getElementById('liberados-reset-selecao');
   const isLiberadosAtivo = Boolean(secaoLiberados?.classList.contains('ativa'));
   const mostrarDetalhes = isLiberadosAtivo && liberadosSubcardSelecionado;
 
   if (detalhesCard) {
     detalhesCard.style.display = mostrarDetalhes ? 'block' : 'none';
+  }
+
+  if (gridCards) {
+    gridCards.classList.toggle('only-active', mostrarDetalhes);
+  }
+
+  if (botaoTrocar) {
+    botaoTrocar.style.display = mostrarDetalhes ? 'inline-flex' : 'none';
   }
 
   const globalImport = document.getElementById('global-import-section');
