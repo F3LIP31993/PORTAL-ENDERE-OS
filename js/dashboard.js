@@ -14,6 +14,7 @@ let currentUser = null;
 
 const LIBERADOS_ABAS = ['projeto-f', 'gpon-hfc', 'greenfield'];
 let liberadosAbaAtiva = 'projeto-f';
+let liberadosSubcardSelecionado = false;
 
 const STORAGE_USERS_KEY = "portalUsers";
 const STORAGE_CURRENT_USER_KEY = "portalCurrentUser";
@@ -2641,14 +2642,42 @@ function getDadosLiberadosProjetoF(base = []) {
   return dados.filter(isStatusLiberadoProjetoF);
 }
 
+function atualizarLayoutLiberados() {
+  const secaoLiberados = document.getElementById('liberados');
+  const detalhesCard = document.getElementById('liberados-detalhes-card');
+  const isLiberadosAtivo = Boolean(secaoLiberados?.classList.contains('ativa'));
+  const mostrarDetalhes = isLiberadosAtivo && liberadosSubcardSelecionado;
+
+  if (detalhesCard) {
+    detalhesCard.style.display = mostrarDetalhes ? 'block' : 'none';
+  }
+
+  const globalImport = document.getElementById('global-import-section');
+  if (globalImport && isLiberadosAtivo) {
+    globalImport.style.display = mostrarDetalhes ? 'block' : 'none';
+  }
+}
+
 function atualizarBotoesAbaLiberados() {
-  const map = {
+  const mapCards = {
+    'projeto-f': document.getElementById('liberados-card-projeto-f'),
+    'gpon-hfc': document.getElementById('liberados-card-gpon-hfc'),
+    'greenfield': document.getElementById('liberados-card-greenfield')
+  };
+
+  Object.entries(mapCards).forEach(([aba, el]) => {
+    if (!el) return;
+    const ativa = aba === liberadosAbaAtiva && liberadosSubcardSelecionado;
+    el.classList.toggle('is-active', ativa);
+  });
+
+  const mapCompatButtons = {
     'projeto-f': document.getElementById('liberados-aba-projeto-f'),
     'gpon-hfc': document.getElementById('liberados-aba-gpon-hfc'),
     'greenfield': document.getElementById('liberados-aba-greenfield')
   };
 
-  Object.entries(map).forEach(([aba, el]) => {
+  Object.entries(mapCompatButtons).forEach(([aba, el]) => {
     if (!el) return;
     const ativa = aba === liberadosAbaAtiva;
     el.classList.toggle('btn-primary', ativa);
@@ -2657,9 +2686,28 @@ function atualizarBotoesAbaLiberados() {
 }
 
 function selecionarAbaLiberados(aba = 'projeto-f') {
+  liberadosSubcardSelecionado = true;
   liberadosAbaAtiva = normalizeLiberadosAba(aba);
   atualizarBotoesAbaLiberados();
+  atualizarLayoutLiberados();
   carregarDadosCategoria('liberados');
+}
+
+function abrirCardLiberados(aba = 'projeto-f') {
+  selecionarAbaLiberados(aba);
+}
+
+function resetarFluxoLiberados() {
+  liberadosSubcardSelecionado = false;
+  atualizarBotoesAbaLiberados();
+  atualizarLayoutLiberados();
+
+  const infoEl = document.getElementById('liberados-aba-info');
+  if (infoEl) {
+    infoEl.textContent = 'Selecione PROJETO F, GPON E HFC ou GREENFIELD para abrir anexo e tabela.';
+  }
+
+  renderTabelaLiberados('tabela-liberados', []);
 }
 
 function renderTabelaLiberados(id, lista) {
@@ -4883,6 +4931,10 @@ function mostrarSecao(id) {
     }
   }
 
+  if (id === 'liberados') {
+    atualizarLayoutLiberados();
+  }
+
   if (id === "historico") {
     loadHistory();
   }
@@ -5566,6 +5618,10 @@ function abrirCategoria(categoriaId) {
 
   // Mostra a seção e ajusta/importa o bloco de importação
   mostrarSecao(categoriaId);
+
+  if (categoriaId === 'liberados') {
+    resetarFluxoLiberados();
+  }
 
   // Carregar dados da categoria
   carregarDadosCategoria(categoriaId);
@@ -7288,6 +7344,18 @@ function carregarDadosCategoria(categoriaId) {
   }
 
   if (categoriaId === 'liberados') {
+    atualizarLayoutLiberados();
+    atualizarBotoesAbaLiberados();
+
+    if (!liberadosSubcardSelecionado) {
+      const infoElInicial = document.getElementById('liberados-aba-info');
+      if (infoElInicial) {
+        infoElInicial.textContent = 'Selecione PROJETO F, GPON E HFC ou GREENFIELD para abrir anexo e tabela.';
+      }
+      atualizarContadores();
+      return;
+    }
+
     const baseLiberados = getPreferredDataset('liberados');
     let dadosAba = getDadosLiberadosDaAba(baseLiberados || [], liberadosAbaAtiva);
 
@@ -7297,7 +7365,6 @@ function carregarDadosCategoria(categoriaId) {
       dadosAba = getDadosLiberadosProjetoF(baseProjetoF || []).map(item => ({ ...item, _aba_liberados: 'projeto-f' }));
     }
 
-    atualizarBotoesAbaLiberados();
     const infoEl = document.getElementById('liberados-aba-info');
     if (infoEl) {
       infoEl.textContent = `Aba ativa: ${getLiberadosAbaLabel(liberadosAbaAtiva)} • ${dadosAba.length} registro(s)`;
