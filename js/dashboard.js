@@ -2518,13 +2518,17 @@ function renderTabelaMduOngoing(id, lista) {
   tbody.innerHTML = "";
 
   if (!lista || lista.length === 0) {
+    window.__mduOngoingRowsSnapshot = [];
     tbody.innerHTML = `<tr><td colspan="10">Nenhum registro</td></tr>`;
     popularFiltroStatusMdu();
     return;
   }
 
-  const rows = lista.map(i => {
-    const codigo = getField(i, "COD-MDUGO");
+  const dados = Array.isArray(lista) ? lista : [];
+  window.__mduOngoingRowsSnapshot = dados;
+
+  const rows = dados.map((i, index) => {
+    const codigo = getField(i, "COD-MDUGO", "CÓDIGO", "CODIGO", "COD", "ID") || '-';
     const endereco = getField(i, "ENDEREÇO");
     const numero = getField(i, "NUMERO");
     const bairro = getField(i, "BAIRRO");
@@ -2545,12 +2549,24 @@ function renderTabelaMduOngoing(id, lista) {
         <td>${solicitante}</td>
         <td>${statusGeral}</td>
         <td>${motivoGeral}</td>
-        <td><button onclick="visualizarMduOngoing('${codigo}')" class="btn-visualizar">🔍 Visualizar</button></td>
+        <td><button type="button" onclick="visualizarMduOngoingPorIndice(${index})" class="btn-visualizar">🔍 Visualizar</button></td>
       </tr>`;
   }).join('');
 
   tbody.innerHTML = rows;
   popularFiltroStatusMdu();
+}
+
+function visualizarMduOngoingPorIndice(index) {
+  const rows = Array.isArray(window.__mduOngoingRowsSnapshot) ? window.__mduOngoingRowsSnapshot : [];
+  const item = rows[index];
+  if (!item) {
+    alert('Registro não encontrado');
+    return;
+  }
+
+  const codigo = String(getField(item, "COD-MDUGO", "CÓDIGO", "CODIGO", "COD", "ID") || '').trim();
+  visualizarMduOngoing(codigo || index);
 }
 
 function renderTabelaProjetoF(id, lista) {
@@ -7983,15 +7999,23 @@ function visualizarSarRedePorIndice(index) {
 }
 
 function visualizarMduOngoing(codigo) {
-  currentPendenteCodigo = codigo;
-  const dados = dadosPorCategoria['mdu-ongoing'] || [];
-  const item = dados.find(i => getField(i, "COD-MDUGO") === codigo);
+  const codigoNorm = String(codigo || '').trim();
+  currentPendenteCodigo = codigoNorm;
+
+  const snapshotRows = Array.isArray(window.__mduOngoingRowsSnapshot) ? window.__mduOngoingRowsSnapshot : [];
+  const baseRows = snapshotRows.length ? snapshotRows : (dadosPorCategoria['mdu-ongoing'] || []);
+
+  const item = baseRows.find((i) => {
+    const valorCodigo = String(getField(i, "COD-MDUGO", "CÓDIGO", "CODIGO", "COD", "ID") || '').trim();
+    return valorCodigo === codigoNorm;
+  }) || (typeof codigo === 'number' ? baseRows[codigo] : null);
+
   if (!item) {
     alert('Registro não encontrado');
     return;
   }
 
-  const codigoExibicao = getField(item, "COD-MDUGO") || codigo;
+  const codigoExibicao = getField(item, "COD-MDUGO", "CÓDIGO", "CODIGO", "COD", "ID") || codigoNorm || '-';
   const enderecoCompleto = `${getField(item, "ENDEREÇO") || '-'} ${getField(item, "NUMERO") || ''}`.trim();
   const bairro = getField(item, "BAIRRO") || '-';
   const cidade = getField(item, "CIDADE") || '-';
