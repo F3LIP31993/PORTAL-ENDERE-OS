@@ -2885,6 +2885,14 @@ td:first-child {
   gap: 12px;
 }
 
+.liberados-subcards-grid.only-active {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.liberados-subcards-grid.only-active .liberados-subcard:not(.is-active) {
+  display: none;
+}
+
 .liberados-subcard {
   border: 1px solid #d3deee;
   border-radius: 14px;
