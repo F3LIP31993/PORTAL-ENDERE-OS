@@ -463,12 +463,26 @@
       </div>
 
       <div class="card">
-        <h2 style="margin-top:0;">Registros Liberados</h2>
-        <div class="epo-action-buttons" style="margin-bottom:10px;">
-          <button type="button" id="liberados-aba-projeto-f" class="btn-primary" onclick="selecionarAbaLiberados('projeto-f')">PROJETO F</button>
-          <button type="button" id="liberados-aba-gpon-hfc" class="btn-secondary" onclick="selecionarAbaLiberados('gpon-hfc')">GPON E HFC</button>
-          <button type="button" id="liberados-aba-greenfield" class="btn-secondary" onclick="selecionarAbaLiberados('greenfield')">GREENFIELD</button>
+        <h2 style="margin-top:0;">Escolha o tipo de importação</h2>
+        <p class="liberados-intro">Selecione um card abaixo para abrir a área de anexo e tabela.</p>
+        <div class="liberados-subcards-grid">
+          <button type="button" id="liberados-card-projeto-f" class="liberados-subcard" onclick="abrirCardLiberados('projeto-f')">
+            <span class="liberados-subcard-title">PROJETO F</span>
+            <span class="liberados-subcard-subtitle">Importação dedicada</span>
+          </button>
+          <button type="button" id="liberados-card-gpon-hfc" class="liberados-subcard" onclick="abrirCardLiberados('gpon-hfc')">
+            <span class="liberados-subcard-title">GPON E HFC</span>
+            <span class="liberados-subcard-subtitle">Importação dedicada</span>
+          </button>
+          <button type="button" id="liberados-card-greenfield" class="liberados-subcard" onclick="abrirCardLiberados('greenfield')">
+            <span class="liberados-subcard-title">GREENFIELD</span>
+            <span class="liberados-subcard-subtitle">Importação dedicada</span>
+          </button>
         </div>
+      </div>
+
+      <div class="card" id="liberados-detalhes-card" style="display:none;">
+        <h2 style="margin-top:0;">Registros Liberados</h2>
         <p id="liberados-aba-info" style="margin:0 0 8px 0; font-size:12px; color:#475569; font-weight:600;"></p>
         <table>
           <thead>
