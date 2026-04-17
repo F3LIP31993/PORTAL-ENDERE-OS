@@ -462,22 +462,43 @@
         <h1>✅ LIBERADOS</h1>
       </div>
 
+      <div class="liberados-hero">
+        <div>
+          <p class="liberados-hero-kicker">Painel Executivo</p>
+          <h2 class="liberados-hero-title">Gestão de Liberações por Fluxo</h2>
+          <p class="liberados-hero-subtitle">Selecione o fluxo para trabalhar com importação dedicada e acompanhamento segmentado.</p>
+        </div>
+        <span class="liberados-hero-chip">Operação Assistida</span>
+      </div>
+
       <div class="card">
-        <h2 style="margin-top:0;">Escolha o tipo de importação</h2>
-        <p class="liberados-intro">Selecione um card abaixo para abrir a área de anexo e tabela.</p>
+        <h2 style="margin-top:0;">Selecione o fluxo de importação</h2>
+        <p class="liberados-intro">Escolha um card para abrir o painel dedicado de anexo e acompanhamento.</p>
         <button type="button" id="liberados-reset-selecao" class="btn-secondary" style="display:none; margin-bottom:10px;" onclick="resetarFluxoLiberados()">Trocar card</button>
         <div class="liberados-subcards-grid">
           <button type="button" id="liberados-card-projeto-f" class="liberados-subcard" onclick="abrirCardLiberados('projeto-f')">
+            <span class="liberados-subcard-head">
+              <span class="liberados-subcard-icon">PF</span>
+              <span id="liberados-badge-projeto-f" class="liberados-subcard-badge">0 registro(s)</span>
+            </span>
             <span class="liberados-subcard-title">PROJETO F</span>
-            <span class="liberados-subcard-subtitle">Importação dedicada</span>
+            <span class="liberados-subcard-subtitle">Fluxo dedicado</span>
           </button>
           <button type="button" id="liberados-card-gpon-hfc" class="liberados-subcard" onclick="abrirCardLiberados('gpon-hfc')">
+            <span class="liberados-subcard-head">
+              <span class="liberados-subcard-icon">GH</span>
+              <span id="liberados-badge-gpon-hfc" class="liberados-subcard-badge">0 registro(s)</span>
+            </span>
             <span class="liberados-subcard-title">GPON E HFC</span>
-            <span class="liberados-subcard-subtitle">Importação dedicada</span>
+            <span class="liberados-subcard-subtitle">Fluxo dedicado</span>
           </button>
           <button type="button" id="liberados-card-greenfield" class="liberados-subcard" onclick="abrirCardLiberados('greenfield')">
+            <span class="liberados-subcard-head">
+              <span class="liberados-subcard-icon">GF</span>
+              <span id="liberados-badge-greenfield" class="liberados-subcard-badge">0 registro(s)</span>
+            </span>
             <span class="liberados-subcard-title">GREENFIELD</span>
-            <span class="liberados-subcard-subtitle">Importação dedicada</span>
+            <span class="liberados-subcard-subtitle">Fluxo dedicado</span>
           </button>
         </div>
       </div>
