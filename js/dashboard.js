@@ -5779,7 +5779,7 @@ function flattenEpoNovosStore(store = {}) {
 function buildEpoNovosStoreFromRows(rows = []) {
   const byEpo = {};
   (Array.isArray(rows) ? rows : []).forEach(item => {
-    const key = String(item?.__epoBucket || _resolverEpoDaLinha(item) || '').trim().toUpperCase();
+    const key = String(item?.__epoBucket || _resolverEpoDaLinha(item, 'gpon-ongoing') || '').trim().toUpperCase();
     if (!key) return;
     if (!byEpo[key]) byEpo[key] = [];
     byEpo[key].push(item);
@@ -5911,22 +5911,65 @@ function abrirImportEpoProjetoF() {
   if (input) { input.value = ''; input.click(); }
 }
 
-function _resolverEpoDaLinha(item) {
-  const EPO_KEYS = ['EPO', 'epo', 'EPO/CLUSTER', 'EPO / Cluster', 'EPO_CLUSTER', 'epo_cluster', 'PARCEIRA', 'parceira', 'PARCEIRO', 'parceiro', 'CLUSTER', 'cluster'];
-  const raw = (getField(item, ...EPO_KEYS) || '').toString().trim().toUpperCase();
-  if (!raw) return null;
+function normalizarNomeEpoParaPill(rawValue = '') {
   const normalizeBucket = (value = '') => normalizeText(String(value || '')).replace(/[^a-z0-9]/g, '');
+  const raw = String(rawValue || '').trim();
+  if (!raw) return '';
 
-  const exact = EPO_PILLS.find(p => p === raw);
-  if (exact) return exact;
+  const rawUpper = raw.toUpperCase();
+  if (EPO_PILLS.includes(rawUpper)) return rawUpper;
 
-  const rawNorm = normalizeBucket(raw);
-  const byNormalized = EPO_PILLS.find((p) => {
-    const pNorm = normalizeBucket(p);
-    return rawNorm === pNorm || rawNorm.includes(pNorm) || pNorm.includes(rawNorm);
+  const rawNorm = normalizeBucket(rawUpper);
+  if (!rawNorm) return '';
+
+  const byNormalized = EPO_PILLS.find((pill) => normalizeBucket(pill) === rawNorm);
+  if (byNormalized) return byNormalized;
+
+  const byContains = EPO_PILLS.find((pill) => {
+    const pillNorm = normalizeBucket(pill);
+    return rawNorm.includes(pillNorm) || pillNorm.includes(rawNorm);
   });
 
-  return byNormalized || raw;
+  return byContains || '';
+}
+
+function _resolverEpoDaLinha(item, actionKey = 'gpon-ongoing') {
+  const isProjetoF = actionKey === 'projeto-f';
+  const epoMode = isProjetoF ? 'projeto-f' : 'ongoing';
+  const preferredKeys = isProjetoF
+    ? ['PARCEIRA', 'parceira', 'PARCEIRO', 'parceiro']
+    : ['EPO', 'epo', 'EPO/CLUSTER', 'EPO / Cluster', 'EPO_CLUSTER', 'epo_cluster'];
+
+  const fallbackKeys = isProjetoF
+    ? ['EPO', 'epo', 'CLUSTER', 'cluster']
+    : ['PARCEIRA', 'parceira', 'CLUSTER', 'cluster'];
+
+  const raw = getField(item, ...preferredKeys) || getField(item, ...fallbackKeys) || '';
+  const sanitized = sanitizeEpoName(raw, epoMode);
+  return normalizarNomeEpoParaPill(sanitized || raw);
+}
+
+function getEpoCountsByName(epoName = '') {
+  const key = String(epoName || '').trim().toUpperCase();
+  if (!key) return { gpon: 0, projetoF: 0 };
+
+  return {
+    gpon: getEpoRowsForEpo('gpon-ongoing', key).length,
+    projetoF: getEpoRowsForEpo('projeto-f', key).length
+  };
+}
+
+function atualizarResumoEpoSelecionada() {
+  const selectedNameEl = document.getElementById('epo-selected-name');
+  if (!selectedNameEl) return;
+
+  if (!epoSelecionadaAtual) {
+    selectedNameEl.textContent = '-';
+    return;
+  }
+
+  const counts = getEpoCountsByName(epoSelecionadaAtual);
+  selectedNameEl.textContent = `${epoSelecionadaAtual} | GPON ONGOING - ${counts.gpon} / PROJETO F - ${counts.projetoF}`;
 }
 
 function parseEpoImportRowsRobusto(text = '') {
@@ -5988,25 +6031,37 @@ function importarPlanilhaEpoGponOngoing() {
       return;
     }
 
-    // Modo global obrigatório: ao importar uma vez, alimenta todas as EPOs.
     const byEpo = {};
+    const semEpo = [];
+    linhasValidas.forEach((item) => {
+      const epo = _resolverEpoDaLinha(item, 'gpon-ongoing');
+      if (!epo) {
+        semEpo.push(item);
+        return;
+      }
+
+      if (!byEpo[epo]) byEpo[epo] = [];
+      byEpo[epo].push({ ...item, __epoBucket: epo });
+    });
+
     EPO_PILLS.forEach((epo) => {
-      byEpo[epo] = linhasValidas.map((item) => ({ ...item, __epoBucket: epo }));
+      if (!Array.isArray(byEpo[epo])) byEpo[epo] = [];
     });
 
     saveEpoStore('gpon-ongoing', byEpo);
     atualizarCountPillsEpo();
+    atualizarResumoEpoSelecionada();
     atualizarContadores();
     persistirDadosCompartilhados('epo-gpon-ongoing', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
     cacheDatasetLocally('epo-gpon-ongoing', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
 
     const total = linhasValidas.length;
-    const epoCount = Object.keys(byEpo).length;
     const resumo = formatarResumoEpoCompleto(byEpo);
+    const ignoredText = semEpo.length ? ` • ${semEpo.length} sem EPO` : '';
 
-    if (statusEl) statusEl.textContent = `✅ ${total} linhas válidas replicadas para ${epoCount} EPOs • ${resumo}`;
+    if (statusEl) statusEl.textContent = `✅ ${total} linhas válidas distribuídas por EPO${ignoredText} • ${resumo}`;
     const resultEl = document.getElementById('epo-action-result');
-    if (resultEl) resultEl.textContent = `✅ Importado GPON ONGOING: ${resumo}`;
+    if (resultEl) resultEl.textContent = `✅ Importado GPON ONGOING por coluna EPO: ${resumo}${ignoredText}`;
 
     updateEpoImportStatus('gpon-ongoing');
 
@@ -6061,24 +6116,36 @@ function importarPlanilhaEpoProjetoF() {
       return;
     }
 
-    // Modo global obrigatório: ao importar uma vez, alimenta todas as EPOs.
     const byEpo = {};
+    const semParceira = [];
+    linhasValidas.forEach((item) => {
+      const epo = _resolverEpoDaLinha(item, 'projeto-f');
+      if (!epo) {
+        semParceira.push(item);
+        return;
+      }
+
+      if (!byEpo[epo]) byEpo[epo] = [];
+      byEpo[epo].push({ ...item, __epoBucket: epo });
+    });
+
     EPO_PILLS.forEach((epo) => {
-      byEpo[epo] = linhasValidas.map((item) => ({ ...item, __epoBucket: epo }));
+      if (!Array.isArray(byEpo[epo])) byEpo[epo] = [];
     });
 
     saveEpoStore('projeto-f', byEpo);
     atualizarCountPillsEpo();
+    atualizarResumoEpoSelecionada();
     persistirDadosCompartilhados('epo-projeto-f', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
     cacheDatasetLocally('epo-projeto-f', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
 
     const total = linhasValidas.length;
-    const epoCount = Object.keys(byEpo).length;
     const resumo = formatarResumoEpoCompleto(byEpo);
+    const ignoredText = semParceira.length ? ` • ${semParceira.length} sem PARCEIRA` : '';
 
-    if (statusEl) statusEl.textContent = `✅ ${total} linhas válidas replicadas para ${epoCount} EPOs • ${resumo}`;
+    if (statusEl) statusEl.textContent = `✅ ${total} linhas válidas distribuídas por PARCEIRA${ignoredText} • ${resumo}`;
     const resultEl = document.getElementById('epo-action-result');
-    if (resultEl) resultEl.textContent = `✅ Importado PROJETO F: ${resumo}`;
+    if (resultEl) resultEl.textContent = `✅ Importado PROJETO F por coluna PARCEIRA: ${resumo}${ignoredText}`;
 
     updateEpoImportStatus('projeto-f');
 
@@ -6106,14 +6173,18 @@ function abrirImportEpoNovos() { abrirImportEpoGponOngoing(); }
 function importarPlanilhaEpoNovos() { importarPlanilhaEpoGponOngoing(); }
 
 function atualizarCountPillsEpo() {
-  const sourceAction = epoAcaoAtual === 'projeto-f' ? 'projeto-f' : 'gpon-ongoing';
-  const store = getEpoStore(sourceAction);
   document.querySelectorAll('#epo .epo-pill[data-epo]').forEach(btn => {
-    const epoName = btn.dataset.epo;
-    const count = Array.isArray(store[epoName]) ? store[epoName].length : 0;
+    const epoName = String(btn.dataset.epo || '').trim().toUpperCase();
+    const counts = getEpoCountsByName(epoName);
     const span = btn.querySelector('.epo-pill-count');
-    if (span) span.textContent = count > 0 ? ` (${count})` : '';
+    if (span) {
+      const hasAny = counts.gpon > 0 || counts.projetoF > 0;
+      span.textContent = hasAny ? ` (${counts.gpon}/${counts.projetoF})` : '';
+      span.title = hasAny ? `GPON ONGOING: ${counts.gpon} | PROJETO F: ${counts.projetoF}` : '';
+    }
   });
+
+  atualizarResumoEpoSelecionada();
 }
 
 function getEpoTecnicosStore() {
@@ -6809,7 +6880,7 @@ function selecionarEpo(nomeEpo) {
   if (importTools) importTools.style.display = 'flex';
   if (resetButton) resetButton.style.display = 'inline-flex';
   if (intro) intro.style.display = 'none';
-  if (selectedNameEl) selectedNameEl.textContent = epoSelecionadaAtual || '-';
+  if (selectedNameEl) atualizarResumoEpoSelecionada();
   if (resultEl) {
     resultEl.textContent = epoSelecionadaAtual
       ? `Selecione uma opção para ${epoSelecionadaAtual}.`
@@ -6842,7 +6913,7 @@ function resetarSelecaoEpo() {
   if (importTools) importTools.style.display = 'none';
   if (resetButton) resetButton.style.display = 'none';
   if (intro) intro.style.display = '';
-  if (selectedNameEl) selectedNameEl.textContent = '-';
+  if (selectedNameEl) atualizarResumoEpoSelecionada();
   if (resultEl) resultEl.textContent = 'Selecione uma EPO para habilitar as opções.';
   if (actionContent) actionContent.innerHTML = '';
 
