@@ -1390,7 +1390,13 @@ function getCategoriaNome(categoriaId) {
 function updateImportTargetLabel() {
   const label = document.getElementById("import-target-name");
   if (!label) return;
-  label.textContent = categoriaAtualParaImport ? getCategoriaNome(categoriaAtualParaImport) : "-";
+
+  if (categoriaAtualParaImport === 'liberados' && liberadosSubcardSelecionado) {
+    label.textContent = `${getCategoriaNome(categoriaAtualParaImport)} • ${getLiberadosAbaLabel(liberadosAbaAtiva)}`;
+  } else {
+    label.textContent = categoriaAtualParaImport ? getCategoriaNome(categoriaAtualParaImport) : "-";
+  }
+
   updateImportLockInfo(categoriaAtualParaImport);
 }
 
@@ -1858,6 +1864,7 @@ function importarLiberadosPorAba(abaDestino = 'projeto-f', linhas = [], delimite
   persistirDadosCompartilhados('liberados', consolidados, { source: 'manual', locked: true });
 
   renderTabelaLiberados('tabela-liberados', dadosAbaAtiva);
+  atualizarBadgesLiberados();
   atualizarContadores();
 
   const infoEl = document.getElementById('liberados-aba-info');
@@ -2642,6 +2649,23 @@ function getDadosLiberadosProjetoF(base = []) {
   return dados.filter(isStatusLiberadoProjetoF);
 }
 
+function atualizarBadgesLiberados() {
+  const estrutura = getDadosLiberadosEstruturados(getPreferredDataset('liberados') || []);
+  const map = {
+    'projeto-f': document.getElementById('liberados-badge-projeto-f'),
+    'gpon-hfc': document.getElementById('liberados-badge-gpon-hfc'),
+    'greenfield': document.getElementById('liberados-badge-greenfield')
+  };
+
+  Object.entries(map).forEach(([aba, el]) => {
+    if (!el) return;
+    const total = Array.isArray(estrutura?.[aba]) ? estrutura[aba].length : 0;
+    el.textContent = `${total} registro(s)`;
+    el.classList.toggle('is-empty', total === 0);
+    el.classList.toggle('is-filled', total > 0);
+  });
+}
+
 function atualizarLayoutLiberados() {
   const secaoLiberados = document.getElementById('liberados');
   const detalhesCard = document.getElementById('liberados-detalhes-card');
@@ -2665,6 +2689,9 @@ function atualizarLayoutLiberados() {
   const globalImport = document.getElementById('global-import-section');
   if (globalImport && isLiberadosAtivo) {
     globalImport.style.display = mostrarDetalhes ? 'block' : 'none';
+    globalImport.classList.toggle('liberados-import-premium', mostrarDetalhes);
+  } else if (globalImport) {
+    globalImport.classList.remove('liberados-import-premium');
   }
 }
 
@@ -2699,6 +2726,8 @@ function selecionarAbaLiberados(aba = 'projeto-f') {
   liberadosSubcardSelecionado = true;
   liberadosAbaAtiva = normalizeLiberadosAba(aba);
   atualizarBotoesAbaLiberados();
+  atualizarBadgesLiberados();
+  updateImportTargetLabel();
   atualizarLayoutLiberados();
   carregarDadosCategoria('liberados');
 }
@@ -2710,6 +2739,8 @@ function abrirCardLiberados(aba = 'projeto-f') {
 function resetarFluxoLiberados() {
   liberadosSubcardSelecionado = false;
   atualizarBotoesAbaLiberados();
+  atualizarBadgesLiberados();
+  updateImportTargetLabel();
   atualizarLayoutLiberados();
 
   const infoEl = document.getElementById('liberados-aba-info');
@@ -7356,6 +7387,7 @@ function carregarDadosCategoria(categoriaId) {
   if (categoriaId === 'liberados') {
     atualizarLayoutLiberados();
     atualizarBotoesAbaLiberados();
+    atualizarBadgesLiberados();
 
     if (!liberadosSubcardSelecionado) {
       const infoElInicial = document.getElementById('liberados-aba-info');
