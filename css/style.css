@@ -2872,6 +2872,63 @@ td:first-child {
   align-items: stretch;
 }
 
+.liberados-intro {
+  margin: 0 0 12px 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.liberados-subcards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.liberados-subcard {
+  border: 1px solid #d3deee;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.liberados-subcard:hover {
+  transform: translateY(-2px);
+  border-color: #93c5fd;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.15);
+}
+
+.liberados-subcard.is-active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.liberados-subcard-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0f172a;
+}
+
+.liberados-subcard-subtitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+@media (max-width: 900px) {
+  .liberados-subcards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .categoria-card {
   background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
   border: 1px solid #dbe4f0;
