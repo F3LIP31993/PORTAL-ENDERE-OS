@@ -5633,6 +5633,12 @@ function getEpoRowsForEpo(actionKey = 'gpon-ongoing', nomeEpo = '') {
   return foundKey && Array.isArray(store[foundKey]) ? store[foundKey] : [];
 }
 
+function formatarResumoEpoCompleto(byEpo = {}) {
+  return EPO_PILLS
+    .map((epo) => `${epo}:${Array.isArray(byEpo?.[epo]) ? byEpo[epo].length : 0}`)
+    .join(' | ');
+}
+
 function updateEpoImportStatus(actionKey = 'gpon-ongoing', extraText = '') {
   const cfg = getEpoDatasetConfig(actionKey);
   const statusEl = document.getElementById(cfg.statusElementId);
@@ -5766,16 +5772,33 @@ function importarPlanilhaEpoGponOngoing() {
     const linhas = parseGenericCsvRows(textClean, delimiter);
 
     const byEpo = {};
+    const naoClassificadas = [];
     linhas.forEach(item => {
       const codigo = getField(item, 'COD-MDUGO', 'CODIGO', 'CÓDIGO', 'COD', 'ID', 'id');
       const endereco = getField(item, 'ENDEREÇO', 'ENDERECO', 'endereco');
       if (!String(codigo || '').trim() && !String(endereco || '').trim()) return;
 
       const key = _resolverEpoDaLinha(item);
-      if (!key) return;
+      if (!key) {
+        naoClassificadas.push(item);
+        return;
+      }
       if (!byEpo[key]) byEpo[key] = [];
       byEpo[key].push(item);
     });
+
+    // Importação global: se não houver coluna EPO identificável, replica para todas as EPOs.
+    if (!Object.keys(byEpo).length && linhas.length) {
+      EPO_PILLS.forEach((epo) => {
+        byEpo[epo] = linhas.map((item) => ({ ...item, __epoBucket: epo }));
+      });
+    } else if (naoClassificadas.length) {
+      // Linhas sem EPO explícita vão para todas as EPOs para manter comportamento global.
+      EPO_PILLS.forEach((epo) => {
+        if (!byEpo[epo]) byEpo[epo] = [];
+        byEpo[epo].push(...naoClassificadas.map((item) => ({ ...item, __epoBucket: epo })));
+      });
+    }
 
     saveEpoStore('gpon-ongoing', byEpo);
     atualizarCountPillsEpo();
@@ -5785,11 +5808,11 @@ function importarPlanilhaEpoGponOngoing() {
 
     const total = linhas.length;
     const epoCount = Object.keys(byEpo).length;
-    const resumo = Object.entries(byEpo).map(([k, v]) => `${k}:${v.length}`).join(' | ');
+    const resumo = formatarResumoEpoCompleto(byEpo);
 
-    if (statusEl) statusEl.textContent = `✅ ${total} linhas processadas • ${epoCount} EPOs`;
+    if (statusEl) statusEl.textContent = `✅ ${total} linhas processadas • ${epoCount} EPOs • ${resumo}`;
     const resultEl = document.getElementById('epo-action-result');
-    if (resultEl) resultEl.textContent = `✅ Importado: ${resumo}`;
+    if (resultEl) resultEl.textContent = `✅ Importado GPON ONGOING: ${resumo}`;
 
     updateEpoImportStatus('gpon-ongoing');
 
@@ -5827,12 +5850,29 @@ function importarPlanilhaEpoProjetoF() {
     const linhas = parseGenericCsvRows(textClean, delimiter);
 
     const byEpo = {};
+    const naoClassificadas = [];
     linhas.forEach(item => {
       const key = _resolverEpoDaLinha(item);
-      if (!key) return;
+      if (!key) {
+        naoClassificadas.push(item);
+        return;
+      }
       if (!byEpo[key]) byEpo[key] = [];
       byEpo[key].push(item);
     });
+
+    // Importação global: se não houver coluna EPO identificável, replica para todas as EPOs.
+    if (!Object.keys(byEpo).length && linhas.length) {
+      EPO_PILLS.forEach((epo) => {
+        byEpo[epo] = linhas.map((item) => ({ ...item, __epoBucket: epo }));
+      });
+    } else if (naoClassificadas.length) {
+      // Linhas sem EPO explícita vão para todas as EPOs para manter comportamento global.
+      EPO_PILLS.forEach((epo) => {
+        if (!byEpo[epo]) byEpo[epo] = [];
+        byEpo[epo].push(...naoClassificadas.map((item) => ({ ...item, __epoBucket: epo })));
+      });
+    }
 
     saveEpoStore('projeto-f', byEpo);
     atualizarCountPillsEpo();
@@ -5841,9 +5881,9 @@ function importarPlanilhaEpoProjetoF() {
 
     const total = linhas.length;
     const epoCount = Object.keys(byEpo).length;
-    const resumo = Object.entries(byEpo).map(([k, v]) => `${k}:${v.length}`).join(' | ');
+    const resumo = formatarResumoEpoCompleto(byEpo);
 
-    if (statusEl) statusEl.textContent = `✅ ${total} registros em ${epoCount} EPOs`;
+    if (statusEl) statusEl.textContent = `✅ ${total} registros em ${epoCount} EPOs • ${resumo}`;
     const resultEl = document.getElementById('epo-action-result');
     if (resultEl) resultEl.textContent = `✅ Importado PROJETO F: ${resumo}`;
 
