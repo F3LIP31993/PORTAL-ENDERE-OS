@@ -5968,32 +5968,138 @@ function atualizarResumoEpoSelecionada() {
     return;
   }
 
+  selectedNameEl.textContent = epoSelecionadaAtual;
+}
+
+function atualizarRotulosAcoesEpo() {
+  const btnEquipes = document.querySelector('#epo .epo-action-trigger[data-action="equipes"]');
+  const btnGpon = document.querySelector('#epo .epo-action-trigger[data-action="gpon-ongoing"]');
+  const btnProjetoF = document.querySelector('#epo .epo-action-trigger[data-action="projeto-f"]');
+
+  if (btnEquipes) btnEquipes.textContent = 'LISTA DE EQUIPES';
+
+  if (!epoSelecionadaAtual) {
+    if (btnGpon) btnGpon.textContent = 'GPON ONGOING';
+    if (btnProjetoF) btnProjetoF.textContent = 'PROJETO F';
+    return;
+  }
+
   const counts = getEpoCountsByName(epoSelecionadaAtual);
-  selectedNameEl.textContent = `${epoSelecionadaAtual} | GPON ONGOING - ${counts.gpon} / PROJETO F - ${counts.projetoF}`;
+  if (btnGpon) btnGpon.textContent = `GPON ONGOING (${counts.gpon})`;
+  if (btnProjetoF) btnProjetoF.textContent = `PROJETO F (${counts.projetoF})`;
+}
+
+function possuiCamposPreenchidos(item) {
+  if (!item || typeof item !== 'object') return false;
+  for (const key in item) {
+    if (!Object.prototype.hasOwnProperty.call(item, key)) continue;
+    const value = item[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return true;
+    }
+  }
+  return false;
+}
+
+function filtrarLinhasValidasRapido(linhas = []) {
+  const validas = [];
+  for (let i = 0; i < linhas.length; i += 1) {
+    const item = linhas[i];
+    if (possuiCamposPreenchidos(item)) {
+      validas.push(item);
+    }
+  }
+  return validas;
+}
+
+function distribuirLinhasPorEpoEmLotes(linhasValidas = [], actionKey = 'gpon-ongoing', statusEl = null) {
+  const byEpo = {};
+  EPO_PILLS.forEach((epo) => {
+    byEpo[epo] = [];
+  });
+
+  const semCorrespondencia = [];
+  const total = linhasValidas.length;
+  const chunkSize = 1200;
+  let index = 0;
+
+  return new Promise((resolve) => {
+    const processarChunk = () => {
+      const limit = Math.min(index + chunkSize, total);
+      for (; index < limit; index += 1) {
+        const item = linhasValidas[index];
+        const epo = _resolverEpoDaLinha(item, actionKey);
+
+        if (!epo) {
+          semCorrespondencia.push(item);
+          continue;
+        }
+
+        item.__epoBucket = epo;
+        byEpo[epo].push(item);
+      }
+
+      if (statusEl && total > chunkSize) {
+        const pct = Math.round((index / total) * 100);
+        statusEl.textContent = `Processando ${index}/${total} (${pct}%)...`;
+      }
+
+      if (index < total) {
+        setTimeout(processarChunk, 0);
+        return;
+      }
+
+      resolve({ byEpo, semCorrespondencia });
+    };
+
+    processarChunk();
+  });
 }
 
 function parseEpoImportRowsRobusto(text = '') {
   const textClean = String(text || '').replace(/^\uFEFF/, '');
   const linhasBrutas = textClean.split(/\r?\n/);
 
-  const delimCandidatos = [';', ',', '\t', '|'];
-  const headerCandidates = [];
+  if (linhasBrutas.length < 2) return [];
 
-  const autoDelimiter = detectarMelhorDelimitadorCSV(linhasBrutas);
+  const autoDelimiter = detectarMelhorDelimitadorCSV(linhasBrutas) || ';';
   const autoHeader = detectarLinhaCabecalhoCSV(linhasBrutas, autoDelimiter);
-  headerCandidates.push(autoHeader);
-  for (let i = 0; i <= Math.min(8, Math.max(0, linhasBrutas.length - 1)); i += 1) {
-    if (!headerCandidates.includes(i)) headerCandidates.push(i);
+  const autoSlice = linhasBrutas.slice(autoHeader).join('\n');
+  const autoRows = parseGenericCsvRows(autoSlice, autoDelimiter);
+  if (autoRows.length > 0) {
+    return autoRows;
   }
 
-  let bestRows = [];
+  const delimCandidatos = [autoDelimiter, ';', ',', '\t', '|']
+    .filter((value, idx, arr) => value && arr.indexOf(value) === idx)
+    .slice(0, 3);
 
-  for (const delimiter of delimCandidatos) {
-    for (const headerIndex of headerCandidates) {
-      const slice = linhasBrutas.slice(headerIndex).join('\n');
-      const rows = parseGenericCsvRows(slice, delimiter);
+  const headerCandidates = [autoHeader, 0, 1, 2, 3]
+    .filter((value, idx, arr) => Number.isInteger(value) && value >= 0 && arr.indexOf(value) === idx)
+    .slice(0, 4);
+
+  const sliceCache = new Map();
+  const getSliceByHeader = (headerIndex) => {
+    if (!sliceCache.has(headerIndex)) {
+      sliceCache.set(headerIndex, linhasBrutas.slice(headerIndex).join('\n'));
+    }
+    return sliceCache.get(headerIndex);
+  };
+
+  let bestRows = autoRows;
+
+  for (let d = 0; d < delimCandidatos.length; d += 1) {
+    const delimiter = delimCandidatos[d];
+    for (let h = 0; h < headerCandidates.length; h += 1) {
+      const headerIndex = headerCandidates[h];
+      const rows = parseGenericCsvRows(getSliceByHeader(headerIndex), delimiter);
       if (rows.length > bestRows.length) {
         bestRows = rows;
+      }
+
+      // Encontrou volume bom o suficiente: evita rodadas extras.
+      if (bestRows.length >= 1000) {
+        return bestRows;
       }
     }
   }
@@ -6008,7 +6114,7 @@ function importarPlanilhaEpoGponOngoing() {
   if (!file) return;
   if (statusEl) statusEl.textContent = 'Importando...';
 
-  const processarTexto = (text) => {
+  const processarTexto = async (text) => {
     const textClean = String(text || '').replace(/^\uFEFF/, '');
     if (textClean.startsWith('PK')) {
       if (statusEl) statusEl.textContent = '⚠️ Arquivo Excel detectado. Exporte a aba em CSV para importar.';
@@ -6024,29 +6130,15 @@ function importarPlanilhaEpoGponOngoing() {
       return;
     }
 
-    const linhasValidas = linhas.filter((item) => Object.values(item || {}).some((value) => String(value || '').trim() !== ''));
+    const linhasValidas = filtrarLinhasValidasRapido(linhas);
     if (!linhasValidas.length) {
       if (statusEl) statusEl.textContent = '⚠️ A planilha foi lida, mas não há registros válidos para importar.';
       alert('⚠️ A planilha foi lida, mas não há registros válidos para GPON ONGOING.');
       return;
     }
 
-    const byEpo = {};
-    const semEpo = [];
-    linhasValidas.forEach((item) => {
-      const epo = _resolverEpoDaLinha(item, 'gpon-ongoing');
-      if (!epo) {
-        semEpo.push(item);
-        return;
-      }
-
-      if (!byEpo[epo]) byEpo[epo] = [];
-      byEpo[epo].push({ ...item, __epoBucket: epo });
-    });
-
-    EPO_PILLS.forEach((epo) => {
-      if (!Array.isArray(byEpo[epo])) byEpo[epo] = [];
-    });
+    if (statusEl) statusEl.textContent = `Processando 0/${linhasValidas.length} (0%)...`;
+    const { byEpo, semCorrespondencia } = await distribuirLinhasPorEpoEmLotes(linhasValidas, 'gpon-ongoing', statusEl);
 
     saveEpoStore('gpon-ongoing', byEpo);
     atualizarCountPillsEpo();
@@ -6057,7 +6149,7 @@ function importarPlanilhaEpoGponOngoing() {
 
     const total = linhasValidas.length;
     const resumo = formatarResumoEpoCompleto(byEpo);
-    const ignoredText = semEpo.length ? ` • ${semEpo.length} sem EPO` : '';
+    const ignoredText = semCorrespondencia.length ? ` • ${semCorrespondencia.length} sem EPO` : '';
 
     if (statusEl) statusEl.textContent = `✅ ${total} linhas válidas distribuídas por EPO${ignoredText} • ${resumo}`;
     const resultEl = document.getElementById('epo-action-result');
@@ -6075,11 +6167,15 @@ function importarPlanilhaEpoGponOngoing() {
     // Se contiver caractere de substituição, o arquivo é ANSI — relê como windows-1252
     if (text.includes('\ufffd')) {
       const reader2 = new FileReader();
-      reader2.onload = (e2) => processarTexto(String(e2.target?.result || ''));
+      reader2.onload = (e2) => processarTexto(String(e2.target?.result || '')).catch(() => {
+        if (statusEl) statusEl.textContent = '⚠️ Erro ao processar importação.';
+      });
       reader2.onerror = () => { if (statusEl) statusEl.textContent = '⚠️ Erro ao ler arquivo.'; };
       reader2.readAsText(file, 'windows-1252');
     } else {
-      processarTexto(text);
+      processarTexto(text).catch(() => {
+        if (statusEl) statusEl.textContent = '⚠️ Erro ao processar importação.';
+      });
     }
   };
   reader.onerror = () => { if (statusEl) statusEl.textContent = '⚠️ Erro ao ler arquivo.'; };
@@ -6093,7 +6189,7 @@ function importarPlanilhaEpoProjetoF() {
   if (!file) return;
   if (statusEl) statusEl.textContent = 'Importando...';
 
-  const processarTexto = (text) => {
+  const processarTexto = async (text) => {
     const textClean = String(text || '').replace(/^\uFEFF/, '');
     if (textClean.startsWith('PK')) {
       if (statusEl) statusEl.textContent = '⚠️ Arquivo Excel detectado. Exporte a aba em CSV para importar.';
@@ -6109,29 +6205,15 @@ function importarPlanilhaEpoProjetoF() {
       return;
     }
 
-    const linhasValidas = linhas.filter((item) => Object.values(item || {}).some((value) => String(value || '').trim() !== ''));
+    const linhasValidas = filtrarLinhasValidasRapido(linhas);
     if (!linhasValidas.length) {
       if (statusEl) statusEl.textContent = '⚠️ A planilha foi lida, mas não há registros válidos para importar.';
       alert('⚠️ A planilha foi lida, mas não há registros válidos para PROJETO F.');
       return;
     }
 
-    const byEpo = {};
-    const semParceira = [];
-    linhasValidas.forEach((item) => {
-      const epo = _resolverEpoDaLinha(item, 'projeto-f');
-      if (!epo) {
-        semParceira.push(item);
-        return;
-      }
-
-      if (!byEpo[epo]) byEpo[epo] = [];
-      byEpo[epo].push({ ...item, __epoBucket: epo });
-    });
-
-    EPO_PILLS.forEach((epo) => {
-      if (!Array.isArray(byEpo[epo])) byEpo[epo] = [];
-    });
+    if (statusEl) statusEl.textContent = `Processando 0/${linhasValidas.length} (0%)...`;
+    const { byEpo, semCorrespondencia } = await distribuirLinhasPorEpoEmLotes(linhasValidas, 'projeto-f', statusEl);
 
     saveEpoStore('projeto-f', byEpo);
     atualizarCountPillsEpo();
@@ -6141,7 +6223,7 @@ function importarPlanilhaEpoProjetoF() {
 
     const total = linhasValidas.length;
     const resumo = formatarResumoEpoCompleto(byEpo);
-    const ignoredText = semParceira.length ? ` • ${semParceira.length} sem PARCEIRA` : '';
+    const ignoredText = semCorrespondencia.length ? ` • ${semCorrespondencia.length} sem PARCEIRA` : '';
 
     if (statusEl) statusEl.textContent = `✅ ${total} linhas válidas distribuídas por PARCEIRA${ignoredText} • ${resumo}`;
     const resultEl = document.getElementById('epo-action-result');
@@ -6158,11 +6240,15 @@ function importarPlanilhaEpoProjetoF() {
     const text = String(e.target?.result || '');
     if (text.includes('\ufffd')) {
       const reader2 = new FileReader();
-      reader2.onload = (e2) => processarTexto(String(e2.target?.result || ''));
+      reader2.onload = (e2) => processarTexto(String(e2.target?.result || '')).catch(() => {
+        if (statusEl) statusEl.textContent = '⚠️ Erro ao processar importação.';
+      });
       reader2.onerror = () => { if (statusEl) statusEl.textContent = '⚠️ Erro ao ler arquivo.'; };
       reader2.readAsText(file, 'windows-1252');
     } else {
-      processarTexto(text);
+      processarTexto(text).catch(() => {
+        if (statusEl) statusEl.textContent = '⚠️ Erro ao processar importação.';
+      });
     }
   };
   reader.onerror = () => { if (statusEl) statusEl.textContent = '⚠️ Erro ao ler arquivo.'; };
@@ -6185,6 +6271,7 @@ function atualizarCountPillsEpo() {
   });
 
   atualizarResumoEpoSelecionada();
+  atualizarRotulosAcoesEpo();
 }
 
 function getEpoTecnicosStore() {
@@ -6910,7 +6997,7 @@ function resetarSelecaoEpo() {
   if (epoSection) epoSection.classList.add('epo-selection-mode');
   if (pillGrid) pillGrid.classList.remove('only-active');
   if (panel) panel.style.display = 'none';
-  if (importTools) importTools.style.display = 'none';
+  if (importTools) importTools.style.display = 'flex';
   if (resetButton) resetButton.style.display = 'none';
   if (intro) intro.style.display = '';
   if (selectedNameEl) atualizarResumoEpoSelecionada();
