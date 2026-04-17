@@ -5811,33 +5811,18 @@ function importarPlanilhaEpoGponOngoing() {
       return;
     }
 
-    const byEpo = {};
-    const naoClassificadas = [];
-    linhas.forEach(item => {
-      const hasAnyData = Object.values(item || {}).some((value) => String(value || '').trim() !== '');
-      if (!hasAnyData) return;
-
-      const key = _resolverEpoDaLinha(item);
-      if (!key) {
-        naoClassificadas.push(item);
-        return;
-      }
-      if (!byEpo[key]) byEpo[key] = [];
-      byEpo[key].push(item);
-    });
-
-    // Importação global: se não houver coluna EPO identificável, replica para todas as EPOs.
-    if (!Object.keys(byEpo).length && linhas.length) {
-      EPO_PILLS.forEach((epo) => {
-        byEpo[epo] = linhas.map((item) => ({ ...item, __epoBucket: epo }));
-      });
-    } else if (naoClassificadas.length) {
-      // Linhas sem EPO explícita vão para todas as EPOs para manter comportamento global.
-      EPO_PILLS.forEach((epo) => {
-        if (!byEpo[epo]) byEpo[epo] = [];
-        byEpo[epo].push(...naoClassificadas.map((item) => ({ ...item, __epoBucket: epo })));
-      });
+    const linhasValidas = linhas.filter((item) => Object.values(item || {}).some((value) => String(value || '').trim() !== ''));
+    if (!linhasValidas.length) {
+      if (statusEl) statusEl.textContent = '⚠️ A planilha foi lida, mas não há registros válidos para importar.';
+      alert('⚠️ A planilha foi lida, mas não há registros válidos para GPON ONGOING.');
+      return;
     }
+
+    // Modo global obrigatório: ao importar uma vez, alimenta todas as EPOs.
+    const byEpo = {};
+    EPO_PILLS.forEach((epo) => {
+      byEpo[epo] = linhasValidas.map((item) => ({ ...item, __epoBucket: epo }));
+    });
 
     saveEpoStore('gpon-ongoing', byEpo);
     atualizarCountPillsEpo();
@@ -5845,11 +5830,11 @@ function importarPlanilhaEpoGponOngoing() {
     persistirDadosCompartilhados('epo-gpon-ongoing', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
     cacheDatasetLocally('epo-gpon-ongoing', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
 
-    const total = linhas.length;
+    const total = linhasValidas.length;
     const epoCount = Object.keys(byEpo).length;
     const resumo = formatarResumoEpoCompleto(byEpo);
 
-    if (statusEl) statusEl.textContent = `✅ ${total} linhas processadas • ${epoCount} EPOs • ${resumo}`;
+    if (statusEl) statusEl.textContent = `✅ ${total} linhas válidas replicadas para ${epoCount} EPOs • ${resumo}`;
     const resultEl = document.getElementById('epo-action-result');
     if (resultEl) resultEl.textContent = `✅ Importado GPON ONGOING: ${resumo}`;
 
@@ -5899,41 +5884,29 @@ function importarPlanilhaEpoProjetoF() {
       return;
     }
 
-    const byEpo = {};
-    const naoClassificadas = [];
-    linhas.forEach(item => {
-      const key = _resolverEpoDaLinha(item);
-      if (!key) {
-        naoClassificadas.push(item);
-        return;
-      }
-      if (!byEpo[key]) byEpo[key] = [];
-      byEpo[key].push(item);
-    });
-
-    // Importação global: se não houver coluna EPO identificável, replica para todas as EPOs.
-    if (!Object.keys(byEpo).length && linhas.length) {
-      EPO_PILLS.forEach((epo) => {
-        byEpo[epo] = linhas.map((item) => ({ ...item, __epoBucket: epo }));
-      });
-    } else if (naoClassificadas.length) {
-      // Linhas sem EPO explícita vão para todas as EPOs para manter comportamento global.
-      EPO_PILLS.forEach((epo) => {
-        if (!byEpo[epo]) byEpo[epo] = [];
-        byEpo[epo].push(...naoClassificadas.map((item) => ({ ...item, __epoBucket: epo })));
-      });
+    const linhasValidas = linhas.filter((item) => Object.values(item || {}).some((value) => String(value || '').trim() !== ''));
+    if (!linhasValidas.length) {
+      if (statusEl) statusEl.textContent = '⚠️ A planilha foi lida, mas não há registros válidos para importar.';
+      alert('⚠️ A planilha foi lida, mas não há registros válidos para PROJETO F.');
+      return;
     }
+
+    // Modo global obrigatório: ao importar uma vez, alimenta todas as EPOs.
+    const byEpo = {};
+    EPO_PILLS.forEach((epo) => {
+      byEpo[epo] = linhasValidas.map((item) => ({ ...item, __epoBucket: epo }));
+    });
 
     saveEpoStore('projeto-f', byEpo);
     atualizarCountPillsEpo();
     persistirDadosCompartilhados('epo-projeto-f', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
     cacheDatasetLocally('epo-projeto-f', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
 
-    const total = linhas.length;
+    const total = linhasValidas.length;
     const epoCount = Object.keys(byEpo).length;
     const resumo = formatarResumoEpoCompleto(byEpo);
 
-    if (statusEl) statusEl.textContent = `✅ ${total} registros em ${epoCount} EPOs • ${resumo}`;
+    if (statusEl) statusEl.textContent = `✅ ${total} linhas válidas replicadas para ${epoCount} EPOs • ${resumo}`;
     const resultEl = document.getElementById('epo-action-result');
     if (resultEl) resultEl.textContent = `✅ Importado PROJETO F: ${resumo}`;
 
