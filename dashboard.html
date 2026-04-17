@@ -233,7 +233,7 @@
       <div class="card epo-premium-card">
         <div class="epo-heading-wrap" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <h2 class="epo-heading">EPO</h2>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div id="epo-import-tools" class="epo-import-tools" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;">
             <div style="display:flex;align-items:center;gap:6px;">
               <input id="epo-gpon-import-file" type="file" accept=".csv,.txt" style="display:none;" onchange="importarPlanilhaEpoGponOngoing()" />
               <button type="button" class="btn-secondary epo-clip-upload" onclick="abrirImportEpoGponOngoing()" title="Importar planilha do backlog ONGOING (GPON)">📎</button>
@@ -248,6 +248,8 @@
             </div>
           </div>
         </div>
+
+        <p class="epo-subheading epo-selecao-intro" id="epo-selecao-intro">Selecione uma EPO para abrir importações e a área de equipes.</p>
 
         <div class="epo-pill-grid" role="list" aria-label="Lista de EPOs">
           <button type="button" class="epo-pill" data-epo="ACESSO" role="listitem" onclick="selecionarEpo('ACESSO')">ACESSO<span class="epo-pill-count"></span></button>
@@ -264,7 +266,10 @@
         </div>
 
         <div id="epo-action-panel" class="epo-action-panel" style="display:none;">
-          <p class="epo-action-title">EPO selecionada: <strong id="epo-selected-name">-</strong></p>
+          <div class="epo-action-header">
+            <p class="epo-action-title">EPO selecionada: <strong id="epo-selected-name">-</strong></p>
+            <button type="button" id="epo-reset-selecao" class="btn-secondary" onclick="resetarSelecaoEpo()">Trocar EPO</button>
+          </div>
           <div class="epo-action-buttons">
             <button type="button" class="btn-primary epo-action-trigger" data-action="equipes" onclick="executarAcaoEpo('equipes')">LISTA DE EQUIPES</button>
             <button type="button" class="btn-secondary epo-action-trigger" data-action="gpon-ongoing" onclick="executarAcaoEpo('gpon-ongoing')">GPON ONGOING</button>
