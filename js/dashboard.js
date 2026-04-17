@@ -5701,6 +5701,10 @@ function abrirCategoria(categoriaId) {
     resetarFluxoLiberados();
   }
 
+  if (categoriaId === 'epo') {
+    resetarSelecaoEpo();
+  }
+
   // Carregar dados da categoria
   carregarDadosCategoria(categoriaId);
 }
@@ -6784,7 +6788,12 @@ async function retirarResponsavelNovoEntrante(index) {
 function selecionarEpo(nomeEpo) {
   epoSelecionadaAtual = String(nomeEpo || '').trim();
 
+  const epoSection = document.getElementById('epo');
   const panel = document.getElementById('epo-action-panel');
+  const importTools = document.getElementById('epo-import-tools');
+  const resetButton = document.getElementById('epo-reset-selecao');
+  const intro = document.getElementById('epo-selecao-intro');
+  const pillGrid = document.querySelector('#epo .epo-pill-grid');
   const selectedNameEl = document.getElementById('epo-selected-name');
   const resultEl = document.getElementById('epo-action-result');
 
@@ -6793,7 +6802,13 @@ function selecionarEpo(nomeEpo) {
   });
   atualizarCountPillsEpo();
 
+  if (epoSection) epoSection.classList.remove('epo-selection-mode');
+  if (pillGrid) pillGrid.classList.add('only-active');
+
   if (panel) panel.style.display = 'block';
+  if (importTools) importTools.style.display = 'flex';
+  if (resetButton) resetButton.style.display = 'inline-flex';
+  if (intro) intro.style.display = 'none';
   if (selectedNameEl) selectedNameEl.textContent = epoSelecionadaAtual || '-';
   if (resultEl) {
     resultEl.textContent = epoSelecionadaAtual
@@ -6803,7 +6818,40 @@ function selecionarEpo(nomeEpo) {
 
   if (epoAcaoAtual) {
     executarAcaoEpo(epoAcaoAtual);
+  } else {
+    executarAcaoEpo('equipes');
   }
+}
+
+function resetarSelecaoEpo() {
+  epoSelecionadaAtual = '';
+
+  const epoSection = document.getElementById('epo');
+  const panel = document.getElementById('epo-action-panel');
+  const importTools = document.getElementById('epo-import-tools');
+  const resetButton = document.getElementById('epo-reset-selecao');
+  const intro = document.getElementById('epo-selecao-intro');
+  const pillGrid = document.querySelector('#epo .epo-pill-grid');
+  const selectedNameEl = document.getElementById('epo-selected-name');
+  const resultEl = document.getElementById('epo-action-result');
+  const actionContent = document.getElementById('epo-action-content');
+
+  if (epoSection) epoSection.classList.add('epo-selection-mode');
+  if (pillGrid) pillGrid.classList.remove('only-active');
+  if (panel) panel.style.display = 'none';
+  if (importTools) importTools.style.display = 'none';
+  if (resetButton) resetButton.style.display = 'none';
+  if (intro) intro.style.display = '';
+  if (selectedNameEl) selectedNameEl.textContent = '-';
+  if (resultEl) resultEl.textContent = 'Selecione uma EPO para habilitar as opções.';
+  if (actionContent) actionContent.innerHTML = '';
+
+  document.querySelectorAll('#epo .epo-pill[data-epo]').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  setEpoActionButtonActive('');
+  atualizarCountPillsEpo();
 }
 
 function executarAcaoEpo(tipoAcao) {
