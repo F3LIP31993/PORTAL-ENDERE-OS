@@ -1724,7 +1724,7 @@ function parseLiberadosCsvRows(linhas = [], fallbackDelimiter = ';', abaPadrao =
     { key: 'SOLICITANTE', aliases: ['SOLICITANTE'] },
     { key: 'DDD', aliases: ['DDD'] },
     { key: 'CIDADE', aliases: ['CIDADE'] },
-    { key: 'ENDEREÇO', aliases: ['ENDEREÇO', 'ENDERECO'] },
+    { key: 'ENDEREÇO', aliases: ['ENDEREÇO', 'ENDERECO', 'ENDERE O'] },
     { key: 'BLOCOS', aliases: ['BLOCOS', 'BLOCO'] },
     { key: 'HP', aliases: ['HP', 'HPS'] },
     { key: 'STATUS', aliases: ['STATUS', 'STATUS_GERAL'] },
@@ -1804,6 +1804,43 @@ function parseLiberadosCsvRows(linhas = [], fallbackDelimiter = ';', abaPadrao =
     }
 
     if (parsedRows.length) return parsedRows;
+  }
+
+  // Fallback para planilhas com 10 colunas em formato fixo mesmo com header corrompido (ex.: ENDERE�O).
+  if (sourceLines.length >= 2) {
+    const firstCols = splitBest(sourceLines[0] || '');
+    const headerHint = normalizeHeader(firstCols.join(' '));
+    const hasLiberadosHint = headerHint.includes('tipo rede')
+      && headerHint.includes('solicitante')
+      && headerHint.includes('ddd')
+      && headerHint.includes('cidade');
+
+    if (hasLiberadosHint && firstCols.length >= 9) {
+      const fixedRows = [];
+      for (let i = 1; i < sourceLines.length; i += 1) {
+        const cols = splitBest(sourceLines[i]);
+        if (!cols.some((c) => String(c || '').trim() !== '')) continue;
+
+        const row = {
+          'TIPO_REDE': String(cols[0] || '').trim(),
+          'SOLICITANTE': String(cols[1] || '').trim(),
+          'DDD': String(cols[2] || '').trim(),
+          'CIDADE': String(cols[3] || '').trim(),
+          'ENDEREÇO': String(cols[4] || '').trim(),
+          'BLOCOS': String(cols[5] || '').trim(),
+          'HP': String(cols[6] || '').trim(),
+          'STATUS': String(cols[7] || '').trim(),
+          'DT_CONCLUIDO': String(cols[8] || '').trim(),
+          'COD_IMOVEL': String(cols[9] || '').trim(),
+          '_aba_liberados': normalizeLiberadosAba(abaPadrao)
+        };
+
+        const hasData = colunasLiberados.some((col) => String(row[col.key] || '').trim() !== '');
+        if (hasData) fixedRows.push(row);
+      }
+
+      if (fixedRows.length) return fixedRows;
+    }
   }
 
   const baseRows = parseSarRedeCsvRows(sourceLines, fallbackDelimiter);
