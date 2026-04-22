@@ -5767,6 +5767,7 @@ function voltarDoCategoria() {
 let epoSelecionadaAtual = '';
 let epoAcaoAtual = '';
 let epoUltimoAceite = null;
+let epoTecnicoEditIndex = -1;
 const STORAGE_EPO_TECNICOS_KEY = 'portalEpoTecnicos';
 const STORAGE_EPO_ACEITES_KEY = 'portalEpoAceites';
 const STORAGE_EPO_GPON_KEY = 'portalEpoGponOngoing';
@@ -6609,14 +6610,20 @@ function renderTabelaTecnicosEpo(lista) {
     return '<p style="opacity:.75; margin:8px 0 0 0;">Nenhum técnico cadastrado para esta EPO.</p>';
   }
 
-  const rows = lista.map(item => `
+  const rows = lista.map((item, idx) => `
     <tr>
       <td>${escapeHtml(item.nome || '-')}</td>
       <td>${escapeHtml(item.rg || '-')}</td>
       <td>${escapeHtml(item.cpf || '-')}</td>
       <td>${escapeHtml(item.placa || '-')}</td>
       <td>${escapeHtml(item.modelo || '-')}</td>
-      <td>${escapeHtml(item.createdAt ? new Date(item.createdAt).toLocaleString() : '-')}</td>
+      <td>${escapeHtml(formatDateTimeBr(item.createdAt))}</td>
+      <td>
+        <div class="epo-inline-actions epo-tecnico-actions">
+          <button type="button" class="btn-secondary" onclick="editarTecnicoEpo(${idx})">Alterar</button>
+          <button type="button" class="btn-secondary" onclick="excluirTecnicoEpo(${idx})">Excluir</button>
+        </div>
+      </td>
     </tr>
   `).join('');
 
@@ -6631,6 +6638,7 @@ function renderTabelaTecnicosEpo(lista) {
             <th>Placa Carro</th>
             <th>Modelo Carro</th>
             <th>Cadastrado em</th>
+            <th>Ações</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -6642,6 +6650,8 @@ function renderTabelaTecnicosEpo(lista) {
 function renderListaEquipesEpo() {
   const container = document.getElementById('epo-action-content');
   if (!container) return;
+
+  epoTecnicoEditIndex = -1;
 
   const tecnicos = getTecnicosDaEpo(epoSelecionadaAtual);
   container.innerHTML = `
@@ -6657,7 +6667,8 @@ function renderListaEquipesEpo() {
         <input id="epo-tecnico-modelo" type="text" placeholder="MODELO CARRO" />
       </div>
       <div class="epo-form-actions">
-        <button type="button" class="btn-primary" onclick="salvarCadastroTecnicoEpo()">SALVAR CADASTRO</button>
+        <button type="button" id="epo-tecnico-save-btn" class="btn-primary" onclick="salvarCadastroTecnicoEpo()">SALVAR CADASTRO</button>
+        <button type="button" id="epo-tecnico-cancel-btn" class="btn-secondary" style="display:none;" onclick="cancelarEdicaoTecnicoEpo()">CANCELAR EDIÇÃO</button>
       </div>
       <div class="epo-form-actions epo-upload-row">
         <input id="epo-tecnicos-file" type="file" accept=".csv,.txt" style="display:none;" onchange="importarTecnicosEpoPorPlanilha()" />
@@ -6682,6 +6693,88 @@ function abrirSeletorPlanilhaTecnicosEpo() {
   if (input) input.click();
 }
 
+function atualizarModoFormularioTecnicoEpo() {
+  const saveBtn = document.getElementById('epo-tecnico-save-btn');
+  const cancelBtn = document.getElementById('epo-tecnico-cancel-btn');
+
+  if (saveBtn) {
+    saveBtn.textContent = epoTecnicoEditIndex >= 0 ? 'SALVAR ALTERAÇÃO' : 'SALVAR CADASTRO';
+  }
+
+  if (cancelBtn) {
+    cancelBtn.style.display = epoTecnicoEditIndex >= 0 ? 'inline-flex' : 'none';
+  }
+}
+
+function limparFormularioTecnicoEpo() {
+  const campos = [
+    'epo-tecnico-nome',
+    'epo-tecnico-rg',
+    'epo-tecnico-cpf',
+    'epo-tecnico-placa',
+    'epo-tecnico-modelo'
+  ];
+
+  campos.forEach(id => {
+    const input = document.getElementById(id);
+    if (input) input.value = '';
+  });
+}
+
+function editarTecnicoEpo(index) {
+  if (!epoSelecionadaAtual) return;
+
+  const idx = Number(index);
+  const tecnicos = getTecnicosDaEpo(epoSelecionadaAtual);
+  const tecnico = tecnicos[idx];
+  if (!tecnico) return;
+
+  epoTecnicoEditIndex = idx;
+
+  const form = document.getElementById('cadastro-tecnico-form');
+  if (form) form.style.display = 'block';
+
+  const nomeInput = document.getElementById('epo-tecnico-nome');
+  const rgInput = document.getElementById('epo-tecnico-rg');
+  const cpfInput = document.getElementById('epo-tecnico-cpf');
+  const placaInput = document.getElementById('epo-tecnico-placa');
+  const modeloInput = document.getElementById('epo-tecnico-modelo');
+
+  if (nomeInput) nomeInput.value = tecnico.nome || '';
+  if (rgInput) rgInput.value = tecnico.rg || '';
+  if (cpfInput) cpfInput.value = tecnico.cpf || '';
+  if (placaInput) placaInput.value = tecnico.placa || '';
+  if (modeloInput) modeloInput.value = tecnico.modelo || '';
+
+  atualizarModoFormularioTecnicoEpo();
+}
+
+function cancelarEdicaoTecnicoEpo() {
+  epoTecnicoEditIndex = -1;
+  limparFormularioTecnicoEpo();
+  atualizarModoFormularioTecnicoEpo();
+}
+
+function excluirTecnicoEpo(index) {
+  if (!epoSelecionadaAtual) return;
+
+  const idx = Number(index);
+  const tecnicos = getTecnicosDaEpo(epoSelecionadaAtual);
+  const tecnico = tecnicos[idx];
+  if (!tecnico) return;
+
+  if (!confirm(`Deseja excluir o técnico ${tecnico.nome || 'selecionado'}?`)) {
+    return;
+  }
+
+  tecnicos.splice(idx, 1);
+  saveTecnicosDaEpo(epoSelecionadaAtual, tecnicos);
+  executarAcaoEpo('equipes');
+
+  const resultEl = document.getElementById('epo-action-result');
+  if (resultEl) resultEl.textContent = `🗑️ Técnico excluído em ${epoSelecionadaAtual}.`;
+}
+
 function salvarCadastroTecnicoEpo() {
   if (!epoSelecionadaAtual) return;
 
@@ -6697,12 +6790,31 @@ function salvarCadastroTecnicoEpo() {
   }
 
   const tecnicos = getTecnicosDaEpo(epoSelecionadaAtual);
-  tecnicos.push({ nome, rg, cpf, placa, modelo, createdAt: new Date().toISOString() });
+  const payload = { nome, rg, cpf, placa, modelo };
+
+  if (epoTecnicoEditIndex >= 0 && tecnicos[epoTecnicoEditIndex]) {
+    const registroAtual = tecnicos[epoTecnicoEditIndex];
+    tecnicos[epoTecnicoEditIndex] = {
+      ...registroAtual,
+      ...payload,
+      updatedAt: new Date().toISOString()
+    };
+  } else {
+    tecnicos.push({ ...payload, createdAt: new Date().toISOString() });
+  }
+
   saveTecnicosDaEpo(epoSelecionadaAtual, tecnicos);
+
+  const estavaEditando = epoTecnicoEditIndex >= 0;
+  epoTecnicoEditIndex = -1;
 
   executarAcaoEpo('equipes');
   const resultEl = document.getElementById('epo-action-result');
-  if (resultEl) resultEl.textContent = `✅ Técnico cadastrado com sucesso em ${epoSelecionadaAtual}.`;
+  if (resultEl) {
+    resultEl.textContent = estavaEditando
+      ? `✅ Cadastro técnico atualizado com sucesso em ${epoSelecionadaAtual}.`
+      : `✅ Técnico cadastrado com sucesso em ${epoSelecionadaAtual}.`;
+  }
 }
 
 function importarTecnicosEpoPorPlanilha() {
