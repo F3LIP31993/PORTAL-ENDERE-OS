@@ -6843,11 +6843,9 @@ function renderGponOngoingEpo(customRows = null) {
           <div class="epo-inline-actions">
             <button type="button" class="btn-secondary" onclick="visualizarNovoEntrante(${idx})">Visualizar</button>
             ${isAceito
-              ? `<button type="button" class="epo-btn-aceito${isAceitoRecente ? ' pulse' : ''}" disabled>Aceito</button>
-                 <button type="button" class="btn-secondary" onclick="retirarResponsavelNovoEntrante(${idx})">Retirar</button>`
+              ? `<button type="button" class="epo-btn-aceito${isAceitoRecente ? ' pulse' : ''}" disabled>Aceito</button>`
               : `<button type="button" class="btn-primary" onclick="aceitarNovoEntrante(${idx})">Aceitar</button>`}
           </div>
-          ${isAceito ? `<p class="epo-aceite-owner">Aceito por ${escapeHtml(aceite?.responsavel || '-')}</p>` : ''}
         </td>
       </tr>
     `;
@@ -6974,11 +6972,9 @@ function renderProjetoFEpo(customRows = null) {
           <div class="epo-inline-actions">
             <button type="button" class="btn-secondary" onclick="visualizarProjetoFEpo(${idx})">Visualizar</button>
             ${isAceito
-              ? `<button type="button" class="epo-btn-aceito${isAceitoRecente ? ' pulse' : ''}" disabled>Aceito</button>
-                 <button type="button" class="btn-secondary" onclick="retirarAceiteProjetoFEpo(${idx})">Retirar</button>`
+              ? `<button type="button" class="epo-btn-aceito${isAceitoRecente ? ' pulse' : ''}" disabled>Aceito</button>`
               : `<button type="button" class="btn-primary" onclick="aceitarProjetoFEpo(${idx})">Aceitar</button>`}
           </div>
-          ${isAceito ? `<p class="epo-aceite-owner">Aceito por ${escapeHtml(aceite?.responsavel || '-')}</p>` : ''}
         </td>
       </tr>
     `;
@@ -7089,8 +7085,11 @@ async function visualizarNovoEntrante(index) {
 
   const footer = document.querySelector('#modal-obs .modal-footer');
   if (footer) {
-    const oldBtn = document.getElementById('modal-retirar-responsavel');
-    if (oldBtn) oldBtn.remove();
+    syncEpoModalRetirarButton({
+      tipoAcao: 'gpon-ongoing',
+      codigo,
+      index
+    });
   }
 
   const anexoInput = document.getElementById('modal-anexo');
@@ -7178,8 +7177,11 @@ async function visualizarProjetoFEpo(index) {
 
   const footer = document.querySelector('#modal-obs .modal-footer');
   if (footer) {
-    const oldBtn = document.getElementById('modal-retirar-responsavel');
-    if (oldBtn) oldBtn.remove();
+    syncEpoModalRetirarButton({
+      tipoAcao: 'projeto-f',
+      codigo: codigoGed,
+      index
+    });
   }
 
   const anexoInput = document.getElementById('modal-anexo');
@@ -7205,6 +7207,8 @@ async function aceitarNovoEntrante(index) {
   executarAcaoEpo('gpon-ongoing');
   const resultEl = document.getElementById('epo-action-result');
   if (resultEl) resultEl.textContent = `✅ Endereço ${codigo} aceito por ${responsavel}.`;
+
+  await visualizarNovoEntrante(index);
 }
 
 async function retirarResponsavelNovoEntrante(index) {
@@ -7219,7 +7223,7 @@ async function retirarResponsavelNovoEntrante(index) {
   if (resultEl) resultEl.textContent = `↩️ Responsável removido do endereço ${codigo}. O aceite foi liberado novamente.`;
 }
 
-function aceitarProjetoFEpo(index) {
+async function aceitarProjetoFEpo(index) {
   const item = window.__epoProjetoFRows?.[index];
   if (!item || !epoSelecionadaAtual) return;
 
@@ -7230,6 +7234,8 @@ function aceitarProjetoFEpo(index) {
   executarAcaoEpo('projeto-f');
   const resultEl = document.getElementById('epo-action-result');
   if (resultEl) resultEl.textContent = `✅ Projeto F ${codigo} aceito por ${responsavel}.`;
+
+  await visualizarProjetoFEpo(index);
 }
 
 function retirarAceiteProjetoFEpo(index) {
@@ -7242,6 +7248,41 @@ function retirarAceiteProjetoFEpo(index) {
   executarAcaoEpo('projeto-f');
   const resultEl = document.getElementById('epo-action-result');
   if (resultEl) resultEl.textContent = `↩️ Aceite removido do Projeto F ${codigo}.`;
+}
+
+function syncEpoModalRetirarButton({ tipoAcao = 'gpon-ongoing', codigo = '', index = -1 } = {}) {
+  const footer = document.querySelector('#modal-obs .modal-footer');
+  if (!footer) return;
+
+  const oldBtn = document.getElementById('modal-retirar-responsavel');
+  if (oldBtn) oldBtn.remove();
+
+  if (!codigo || index < 0 || !epoSelecionadaAtual) return;
+
+  const aceitesMap = getAceitesMapDaEpo(epoSelecionadaAtual, tipoAcao);
+  const aceiteAtual = aceitesMap.get(String(codigo));
+  if (!aceiteAtual) return;
+
+  const btn = document.createElement('button');
+  btn.id = 'modal-retirar-responsavel';
+  btn.type = 'button';
+  btn.className = 'btn-secondary';
+  btn.textContent = 'Retirar aceite';
+  btn.onclick = async () => {
+    if (tipoAcao === 'projeto-f') {
+      retirarAceiteProjetoFEpo(index);
+    } else {
+      await retirarResponsavelNovoEntrante(index);
+    }
+    syncEpoModalRetirarButton({ tipoAcao, codigo, index });
+  };
+
+  const saveBtn = footer.querySelector('.btn-primary');
+  if (saveBtn) {
+    footer.insertBefore(btn, saveBtn);
+  } else {
+    footer.appendChild(btn);
+  }
 }
 
 function selecionarEpo(nomeEpo) {
