@@ -3616,6 +3616,15 @@ td:first-child {
   font-size: 11px;
 }
 
+#epo .epo-tecnico-actions {
+  flex-wrap: nowrap;
+}
+
+#epo .epo-tecnico-actions .btn-secondary {
+  min-width: 72px;
+  padding: 5px 8px;
+}
+
 .epo-aceite-owner {
   margin: 6px 0 0;
   font-size: 11px;
