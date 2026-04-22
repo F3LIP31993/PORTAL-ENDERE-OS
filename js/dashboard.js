@@ -5933,6 +5933,29 @@ function normalizarNomeEpoParaPill(rawValue = '') {
   return byContains || '';
 }
 
+function extrairValorEpoPorHint(item, isProjetoF = false) {
+  if (!item || typeof item !== 'object') return '';
+
+  const hints = isProjetoF
+    ? ['parceira', 'parceiro', 'epo', 'cluster']
+    : ['epo', 'cluster', 'parceira', 'parceiro'];
+
+  const keys = Object.keys(item);
+  for (let i = 0; i < keys.length; i += 1) {
+    const key = keys[i];
+    const normalizedKey = normalizeText(String(key || '')).replace(/[^a-z0-9]/g, '');
+    if (!normalizedKey) continue;
+
+    const isMatch = hints.some((hint) => normalizedKey.includes(hint));
+    if (!isMatch) continue;
+
+    const value = String(item[key] ?? '').trim();
+    if (value) return value;
+  }
+
+  return '';
+}
+
 function _resolverEpoDaLinha(item, actionKey = 'gpon-ongoing') {
   const isProjetoF = actionKey === 'projeto-f';
   const epoMode = isProjetoF ? 'projeto-f' : 'ongoing';
@@ -5944,7 +5967,11 @@ function _resolverEpoDaLinha(item, actionKey = 'gpon-ongoing') {
     ? ['EPO', 'epo', 'CLUSTER', 'cluster']
     : ['PARCEIRA', 'parceira', 'CLUSTER', 'cluster'];
 
-  const raw = getField(item, ...preferredKeys) || getField(item, ...fallbackKeys) || '';
+  const raw =
+    getField(item, ...preferredKeys) ||
+    getField(item, ...fallbackKeys) ||
+    extrairValorEpoPorHint(item, isProjetoF) ||
+    '';
   const sanitized = sanitizeEpoName(raw, epoMode);
   return normalizarNomeEpoParaPill(sanitized || raw);
 }
@@ -5987,6 +6014,63 @@ function atualizarRotulosAcoesEpo() {
   const counts = getEpoCountsByName(epoSelecionadaAtual);
   if (btnGpon) btnGpon.textContent = `GPON ONGOING (${counts.gpon})`;
   if (btnProjetoF) btnProjetoF.textContent = `PROJETO F (${counts.projetoF})`;
+}
+
+const EPO_IMPORT_TARGET_YEAR = 2026;
+
+function extrairAnoDaLinha(item) {
+  if (!item || typeof item !== 'object') return null;
+
+  const yearKeys = [
+    'ANO_SOLIC', 'ANO CONCL', 'ANO_CONCL', 'ANO',
+    'DT_SOLICITACAO', 'DT_INICIO_LIBERACAO', 'DT_FIM_LIBERACAO',
+    'DATA CONCLUÍDO', 'DATA CONCLUIDO', 'MES_SOLICITACAO', 'MES_CONCL',
+    'MÊS CONCLUÍDO', 'MES CONCLUIDO',
+    'DATA', 'DATA_BASE', 'DATA_CRIACAO',
+    'ano_solic', 'ano_concl', 'ano'
+  ];
+
+  for (let i = 0; i < yearKeys.length; i += 1) {
+    const raw = String(getField(item, yearKeys[i]) || '').trim();
+    if (!raw) continue;
+
+    const match = raw.match(/\b(20\d{2})\b/);
+    if (match) return Number(match[1]);
+  }
+
+  return null;
+}
+
+function filtrarLinhasPorAno(linhas = [], targetYear = EPO_IMPORT_TARGET_YEAR) {
+  const filtradas = [];
+  let linhasComAnoDetectado = 0;
+
+  for (let i = 0; i < linhas.length; i += 1) {
+    const item = linhas[i];
+    const ano = extrairAnoDaLinha(item);
+
+    if (!Number.isInteger(ano)) continue;
+
+    linhasComAnoDetectado += 1;
+    if (ano === targetYear) {
+      filtradas.push(item);
+    }
+  }
+
+  // Se não foi possível detectar ano em nenhuma linha, não bloqueia a importação.
+  if (linhasComAnoDetectado === 0) {
+    return {
+      linhasFiltradas: Array.isArray(linhas) ? linhas : [],
+      linhasComAnoDetectado,
+      filtroAplicado: false
+    };
+  }
+
+  return {
+    linhasFiltradas: filtradas,
+    linhasComAnoDetectado,
+    filtroAplicado: true
+  };
 }
 
 function possuiCamposPreenchidos(item) {
@@ -6035,8 +6119,12 @@ function distribuirLinhasPorEpoEmLotes(linhasValidas = [], actionKey = 'gpon-ong
           continue;
         }
 
-        item.__epoBucket = epo;
-        byEpo[epo].push(item);
+        if (!Array.isArray(byEpo[epo])) {
+          semCorrespondencia.push(item);
+          continue;
+        }
+
+        byEpo[epo].push({ ...item, __epoBucket: epo });
       }
 
       if (statusEl && total > chunkSize) {
@@ -6115,50 +6203,67 @@ function importarPlanilhaEpoGponOngoing() {
   if (statusEl) statusEl.textContent = 'Importando...';
 
   const processarTexto = async (text) => {
-    const textClean = String(text || '').replace(/^\uFEFF/, '');
-    if (textClean.startsWith('PK')) {
-      if (statusEl) statusEl.textContent = '⚠️ Arquivo Excel detectado. Exporte a aba em CSV para importar.';
-      alert('⚠️ Arquivo Excel (.xlsx/.xlsm) detectado. Para importar no EPO, exporte a aba em CSV.');
-      return;
+    try {
+      const textClean = String(text || '').replace(/^\uFEFF/, '');
+      if (textClean.startsWith('PK')) {
+        if (statusEl) statusEl.textContent = '⚠️ Arquivo Excel detectado. Exporte a aba em CSV para importar.';
+        alert('⚠️ Arquivo Excel (.xlsx/.xlsm) detectado. Para importar no EPO, exporte a aba em CSV.');
+        return;
+      }
+
+      const linhas = parseEpoImportRowsRobusto(textClean);
+
+      if (!linhas.length) {
+        if (statusEl) statusEl.textContent = '⚠️ Nenhuma linha válida encontrada. Verifique se a planilha foi exportada em CSV.';
+        alert('⚠️ Nenhuma linha válida encontrada para GPON ONGOING. Verifique cabeçalho e exporte em CSV.');
+        return;
+      }
+
+      const linhasValidas = filtrarLinhasValidasRapido(linhas);
+      if (!linhasValidas.length) {
+        if (statusEl) statusEl.textContent = '⚠️ A planilha foi lida, mas não há registros válidos para importar.';
+        alert('⚠️ A planilha foi lida, mas não há registros válidos para GPON ONGOING.');
+        return;
+      }
+
+      const filtroAno = filtrarLinhasPorAno(linhasValidas, EPO_IMPORT_TARGET_YEAR);
+      const linhasAno = filtroAno.linhasFiltradas;
+      if (!linhasAno.length) {
+        if (statusEl) statusEl.textContent = `⚠️ Nenhum registro do ano ${EPO_IMPORT_TARGET_YEAR} encontrado.`;
+        alert(`⚠️ Nenhum registro do ano ${EPO_IMPORT_TARGET_YEAR} encontrado para GPON ONGOING.`);
+        return;
+      }
+
+      if (statusEl) statusEl.textContent = `Processando 0/${linhasAno.length} (0%)...`;
+      const { byEpo, semCorrespondencia } = await distribuirLinhasPorEpoEmLotes(linhasAno, 'gpon-ongoing', statusEl);
+
+      saveEpoStore('gpon-ongoing', byEpo);
+      atualizarCountPillsEpo();
+      atualizarResumoEpoSelecionada();
+      atualizarContadores();
+      persistirDadosCompartilhados('epo-gpon-ongoing', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
+      cacheDatasetLocally('epo-gpon-ongoing', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
+
+      const total = linhasAno.length;
+      const descartadasAno = linhasValidas.length - linhasAno.length;
+      const resumo = formatarResumoEpoCompleto(byEpo);
+      const ignoredText = semCorrespondencia.length ? ` • ${semCorrespondencia.length} sem EPO` : '';
+      const yearFilterText = filtroAno.filtroAplicado
+        ? (descartadasAno > 0 ? ` • ${descartadasAno} fora de ${EPO_IMPORT_TARGET_YEAR}` : '')
+        : ' • ano não identificado na planilha (filtro desativado)';
+
+      if (statusEl) statusEl.textContent = `✅ ${total} linhas de ${EPO_IMPORT_TARGET_YEAR} distribuídas por EPO${ignoredText}${yearFilterText}`;
+      const resultEl = document.getElementById('epo-action-result');
+      if (resultEl) resultEl.textContent = `✅ Importado GPON ONGOING (${EPO_IMPORT_TARGET_YEAR}): ${resumo}${ignoredText}`;
+
+      updateEpoImportStatus('gpon-ongoing');
+
+      if (epoAcaoAtual === 'gpon-ongoing' && epoSelecionadaAtual) renderGponOngoingEpo();
+      if (input) input.value = '';
+    } catch (err) {
+      console.error('[EPO][GPON ONGOING] Erro ao processar importação:', err);
+      if (statusEl) statusEl.textContent = `⚠️ Erro ao processar importação: ${err?.message || 'desconhecido'}`;
     }
-
-    const linhas = parseEpoImportRowsRobusto(textClean);
-
-    if (!linhas.length) {
-      if (statusEl) statusEl.textContent = '⚠️ Nenhuma linha válida encontrada. Verifique se a planilha foi exportada em CSV.';
-      alert('⚠️ Nenhuma linha válida encontrada para GPON ONGOING. Verifique cabeçalho e exporte em CSV.');
-      return;
-    }
-
-    const linhasValidas = filtrarLinhasValidasRapido(linhas);
-    if (!linhasValidas.length) {
-      if (statusEl) statusEl.textContent = '⚠️ A planilha foi lida, mas não há registros válidos para importar.';
-      alert('⚠️ A planilha foi lida, mas não há registros válidos para GPON ONGOING.');
-      return;
-    }
-
-    if (statusEl) statusEl.textContent = `Processando 0/${linhasValidas.length} (0%)...`;
-    const { byEpo, semCorrespondencia } = await distribuirLinhasPorEpoEmLotes(linhasValidas, 'gpon-ongoing', statusEl);
-
-    saveEpoStore('gpon-ongoing', byEpo);
-    atualizarCountPillsEpo();
-    atualizarResumoEpoSelecionada();
-    atualizarContadores();
-    persistirDadosCompartilhados('epo-gpon-ongoing', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
-    cacheDatasetLocally('epo-gpon-ongoing', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
-
-    const total = linhasValidas.length;
-    const resumo = formatarResumoEpoCompleto(byEpo);
-    const ignoredText = semCorrespondencia.length ? ` • ${semCorrespondencia.length} sem EPO` : '';
-
-    if (statusEl) statusEl.textContent = `✅ ${total} linhas válidas distribuídas por EPO${ignoredText} • ${resumo}`;
-    const resultEl = document.getElementById('epo-action-result');
-    if (resultEl) resultEl.textContent = `✅ Importado GPON ONGOING por coluna EPO: ${resumo}${ignoredText}`;
-
-    updateEpoImportStatus('gpon-ongoing');
-
-    if (epoAcaoAtual === 'gpon-ongoing' && epoSelecionadaAtual) renderGponOngoingEpo();
-    if (input) input.value = '';
   };
 
   const reader = new FileReader();
@@ -6167,14 +6272,14 @@ function importarPlanilhaEpoGponOngoing() {
     // Se contiver caractere de substituição, o arquivo é ANSI — relê como windows-1252
     if (text.includes('\ufffd')) {
       const reader2 = new FileReader();
-      reader2.onload = (e2) => processarTexto(String(e2.target?.result || '')).catch(() => {
-        if (statusEl) statusEl.textContent = '⚠️ Erro ao processar importação.';
+      reader2.onload = (e2) => processarTexto(String(e2.target?.result || '')).catch((err) => {
+        if (statusEl) statusEl.textContent = `⚠️ Erro ao processar importação: ${err?.message || 'desconhecido'}`;
       });
       reader2.onerror = () => { if (statusEl) statusEl.textContent = '⚠️ Erro ao ler arquivo.'; };
       reader2.readAsText(file, 'windows-1252');
     } else {
-      processarTexto(text).catch(() => {
-        if (statusEl) statusEl.textContent = '⚠️ Erro ao processar importação.';
+      processarTexto(text).catch((err) => {
+        if (statusEl) statusEl.textContent = `⚠️ Erro ao processar importação: ${err?.message || 'desconhecido'}`;
       });
     }
   };
@@ -6190,49 +6295,66 @@ function importarPlanilhaEpoProjetoF() {
   if (statusEl) statusEl.textContent = 'Importando...';
 
   const processarTexto = async (text) => {
-    const textClean = String(text || '').replace(/^\uFEFF/, '');
-    if (textClean.startsWith('PK')) {
-      if (statusEl) statusEl.textContent = '⚠️ Arquivo Excel detectado. Exporte a aba em CSV para importar.';
-      alert('⚠️ Arquivo Excel (.xlsx/.xlsm) detectado. Para importar no EPO, exporte a aba em CSV.');
-      return;
+    try {
+      const textClean = String(text || '').replace(/^\uFEFF/, '');
+      if (textClean.startsWith('PK')) {
+        if (statusEl) statusEl.textContent = '⚠️ Arquivo Excel detectado. Exporte a aba em CSV para importar.';
+        alert('⚠️ Arquivo Excel (.xlsx/.xlsm) detectado. Para importar no EPO, exporte a aba em CSV.');
+        return;
+      }
+
+      const linhas = parseEpoImportRowsRobusto(textClean);
+
+      if (!linhas.length) {
+        if (statusEl) statusEl.textContent = '⚠️ Nenhuma linha válida encontrada. Verifique se a planilha foi exportada em CSV.';
+        alert('⚠️ Nenhuma linha válida encontrada para PROJETO F. Verifique cabeçalho e exporte em CSV.');
+        return;
+      }
+
+      const linhasValidas = filtrarLinhasValidasRapido(linhas);
+      if (!linhasValidas.length) {
+        if (statusEl) statusEl.textContent = '⚠️ A planilha foi lida, mas não há registros válidos para importar.';
+        alert('⚠️ A planilha foi lida, mas não há registros válidos para PROJETO F.');
+        return;
+      }
+
+      const filtroAno = filtrarLinhasPorAno(linhasValidas, EPO_IMPORT_TARGET_YEAR);
+      const linhasAno = filtroAno.linhasFiltradas;
+      if (!linhasAno.length) {
+        if (statusEl) statusEl.textContent = `⚠️ Nenhum registro do ano ${EPO_IMPORT_TARGET_YEAR} encontrado.`;
+        alert(`⚠️ Nenhum registro do ano ${EPO_IMPORT_TARGET_YEAR} encontrado para PROJETO F.`);
+        return;
+      }
+
+      if (statusEl) statusEl.textContent = `Processando 0/${linhasAno.length} (0%)...`;
+      const { byEpo, semCorrespondencia } = await distribuirLinhasPorEpoEmLotes(linhasAno, 'projeto-f', statusEl);
+
+      saveEpoStore('projeto-f', byEpo);
+      atualizarCountPillsEpo();
+      atualizarResumoEpoSelecionada();
+      persistirDadosCompartilhados('epo-projeto-f', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
+      cacheDatasetLocally('epo-projeto-f', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
+
+      const total = linhasAno.length;
+      const descartadasAno = linhasValidas.length - linhasAno.length;
+      const resumo = formatarResumoEpoCompleto(byEpo);
+      const ignoredText = semCorrespondencia.length ? ` • ${semCorrespondencia.length} sem PARCEIRA` : '';
+      const yearFilterText = filtroAno.filtroAplicado
+        ? (descartadasAno > 0 ? ` • ${descartadasAno} fora de ${EPO_IMPORT_TARGET_YEAR}` : '')
+        : ' • ano não identificado na planilha (filtro desativado)';
+
+      if (statusEl) statusEl.textContent = `✅ ${total} linhas de ${EPO_IMPORT_TARGET_YEAR} distribuídas por PARCEIRA${ignoredText}${yearFilterText}`;
+      const resultEl = document.getElementById('epo-action-result');
+      if (resultEl) resultEl.textContent = `✅ Importado PROJETO F (${EPO_IMPORT_TARGET_YEAR}): ${resumo}${ignoredText}`;
+
+      updateEpoImportStatus('projeto-f');
+
+      if (epoAcaoAtual === 'projeto-f' && epoSelecionadaAtual) renderProjetoFEpo();
+      if (input) input.value = '';
+    } catch (err) {
+      console.error('[EPO][PROJETO F] Erro ao processar importação:', err);
+      if (statusEl) statusEl.textContent = `⚠️ Erro ao processar importação: ${err?.message || 'desconhecido'}`;
     }
-
-    const linhas = parseEpoImportRowsRobusto(textClean);
-
-    if (!linhas.length) {
-      if (statusEl) statusEl.textContent = '⚠️ Nenhuma linha válida encontrada. Verifique se a planilha foi exportada em CSV.';
-      alert('⚠️ Nenhuma linha válida encontrada para PROJETO F. Verifique cabeçalho e exporte em CSV.');
-      return;
-    }
-
-    const linhasValidas = filtrarLinhasValidasRapido(linhas);
-    if (!linhasValidas.length) {
-      if (statusEl) statusEl.textContent = '⚠️ A planilha foi lida, mas não há registros válidos para importar.';
-      alert('⚠️ A planilha foi lida, mas não há registros válidos para PROJETO F.');
-      return;
-    }
-
-    if (statusEl) statusEl.textContent = `Processando 0/${linhasValidas.length} (0%)...`;
-    const { byEpo, semCorrespondencia } = await distribuirLinhasPorEpoEmLotes(linhasValidas, 'projeto-f', statusEl);
-
-    saveEpoStore('projeto-f', byEpo);
-    atualizarCountPillsEpo();
-    atualizarResumoEpoSelecionada();
-    persistirDadosCompartilhados('epo-projeto-f', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
-    cacheDatasetLocally('epo-projeto-f', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
-
-    const total = linhasValidas.length;
-    const resumo = formatarResumoEpoCompleto(byEpo);
-    const ignoredText = semCorrespondencia.length ? ` • ${semCorrespondencia.length} sem PARCEIRA` : '';
-
-    if (statusEl) statusEl.textContent = `✅ ${total} linhas válidas distribuídas por PARCEIRA${ignoredText} • ${resumo}`;
-    const resultEl = document.getElementById('epo-action-result');
-    if (resultEl) resultEl.textContent = `✅ Importado PROJETO F por coluna PARCEIRA: ${resumo}${ignoredText}`;
-
-    updateEpoImportStatus('projeto-f');
-
-    if (epoAcaoAtual === 'projeto-f' && epoSelecionadaAtual) renderProjetoFEpo();
-    if (input) input.value = '';
   };
 
   const reader = new FileReader();
@@ -6240,14 +6362,14 @@ function importarPlanilhaEpoProjetoF() {
     const text = String(e.target?.result || '');
     if (text.includes('\ufffd')) {
       const reader2 = new FileReader();
-      reader2.onload = (e2) => processarTexto(String(e2.target?.result || '')).catch(() => {
-        if (statusEl) statusEl.textContent = '⚠️ Erro ao processar importação.';
+      reader2.onload = (e2) => processarTexto(String(e2.target?.result || '')).catch((err) => {
+        if (statusEl) statusEl.textContent = `⚠️ Erro ao processar importação: ${err?.message || 'desconhecido'}`;
       });
       reader2.onerror = () => { if (statusEl) statusEl.textContent = '⚠️ Erro ao ler arquivo.'; };
       reader2.readAsText(file, 'windows-1252');
     } else {
-      processarTexto(text).catch(() => {
-        if (statusEl) statusEl.textContent = '⚠️ Erro ao processar importação.';
+      processarTexto(text).catch((err) => {
+        if (statusEl) statusEl.textContent = `⚠️ Erro ao processar importação: ${err?.message || 'desconhecido'}`;
       });
     }
   };
