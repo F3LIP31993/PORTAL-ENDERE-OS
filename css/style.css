@@ -3603,6 +3603,14 @@ td:first-child {
   flex-wrap: wrap;
 }
 
+#epo .epo-table th:nth-child(1),
+#epo .epo-table td:nth-child(1),
+#epo .epo-table th:nth-child(6),
+#epo .epo-table td:nth-child(6) {
+  white-space: nowrap;
+  min-width: 86px;
+}
+
 #epo .epo-table th:last-child,
 #epo .epo-table td:last-child {
   min-width: 170px;
