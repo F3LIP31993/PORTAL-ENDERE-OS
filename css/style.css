@@ -3580,8 +3580,8 @@ td:first-child {
 .epo-table th,
 .epo-table td {
   border-bottom: 1px solid #ebf1fa;
-  padding: 9px;
-  font-size: 12px;
+  padding: 8px;
+  font-size: 11px;
   text-align: left;
 }
 
@@ -3600,6 +3600,20 @@ td:first-child {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+#epo .epo-table th:last-child,
+#epo .epo-table td:last-child {
+  min-width: 170px;
+  width: 170px;
+}
+
+#epo .epo-inline-actions .btn-secondary,
+#epo .epo-inline-actions .btn-primary {
+  white-space: nowrap;
+  min-width: 86px;
+  padding: 6px 10px;
+  font-size: 11px;
 }
 
 .epo-aceite-owner {
