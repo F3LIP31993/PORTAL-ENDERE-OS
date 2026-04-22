@@ -20,6 +20,21 @@ const STORAGE_USERS_KEY = "portalUsers";
 const STORAGE_CURRENT_USER_KEY = "portalCurrentUser";
 const STORAGE_COLUMN_DENSITY_KEY = "portalColumnDensity";
 const STORAGE_DATASET_CACHE_KEY = "portalDatasetCache";
+const SESSION_ONLY_DATASET_KEYS = ['epo-gpon-ongoing', 'epo-projeto-f'];
+
+const runtimeDatasetCache = {};
+const runtimeEpoStores = {
+  'gpon-ongoing': null,
+  'projeto-f': null,
+};
+
+function stripSessionOnlyDatasets(cache = {}) {
+  const sanitized = { ...(cache || {}) };
+  SESSION_ONLY_DATASET_KEYS.forEach((key) => {
+    delete sanitized[key];
+  });
+  return sanitized;
+}
 
 const BACKLOG_EMPRESARIAL_STATUS = [
   "1.VISTORIA", "2.PROJETO_INTERNO", "3.PROJETO_REDE", "4.CONSTRUCAO_REDE", "5.CONSTRUCAO", "7.LIBERACAO"
@@ -62,15 +77,33 @@ function setColumnDensity(density) {
 function getLocalDatasetCache() {
   try {
     const raw = localStorage.getItem(STORAGE_DATASET_CACHE_KEY);
-    return raw ? JSON.parse(raw) : {};
+    const persisted = stripSessionOnlyDatasets(raw ? JSON.parse(raw) : {});
+    return { ...persisted, ...runtimeDatasetCache };
   } catch {
-    return {};
+    return { ...runtimeDatasetCache };
   }
 }
 
 function saveLocalDatasetCache(cache) {
-  localStorage.setItem(STORAGE_DATASET_CACHE_KEY, JSON.stringify(cache || {}));
+  localStorage.setItem(STORAGE_DATASET_CACHE_KEY, JSON.stringify(stripSessionOnlyDatasets(cache || {})));
 }
+
+function cleanupSessionOnlyDatasetStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_DATASET_CACHE_KEY);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    const sanitized = stripSessionOnlyDatasets(parsed);
+    if (JSON.stringify(parsed) !== JSON.stringify(sanitized)) {
+      localStorage.setItem(STORAGE_DATASET_CACHE_KEY, JSON.stringify(sanitized));
+    }
+  } catch {
+    // Sem bloqueio: segue usando cache em memória.
+  }
+}
+
+cleanupSessionOnlyDatasetStorage();
 
 function cacheDatasetLocally(categoria, items, meta = {}) {
   if (!categoria || !Array.isArray(items)) return;
@@ -78,14 +111,20 @@ function cacheDatasetLocally(categoria, items, meta = {}) {
   const previous = cache[categoria] || {};
   const currentUser = getCurrentUser();
   const inferredUpdatedBy = currentUser?.username || currentUser?.name || '';
-  cache[categoria] = {
+  const snapshot = {
     items,
     updatedAt: meta.updatedAt || new Date().toISOString(),
     source: meta.source || previous.source || 'shared',
     locked: typeof meta.locked === 'boolean' ? meta.locked : Boolean(previous.locked),
     updatedBy: meta.updatedBy || meta.updated_by || previous.updatedBy || inferredUpdatedBy,
   };
-  saveLocalDatasetCache(cache);
+
+  if (SESSION_ONLY_DATASET_KEYS.includes(categoria)) {
+    runtimeDatasetCache[categoria] = snapshot;
+  } else {
+    cache[categoria] = snapshot;
+    saveLocalDatasetCache(cache);
+  }
 
   if (categoria === categoriaAtualParaImport) {
     updateImportLockInfo(categoria);
@@ -5749,13 +5788,29 @@ function getEpoDatasetConfig(actionKey = 'gpon-ongoing') {
 }
 
 function getEpoStore(actionKey = 'gpon-ongoing') {
+  if (runtimeEpoStores[actionKey]) {
+    return runtimeEpoStores[actionKey];
+  }
+
   const cfg = getEpoDatasetConfig(actionKey);
-  try { return JSON.parse(localStorage.getItem(cfg.storageKey) || '{}'); } catch { return {}; }
+  try {
+    const parsed = JSON.parse(localStorage.getItem(cfg.storageKey) || '{}');
+    runtimeEpoStores[actionKey] = parsed;
+    return parsed;
+  } catch {
+    return {};
+  }
 }
 
 function saveEpoStore(actionKey = 'gpon-ongoing', store = {}) {
+  runtimeEpoStores[actionKey] = store || {};
+
   const cfg = getEpoDatasetConfig(actionKey);
-  localStorage.setItem(cfg.storageKey, JSON.stringify(store || {}));
+  try {
+    localStorage.removeItem(cfg.storageKey);
+  } catch {
+    // Ignora: EPO agora prioriza memória de sessão para evitar quota exceeded.
+  }
 }
 
 function getEpoNovosStore() {
