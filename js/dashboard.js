@@ -4966,6 +4966,12 @@ function initHeaderSearch() {
       }
     });
 
+    input.addEventListener('input', () => {
+      if (categoriaId === 'epo' && !input.value.trim()) {
+        buscarEmCategoria(categoriaId);
+      }
+    });
+
     container.appendChild(input);
     container.appendChild(button);
 
@@ -6486,18 +6492,91 @@ function normalizeListaAceitesEpo(lista) {
   return lista
     .map((item) => {
       if (typeof item === 'string') {
-        return { codigo: item, responsavel: '-', aceitoEm: null };
+        return { codigo: item, tipo: 'gpon-ongoing', responsavel: '-', aceitoEm: null };
       }
 
       if (!item || typeof item !== 'object') return null;
 
       return {
         codigo: String(item.codigo || item.cod || item.COD_MDUGO || '').trim(),
+        tipo: String(item.tipo || item.acao || 'gpon-ongoing').trim() || 'gpon-ongoing',
         responsavel: String(item.responsavel || item.user || '-').trim() || '-',
         aceitoEm: item.aceitoEm || item.createdAt || null
       };
     })
     .filter((item) => item && item.codigo);
+}
+
+function getAceitesDaEpo(nomeEpo) {
+  const aceitesStore = getEpoAceitesStore();
+  return normalizeListaAceitesEpo(aceitesStore?.[nomeEpo]);
+}
+
+function getAceitesMapDaEpo(nomeEpo, tipoAcao = 'gpon-ongoing') {
+  const map = new Map();
+  const lista = getAceitesDaEpo(nomeEpo);
+  lista.forEach((entry) => {
+    if (!entry || entry.tipo !== tipoAcao || !entry.codigo) return;
+    map.set(String(entry.codigo), entry);
+  });
+  return map;
+}
+
+function salvarAceiteEpo(tipoAcao = 'gpon-ongoing', codigo = '') {
+  if (!epoSelecionadaAtual || !codigo) return null;
+
+  const aceitesStore = getEpoAceitesStore();
+  const listaAtual = normalizeListaAceitesEpo(aceitesStore?.[epoSelecionadaAtual]);
+  const responsavel = getNomeResponsavelAtual();
+  const idxExistente = listaAtual.findIndex((entry) => String(entry.codigo) === String(codigo) && entry.tipo === tipoAcao);
+
+  if (idxExistente === -1) {
+    listaAtual.push({ codigo: String(codigo), tipo: tipoAcao, responsavel, aceitoEm: new Date().toISOString() });
+  } else {
+    listaAtual[idxExistente] = {
+      ...listaAtual[idxExistente],
+      responsavel,
+      aceitoEm: new Date().toISOString()
+    };
+  }
+
+  aceitesStore[epoSelecionadaAtual] = listaAtual;
+  saveEpoAceitesStore(aceitesStore);
+
+  epoUltimoAceite = {
+    epo: epoSelecionadaAtual,
+    tipo: tipoAcao,
+    codigo: String(codigo),
+    at: Date.now()
+  };
+
+  return { responsavel };
+}
+
+function removerAceiteEpo(tipoAcao = 'gpon-ongoing', codigo = '') {
+  if (!epoSelecionadaAtual || !codigo) return;
+
+  const aceitesStore = getEpoAceitesStore();
+  const listaAtual = normalizeListaAceitesEpo(aceitesStore?.[epoSelecionadaAtual]);
+  aceitesStore[epoSelecionadaAtual] = listaAtual.filter((entry) => !(String(entry.codigo) === String(codigo) && entry.tipo === tipoAcao));
+  saveEpoAceitesStore(aceitesStore);
+
+  if (
+    epoUltimoAceite
+    && epoUltimoAceite.epo === epoSelecionadaAtual
+    && epoUltimoAceite.tipo === tipoAcao
+    && String(epoUltimoAceite.codigo) === String(codigo)
+  ) {
+    epoUltimoAceite = null;
+  }
+}
+
+function _getCodigoAceiteDaLinhaEpo(item, index, tipoAcao = 'gpon-ongoing') {
+  if (tipoAcao === 'projeto-f') {
+    return getProjetoFCodigoGed(item, `LINHA-${Number(index) + 1}`);
+  }
+
+  return String(getField(item, 'COD-MDUGO', 'cod-mdugo', 'codmdugo') || `LINHA-${Number(index) + 1}`);
 }
 
 function formatDateTimeBr(value) {
@@ -6722,6 +6801,7 @@ function renderGponOngoingEpo(customRows = null) {
   }
 
   window.__epoGponRows = dados;
+  const aceitesMap = getAceitesMapDaEpo(epoSelecionadaAtual, 'gpon-ongoing');
 
   const rows = dados.map((item, idx) => {
     const codigo = String(getField(item, 'COD-MDUGO', 'CODIGO', 'CÓDIGO', 'cod-mdugo', 'codmdugo') || `LINHA-${idx + 1}`);
@@ -6733,9 +6813,23 @@ function renderGponOngoingEpo(customRows = null) {
     const solicitante = getField(item, 'SOLICITANTE', 'solicitante') || '-';
     const status = getField(item, 'STATUS_GERAL', 'STATUS', 'status', 'Status Geral') || '-';
     const motivo = getField(item, 'MOTIVO_GERAL', 'MOTIVO', 'motivo', 'Motivo Geral') || '-';
+    const aceite = aceitesMap.get(codigo);
+    const isAceito = Boolean(aceite);
+    const isAceitoRecente = Boolean(
+      isAceito
+      && epoUltimoAceite
+      && epoUltimoAceite.epo === epoSelecionadaAtual
+      && epoUltimoAceite.tipo === 'gpon-ongoing'
+      && String(epoUltimoAceite.codigo) === codigo
+      && (Date.now() - Number(epoUltimoAceite.at || 0) <= 15000)
+    );
+    const rowClass = [
+      isAceito ? 'epo-row-aceita' : '',
+      isAceitoRecente ? 'epo-row-aceita-recente' : ''
+    ].filter(Boolean).join(' ');
 
     return `
-      <tr>
+      <tr class="${rowClass}">
         <td>${escapeHtml(codigo)}</td>
         <td>${escapeHtml(enderecoBase)}</td>
         <td>${escapeHtml(numero)}</td>
@@ -6748,7 +6842,12 @@ function renderGponOngoingEpo(customRows = null) {
         <td>
           <div class="epo-inline-actions">
             <button type="button" class="btn-secondary" onclick="visualizarNovoEntrante(${idx})">Visualizar</button>
+            ${isAceito
+              ? `<button type="button" class="epo-btn-aceito${isAceitoRecente ? ' pulse' : ''}" disabled>Aceito</button>
+                 <button type="button" class="btn-secondary" onclick="retirarResponsavelNovoEntrante(${idx})">Retirar</button>`
+              : `<button type="button" class="btn-primary" onclick="aceitarNovoEntrante(${idx})">Aceitar</button>`}
           </div>
+          ${isAceito ? `<p class="epo-aceite-owner">Aceito por ${escapeHtml(aceite?.responsavel || '-')}</p>` : ''}
         </td>
       </tr>
     `;
@@ -6779,7 +6878,20 @@ function renderGponOngoingEpo(customRows = null) {
 }
 
 function getProjetoFCodigoGed(item, fallback = '') {
-  return String(getField(item, 'CÓD. GED', 'COD. GED', 'COD_GED', 'cod_ged', 'GED', 'ged') || fallback || '').trim() || '-';
+  const value = getField(
+    item,
+    'CÓD. GED', 'Cód. GED', 'COD. GED', 'COD GED', 'CODGED',
+    'CÓD GED', 'COD_GED', 'cod_ged', 'CÓDIGO GED', 'CODIGO GED',
+    'ID GED', 'ID_GED', 'GED', 'ged', 'COD-MDUGO', 'cod-mdugo', 'codmdugo'
+  )
+    || _getFieldByKeyHint(item, 'ged')
+    || _getFieldByKeyHint(item, 'cod ged')
+    || _getFieldByKeyHint(item, 'codigo ged')
+    || _getFieldByKeyHint(item, 'id ged')
+    || '';
+
+  const normalized = String(value || '').trim();
+  return normalized || String(fallback || '').trim() || '-';
 }
 
 function getProjetoFEndereco(item) {
@@ -6824,6 +6936,7 @@ function renderProjetoFEpo(customRows = null) {
   }
 
   window.__epoProjetoFRows = dados;
+  const aceitesMap = getAceitesMapDaEpo(epoSelecionadaAtual, 'projeto-f');
 
   const rows = dados.map((item, idx) => {
     const cidade = String(getField(item, 'Cidade', 'CIDADE', 'cidade') || '-');
@@ -6833,9 +6946,23 @@ function renderProjetoFEpo(customRows = null) {
     const qtdeBlocos = String(getField(item, 'Qtde Blocos', 'QTDE_BLOCOS', 'QTD_BLOCOS', 'qtd_blocos') || '-');
     const statusMdu = String(getField(item, 'Status MDU', 'STATUS MDU', 'STATUS_MDU', 'status_mdu') || '-');
     const statusLiberacao = String(getField(item, 'Status Liberação', 'STATUS LIBERAÇÃO', 'STATUS LIBERACAO', 'STATUS_LIBERACAO', 'status_liberacao') || '-');
+    const aceite = aceitesMap.get(codGed);
+    const isAceito = Boolean(aceite);
+    const isAceitoRecente = Boolean(
+      isAceito
+      && epoUltimoAceite
+      && epoUltimoAceite.epo === epoSelecionadaAtual
+      && epoUltimoAceite.tipo === 'projeto-f'
+      && String(epoUltimoAceite.codigo) === codGed
+      && (Date.now() - Number(epoUltimoAceite.at || 0) <= 15000)
+    );
+    const rowClass = [
+      isAceito ? 'epo-row-aceita' : '',
+      isAceitoRecente ? 'epo-row-aceita-recente' : ''
+    ].filter(Boolean).join(' ');
 
     return `
-      <tr>
+      <tr class="${rowClass}">
         <td>${escapeHtml(cidade)}</td>
         <td>${escapeHtml(bloco)}</td>
         <td>${escapeHtml(codGed)}</td>
@@ -6846,7 +6973,12 @@ function renderProjetoFEpo(customRows = null) {
         <td>
           <div class="epo-inline-actions">
             <button type="button" class="btn-secondary" onclick="visualizarProjetoFEpo(${idx})">Visualizar</button>
+            ${isAceito
+              ? `<button type="button" class="epo-btn-aceito${isAceitoRecente ? ' pulse' : ''}" disabled>Aceito</button>
+                 <button type="button" class="btn-secondary" onclick="retirarAceiteProjetoFEpo(${idx})">Retirar</button>`
+              : `<button type="button" class="btn-primary" onclick="aceitarProjetoFEpo(${idx})">Aceitar</button>`}
           </div>
+          ${isAceito ? `<p class="epo-aceite-owner">Aceito por ${escapeHtml(aceite?.responsavel || '-')}</p>` : ''}
         </td>
       </tr>
     `;
@@ -7066,58 +7198,50 @@ async function aceitarNovoEntrante(index) {
   const item = window.__epoGponRows?.[index];
   if (!item || !epoSelecionadaAtual) return;
 
-  const codigo = String(getField(item, 'COD-MDUGO', 'cod-mdugo', 'codmdugo') || `LINHA-${index + 1}`);
-  const aceitesStore = getEpoAceitesStore();
-  const listaAtual = normalizeListaAceitesEpo(aceitesStore?.[epoSelecionadaAtual]);
-  const responsavel = getNomeResponsavelAtual();
-  const idxExistente = listaAtual.findIndex((entry) => String(entry.codigo) === codigo);
-
-  if (idxExistente === -1) {
-    listaAtual.push({ codigo, responsavel, aceitoEm: new Date().toISOString() });
-  } else {
-    listaAtual[idxExistente] = {
-      ...listaAtual[idxExistente],
-      responsavel,
-      aceitoEm: new Date().toISOString()
-    };
-  }
-
-  aceitesStore[epoSelecionadaAtual] = listaAtual;
-  saveEpoAceitesStore(aceitesStore);
-
-  epoUltimoAceite = {
-    epo: epoSelecionadaAtual,
-    codigo,
-    at: Date.now()
-  };
+  const codigo = _getCodigoAceiteDaLinhaEpo(item, index, 'gpon-ongoing');
+  const payload = salvarAceiteEpo('gpon-ongoing', codigo);
+  const responsavel = payload?.responsavel || getNomeResponsavelAtual();
 
   executarAcaoEpo('gpon-ongoing');
   const resultEl = document.getElementById('epo-action-result');
   if (resultEl) resultEl.textContent = `✅ Endereço ${codigo} aceito por ${responsavel}.`;
-
-  await visualizarNovoEntrante(index);
 }
 
 async function retirarResponsavelNovoEntrante(index) {
   const item = window.__epoGponRows?.[index];
   if (!item || !epoSelecionadaAtual) return;
 
-  const codigo = String(getField(item, 'COD-MDUGO', 'cod-mdugo', 'codmdugo') || `LINHA-${index + 1}`);
-  const aceitesStore = getEpoAceitesStore();
-  const listaAtual = normalizeListaAceitesEpo(aceitesStore?.[epoSelecionadaAtual]);
-
-  aceitesStore[epoSelecionadaAtual] = listaAtual.filter((entry) => String(entry.codigo) !== codigo);
-  saveEpoAceitesStore(aceitesStore);
-
-  if (epoUltimoAceite && epoUltimoAceite.epo === epoSelecionadaAtual && epoUltimoAceite.codigo === codigo) {
-    epoUltimoAceite = null;
-  }
+  const codigo = _getCodigoAceiteDaLinhaEpo(item, index, 'gpon-ongoing');
+  removerAceiteEpo('gpon-ongoing', codigo);
 
   executarAcaoEpo('gpon-ongoing');
   const resultEl = document.getElementById('epo-action-result');
   if (resultEl) resultEl.textContent = `↩️ Responsável removido do endereço ${codigo}. O aceite foi liberado novamente.`;
+}
 
-  await visualizarNovoEntrante(index);
+function aceitarProjetoFEpo(index) {
+  const item = window.__epoProjetoFRows?.[index];
+  if (!item || !epoSelecionadaAtual) return;
+
+  const codigo = _getCodigoAceiteDaLinhaEpo(item, index, 'projeto-f');
+  const payload = salvarAceiteEpo('projeto-f', codigo);
+  const responsavel = payload?.responsavel || getNomeResponsavelAtual();
+
+  executarAcaoEpo('projeto-f');
+  const resultEl = document.getElementById('epo-action-result');
+  if (resultEl) resultEl.textContent = `✅ Projeto F ${codigo} aceito por ${responsavel}.`;
+}
+
+function retirarAceiteProjetoFEpo(index) {
+  const item = window.__epoProjetoFRows?.[index];
+  if (!item || !epoSelecionadaAtual) return;
+
+  const codigo = _getCodigoAceiteDaLinhaEpo(item, index, 'projeto-f');
+  removerAceiteEpo('projeto-f', codigo);
+
+  executarAcaoEpo('projeto-f');
+  const resultEl = document.getElementById('epo-action-result');
+  if (resultEl) resultEl.textContent = `↩️ Aceite removido do Projeto F ${codigo}.`;
 }
 
 function selecionarEpo(nomeEpo) {
@@ -7936,6 +8060,17 @@ function buscarEmCategoria(categoriaId) {
   const termoBusca = (inputElement?.value || "").toLowerCase().trim();
 
   if (!termoBusca) {
+    if (categoriaId === 'epo' && epoSelecionadaAtual) {
+      if (epoAcaoAtual === 'projeto-f') {
+        renderProjetoFEpo();
+      } else if (epoAcaoAtual === 'gpon-ongoing') {
+        renderGponOngoingEpo();
+      }
+      const resultEl = document.getElementById('epo-action-result');
+      if (resultEl) resultEl.textContent = `✅ Busca limpa. Exibindo todos os registros de ${epoSelecionadaAtual}.`;
+      return;
+    }
+
     alert('🔍 Digite um ID ou endereço para buscar');
     return;
   }
