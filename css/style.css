@@ -2392,8 +2392,9 @@ td:first-child {
   border-radius: 12px;
   font-weight: 700;
   font-size: 13px;
-  min-width: 34px;
+  min-width: 44px;
   text-align: center;
+  white-space: nowrap;
 }
 .aging-badge.level-0 { background: #dcfce7; color: #166534; }
 .aging-badge.level-1 { background: #fff1f2; color: #7f1d1d; }
