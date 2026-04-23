@@ -2,9 +2,9 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="portal-api-base" content="https://portal-enderecos-backend.onrender.com">
+  <meta name="portal-api-base" content="https://portal-endere-os-2.onrender.com">
   <title>Painel MDU</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
 
@@ -233,21 +233,23 @@
       <div class="card epo-premium-card">
         <div class="epo-heading-wrap" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <h2 class="epo-heading">EPO</h2>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div id="epo-import-tools" class="epo-import-tools" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;">
             <div style="display:flex;align-items:center;gap:6px;">
-              <input id="epo-gpon-import-file" type="file" accept=".csv,.txt,.xlsx" style="display:none;" onchange="importarPlanilhaEpoGponOngoing()" />
+              <input id="epo-gpon-import-file" type="file" accept=".csv,.txt" style="display:none;" onchange="importarPlanilhaEpoGponOngoing()" />
               <button type="button" class="btn-secondary epo-clip-upload" onclick="abrirImportEpoGponOngoing()" title="Importar planilha do backlog ONGOING (GPON)">📎</button>
               <span style="font-size:11px;font-weight:700;color:#334155;">GPON ONGOING</span>
               <span id="epo-gpon-import-status" style="font-size:11px;color:#64748b;font-weight:600;"></span>
             </div>
             <div style="display:flex;align-items:center;gap:6px;">
-              <input id="epo-projetof-import-file" type="file" accept=".csv,.txt,.xlsx" style="display:none;" onchange="importarPlanilhaEpoProjetoF()" />
+              <input id="epo-projetof-import-file" type="file" accept=".csv,.txt" style="display:none;" onchange="importarPlanilhaEpoProjetoF()" />
               <button type="button" class="btn-secondary epo-clip-upload" onclick="abrirImportEpoProjetoF()" title="Importar planilha de CONSTRUÇÃO MDU PROJETO_F">📎</button>
               <span style="font-size:11px;font-weight:700;color:#334155;">PROJETO F</span>
               <span id="epo-projetof-import-status" style="font-size:11px;color:#64748b;font-weight:600;"></span>
             </div>
           </div>
         </div>
+
+        <p class="epo-subheading epo-selecao-intro" id="epo-selecao-intro">Selecione uma EPO para abrir importações e a área de equipes.</p>
 
         <div class="epo-pill-grid" role="list" aria-label="Lista de EPOs">
           <button type="button" class="epo-pill" data-epo="ACESSO" role="listitem" onclick="selecionarEpo('ACESSO')">ACESSO<span class="epo-pill-count"></span></button>
@@ -264,7 +266,10 @@
         </div>
 
         <div id="epo-action-panel" class="epo-action-panel" style="display:none;">
-          <p class="epo-action-title">EPO selecionada: <strong id="epo-selected-name">-</strong></p>
+          <div class="epo-action-header">
+            <p class="epo-action-title">EPO selecionada: <strong id="epo-selected-name">-</strong></p>
+            <button type="button" id="epo-reset-selecao" class="btn-secondary" onclick="resetarSelecaoEpo()">Trocar EPO</button>
+          </div>
           <div class="epo-action-buttons">
             <button type="button" class="btn-primary epo-action-trigger" data-action="equipes" onclick="executarAcaoEpo('equipes')">LISTA DE EQUIPES</button>
             <button type="button" class="btn-secondary epo-action-trigger" data-action="gpon-ongoing" onclick="executarAcaoEpo('gpon-ongoing')">GPON ONGOING</button>
@@ -456,30 +461,71 @@
       </div>
     </section>
 
-    <section id="liberados" class="secao">
+    <section id="liberados" class="secao categoria-secao">
       <div class="categoria-header">
         <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
         <h1>✅ LIBERADOS</h1>
       </div>
 
+      <div class="liberados-hero">
+        <div>
+          <p class="liberados-hero-kicker">Painel Executivo</p>
+          <h2 class="liberados-hero-title">Gestão de Liberações por Fluxo</h2>
+        </div>
+      </div>
+
       <div class="card">
+        <h2 style="margin-top:0;">Selecione o fluxo de importação</h2>
+        <button type="button" id="liberados-reset-selecao" class="btn-secondary" style="display:none; margin-bottom:10px;" onclick="resetarFluxoLiberados()">Trocar card</button>
+        <div class="liberados-subcards-grid">
+          <button type="button" id="liberados-card-projeto-f" class="liberados-subcard" onclick="abrirCardLiberados('projeto-f')">
+            <span class="liberados-subcard-head">
+              <span class="liberados-subcard-icon">PF</span>
+              <span id="liberados-badge-projeto-f" class="liberados-subcard-badge">0 registro(s)</span>
+            </span>
+            <span class="liberados-subcard-title">PROJETO F</span>
+            <span class="liberados-subcard-subtitle">Fluxo dedicado</span>
+          </button>
+          <button type="button" id="liberados-card-gpon-hfc" class="liberados-subcard" onclick="abrirCardLiberados('gpon-hfc')">
+            <span class="liberados-subcard-head">
+              <span class="liberados-subcard-icon">GH</span>
+              <span id="liberados-badge-gpon-hfc" class="liberados-subcard-badge">0 registro(s)</span>
+            </span>
+            <span class="liberados-subcard-title">GPON E HFC</span>
+            <span class="liberados-subcard-subtitle">Fluxo dedicado</span>
+          </button>
+          <button type="button" id="liberados-card-greenfield" class="liberados-subcard" onclick="abrirCardLiberados('greenfield')">
+            <span class="liberados-subcard-head">
+              <span class="liberados-subcard-icon">GF</span>
+              <span id="liberados-badge-greenfield" class="liberados-subcard-badge">0 registro(s)</span>
+            </span>
+            <span class="liberados-subcard-title">GREENFIELD</span>
+            <span class="liberados-subcard-subtitle">Fluxo dedicado</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="card" id="liberados-detalhes-card" style="display:none;">
         <h2 style="margin-top:0;">Registros Liberados</h2>
+        <p id="liberados-aba-info" style="margin:0 0 8px 0; font-size:12px; color:#475569; font-weight:600;"></p>
         <table>
           <thead>
             <tr>
-              <th>Cidade</th>
-              <th>Bloco</th>
-              <th>Cód. GED</th>
-              <th>Endereço</th>
-              <th>Qtde Blocos</th>
-              <th>Status MDU</th>
-              <th>Status Liberação</th>
-              <th>Ação</th>
+              <th>TIPO_REDE</th>
+              <th>SOLICITANTE</th>
+              <th>DDD</th>
+              <th>CIDADE</th>
+              <th>ENDEREÇO</th>
+              <th>BLOCOS</th>
+              <th>HP</th>
+              <th>STATUS</th>
+              <th>DT_CONCLUIDO</th>
+              <th>COD_IMOVEL</th>
             </tr>
           </thead>
           <tbody id="tabela-liberados">
             <tr>
-              <td colspan="8" style="text-align:center">Nenhum dado</td>
+              <td colspan="10" style="text-align:center">Nenhum dado</td>
             </tr>
           </tbody>
         </table>
@@ -807,7 +853,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="js/api-config.js"></script>
-  <script src="js/dashboard.js"></script>
+  <script src="api-config.js"></script>
+  <script src="dashboard.js"></script>
 </body>
 </html>

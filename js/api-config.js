@@ -35,7 +35,7 @@
   const runtimeOrigin = window.location.protocol.startsWith("http") ? window.location.origin : "";
   const savedApiBase = getSavedApiBase();
   const isGithubPages = /github\.io$/i.test(window.location.hostname || "");
-  const renderDefaultBase = "https://portal-enderecos-backend.onrender.com";
+  const renderDefaultBase = "https://portal-endere-os-2.onrender.com";
   const fallbackApiBase = window.location.protocol === "file:"
     ? "http://localhost:5000"
     : (isGithubPages ? renderDefaultBase : "");
