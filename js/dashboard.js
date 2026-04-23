@@ -15,6 +15,8 @@ let currentUser = null;
 const LIBERADOS_ABAS = ['projeto-f', 'gpon-hfc', 'greenfield'];
 let liberadosAbaAtiva = 'projeto-f';
 let liberadosSubcardSelecionado = false;
+const sharedSyncRetryQueue = {};
+let sharedSyncRetryInProgress = false;
 
 const STORAGE_USERS_KEY = "portalUsers";
 const STORAGE_CURRENT_USER_KEY = "portalCurrentUser";
@@ -558,23 +560,76 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
   }
 
   try {
-    const response = await fetch(`/api/shared_datasets/${encodeURIComponent(categoria)}`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items })
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
-      throw new Error(errorBody?.error || `Falha ao sincronizar a categoria ${categoria}`);
-    }
+    await enviarDatasetCompartilhadoParaServidor(categoria, items);
+    delete sharedSyncRetryQueue[categoria];
   } catch (error) {
+    sharedSyncRetryQueue[categoria] = {
+      categoria,
+      items,
+      meta: metaWithUser,
+      retries: Number(sharedSyncRetryQueue[categoria]?.retries || 0) + 1,
+      lastError: error?.message || 'Falha desconhecida',
+      queuedAt: new Date().toISOString()
+    };
+
     console.warn(`Falha ao salvar dados compartilhados da categoria ${categoria}.`, error);
     const statusEl = document.getElementById('import-status');
     if (statusEl) {
-      statusEl.textContent = `⚠️ Dados carregados localmente, mas a sincronização do portal compartilhado falhou em ${categoria}.`;
+      statusEl.textContent = `⚠️ Dados salvos localmente. A sincronização compartilhada de ${categoria} será tentada novamente automaticamente.`;
     }
+  }
+}
+
+async function enviarDatasetCompartilhadoParaServidor(categoria, items) {
+  const response = await fetch(`/api/shared_datasets/${encodeURIComponent(categoria)}`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items })
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody?.error || `Falha ao sincronizar a categoria ${categoria}`);
+  }
+}
+
+async function processarFilaSyncCompartilhada() {
+  if (sharedSyncRetryInProgress) return;
+  if (!window.location.protocol.startsWith("http")) return;
+
+  const user = getCurrentUser();
+  if (!user || user.role !== 'admin') return;
+
+  const pendentes = Object.values(sharedSyncRetryQueue || {});
+  if (!pendentes.length) return;
+
+  sharedSyncRetryInProgress = true;
+  try {
+    for (let i = 0; i < pendentes.length; i += 1) {
+      const entry = pendentes[i];
+      const categoria = entry?.categoria;
+      const items = Array.isArray(entry?.items) ? entry.items : [];
+
+      if (!categoria || !items.length) {
+        if (categoria) delete sharedSyncRetryQueue[categoria];
+        continue;
+      }
+
+      try {
+        await enviarDatasetCompartilhadoParaServidor(categoria, items);
+        delete sharedSyncRetryQueue[categoria];
+      } catch (error) {
+        sharedSyncRetryQueue[categoria] = {
+          ...entry,
+          retries: Number(entry?.retries || 0) + 1,
+          lastError: error?.message || 'Falha desconhecida',
+          queuedAt: entry?.queuedAt || new Date().toISOString()
+        };
+      }
+    }
+  } finally {
+    sharedSyncRetryInProgress = false;
   }
 }
 
@@ -619,6 +674,11 @@ async function loadViewerUserProfileData() {
   }
 }
 
+function usuarioPodeImportar() {
+  const user = getCurrentUser();
+  return Boolean(user && user.role === 'admin');
+}
+
 function applyAccessControl() {
   const user = getCurrentUser();
   if (!user) return;
@@ -631,6 +691,7 @@ function applyAccessControl() {
 
   // Cria uma camada de proteção na interface (o backend também protege as APIs)
   const isAdmin = user.role === "admin";
+  const canImport = usuarioPodeImportar();
 
   if (sidebar) sidebar.style.display = "flex";
   if (topActions) topActions.style.display = "flex";
@@ -647,13 +708,23 @@ function applyAccessControl() {
 
   // Usuários de acompanhamento não podem importar nem exportar planilhas
   const importSection = document.getElementById("global-import-section");
-  if (importSection && !isAdmin) {
+  if (importSection && !canImport) {
     importSection.style.display = "none";
   }
 
   document.querySelectorAll('.epo-clip-upload').forEach((btn) => {
-    btn.style.display = isAdmin ? 'inline-flex' : 'none';
+    btn.style.display = canImport ? 'inline-flex' : 'none';
   });
+
+  const modalAnexoBtn = document.getElementById('modal-anexo-button');
+  if (modalAnexoBtn) {
+    modalAnexoBtn.style.display = canImport ? 'inline-flex' : 'none';
+  }
+
+  const modalAnexoInput = document.getElementById('modal-anexo');
+  if (modalAnexoInput) {
+    modalAnexoInput.disabled = !canImport;
+  }
 
   if (!isAdmin && ["historico", "pesquisa", "relatorios", "reuniao", "financeiro"].includes(document.querySelector(".secao.ativa")?.id || "")) {
     mostrarSecao("inicio");
@@ -1333,6 +1404,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   applyAccessControl();
   await carregarDadosCompartilhados();
   await carregarEpoDatasetsCompartilhados();
+  await processarFilaSyncCompartilhada();
 
   // Preenche os cards/tabelas principais ja na entrada para evitar tela vazia.
   ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede', 'projeto-f'].forEach(carregarDadosCategoria);
@@ -1351,6 +1423,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     updateNotificationBadge();
     carregarDadosCompartilhados();
     carregarEpoDatasetsCompartilhados();
+    processarFilaSyncCompartilhada();
 
     const panel = document.getElementById("notificationPanel");
     if (panel && !panel.classList.contains("hidden")) {
@@ -1971,6 +2044,11 @@ function importarLiberadosGreenfield(linhas = [], delimiter = ';', file = null, 
 }
 
 function importarCSV() {
+  if (!usuarioPodeImportar()) {
+    alert('Apenas o administrador pode anexar/importar arquivos.');
+    return;
+  }
+
   const categoria = categoriaAtualParaImport || document.querySelector('.secao.ativa')?.id;
   if (!categoria) {
     return alert("Selecione uma categoria antes de importar.");
@@ -2317,6 +2395,11 @@ function importarCSV() {
 
 // IMPORTAR CSV a partir de caminho no servidor (rede)
 async function importarDoCaminhoRede() {
+  if (!usuarioPodeImportar()) {
+    alert('Apenas o administrador pode anexar/importar arquivos.');
+    return;
+  }
+
   if (!window.location.protocol.startsWith("http")) {
     return alert("⚠️ Recurso disponível apenas quando o servidor estiver rodando (acessar via http://localhost:5000).\nNo modo local (arquivo), não é possível ler caminhos de rede.");
   }
@@ -2351,6 +2434,11 @@ async function importarDoCaminhoRede() {
 
 // IMPORTAR CSV a partir de URL (Google Sheets / OneDrive)
 async function importarDeUrl() {
+  if (!usuarioPodeImportar()) {
+    alert('Apenas o administrador pode anexar/importar arquivos.');
+    return;
+  }
+
   if (!window.location.protocol.startsWith("http")) {
     return alert("⚠️ Recurso disponível apenas quando o servidor estiver rodando (acessar via http://localhost:5000).\nNo modo local (arquivo), não é possível buscar URLs externas.");
   }
@@ -5080,6 +5168,11 @@ function inicializarFiltrosDDD() {
 
 // IMPORTAR CSV NA SEÇÃO ONGOING
 function importarCSVOngoing() {
+  if (!usuarioPodeImportar()) {
+    alert('Apenas o administrador pode anexar/importar arquivos.');
+    return;
+  }
+
   const fileInput = document.getElementById("arquivoCSVOngoing");
   const file = fileInput.files[0];
   
@@ -5964,11 +6057,21 @@ function getEpoNovosParaEpo(nomeEpo) {
 }
 
 function abrirImportEpoGponOngoing() {
+  if (!usuarioPodeImportar()) {
+    alert('Apenas o administrador pode anexar/importar arquivos.');
+    return;
+  }
+
   const input = document.getElementById('epo-gpon-import-file');
   if (input) { input.value = ''; input.click(); }
 }
 
 function abrirImportEpoProjetoF() {
+  if (!usuarioPodeImportar()) {
+    alert('Apenas o administrador pode anexar/importar arquivos.');
+    return;
+  }
+
   const input = document.getElementById('epo-projetof-import-file');
   if (input) { input.value = ''; input.click(); }
 }
@@ -6258,6 +6361,11 @@ function parseEpoImportRowsRobusto(text = '') {
 }
 
 function importarPlanilhaEpoGponOngoing() {
+  if (!usuarioPodeImportar()) {
+    alert('Apenas o administrador pode anexar/importar arquivos.');
+    return;
+  }
+
   const input = document.getElementById('epo-gpon-import-file');
   const statusEl = document.getElementById('epo-gpon-import-status');
   const file = input?.files?.[0];
@@ -6350,6 +6458,11 @@ function importarPlanilhaEpoGponOngoing() {
 }
 
 function importarPlanilhaEpoProjetoF() {
+  if (!usuarioPodeImportar()) {
+    alert('Apenas o administrador pode anexar/importar arquivos.');
+    return;
+  }
+
   const input = document.getElementById('epo-projetof-import-file');
   const statusEl = document.getElementById('epo-projetof-import-status');
   const file = input?.files?.[0];
@@ -7418,7 +7531,7 @@ function selecionarEpo(nomeEpo) {
   if (pillGrid) pillGrid.classList.add('only-active');
 
   if (panel) panel.style.display = 'block';
-  if (importTools) importTools.style.display = 'flex';
+  if (importTools) importTools.style.display = usuarioPodeImportar() ? 'flex' : 'none';
   if (resetButton) resetButton.style.display = 'inline-flex';
   if (intro) intro.style.display = 'none';
   if (selectedNameEl) atualizarResumoEpoSelecionada();
@@ -7451,7 +7564,7 @@ function resetarSelecaoEpo() {
   if (epoSection) epoSection.classList.add('epo-selection-mode');
   if (pillGrid) pillGrid.classList.remove('only-active');
   if (panel) panel.style.display = 'none';
-  if (importTools) importTools.style.display = 'flex';
+  if (importTools) importTools.style.display = usuarioPodeImportar() ? 'flex' : 'none';
   if (resetButton) resetButton.style.display = 'none';
   if (intro) intro.style.display = '';
   if (selectedNameEl) atualizarResumoEpoSelecionada();
