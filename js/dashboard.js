@@ -5948,9 +5948,43 @@ function getEpoRowsByAction(actionKey = 'gpon-ongoing') {
   return flattenEpoNovosStore(getEpoStore(actionKey));
 }
 
+function derivarStoreEpoProjetoFDoDatasetBase() {
+  const baseProjetoF = getPreferredDataset('projeto-f');
+  if (!Array.isArray(baseProjetoF) || !baseProjetoF.length) return null;
+
+  const store = buildEpoNovosStoreFromRows(baseProjetoF.map((item) => ({ ...item })));
+  return Object.keys(store).length ? store : null;
+}
+
+function garantirEpoProjetoFDerivado(options = {}) {
+  const { persistShared = false } = options;
+  const storeExistente = getEpoStore('projeto-f');
+  if (Object.keys(storeExistente || {}).length) {
+    return storeExistente;
+  }
+
+  const storeDerivado = derivarStoreEpoProjetoFDoDatasetBase();
+  if (!storeDerivado) return null;
+
+  const rows = flattenEpoNovosStore(storeDerivado);
+  saveEpoStore('projeto-f', storeDerivado);
+  cacheDatasetLocally('epo-projeto-f', rows, { source: 'derived', locked: true });
+
+  if (persistShared && getCurrentUser()?.role === 'admin') {
+    persistirDadosCompartilhados('epo-projeto-f', rows, { source: 'derived', locked: true });
+  }
+
+  return storeDerivado;
+}
+
 function getEpoRowsForEpo(actionKey = 'gpon-ongoing', nomeEpo = '') {
   const key = String(nomeEpo || '').trim().toUpperCase();
   if (!key) return [];
+
+  if (actionKey === 'projeto-f') {
+    garantirEpoProjetoFDerivado();
+  }
+
   const store = getEpoStore(actionKey);
   if (Array.isArray(store[key])) return store[key];
 
@@ -6025,6 +6059,14 @@ async function carregarEpoDatasetsCompartilhados() {
       }
 
       if (!Array.isArray(rows) || !rows.length) {
+        if (actionKey === 'projeto-f') {
+          const storeDerivado = garantirEpoProjetoFDerivado({ persistShared: true });
+          if (storeDerivado) {
+            updateEpoImportStatus(actionKey, 'derivado do PROJETO F');
+            return;
+          }
+        }
+
         const user = getCurrentUser();
         if (user?.role === 'admin' && localRows.length) {
           persistirDadosCompartilhados(cfg.sharedKey, localRows, { source: 'manual', locked: true });
@@ -7564,8 +7606,10 @@ async function visualizarNovoEntrante(index) {
     }
   }
 
-  await carregarObservacoesPendente(referencia);
-  await carregarAnexosPendente(referencia);
+  await Promise.all([
+    carregarObservacoesPendente(referencia),
+    carregarAnexosPendente(referencia)
+  ]);
 
   const modal = document.getElementById('modal-obs');
   if (modal) modal.classList.remove('hidden');
@@ -7656,8 +7700,10 @@ async function visualizarProjetoFEpo(index) {
     }
   }
 
-  await carregarObservacoesPendente(referencia);
-  await carregarAnexosPendente(referencia);
+  await Promise.all([
+    carregarObservacoesPendente(referencia),
+    carregarAnexosPendente(referencia)
+  ]);
 
   const modal = document.getElementById('modal-obs');
   if (modal) modal.classList.remove('hidden');
@@ -8555,6 +8601,12 @@ function carregarDadosCategoria(categoriaId) {
           })
           .catch(() => {});
       }
+
+      if (Array.isArray(dados) && dados.length) {
+        garantirEpoProjetoFDerivado();
+        atualizarCountPillsEpo();
+      }
+
       renderTabelaProjetoF(tabelaId, dados || []);
     } else if (categoriaId === 'liberados') {
       const baseLiberados = getPreferredDataset('liberados');
