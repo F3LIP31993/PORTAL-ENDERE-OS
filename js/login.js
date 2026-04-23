@@ -1,6 +1,56 @@
 const STORAGE_USERS_KEY = "portalUsers";
 const STORAGE_CURRENT_USER_KEY = "portalCurrentUser";
 
+function finalizarLoginComSucesso(user, senha = "") {
+  if (!user || !user.username) return;
+
+  const erroEl = document.getElementById("erro");
+  const btnLogin = document.querySelector(".btn-login");
+
+  upsertStoredUser(user, senha);
+  localStorage.setItem(STORAGE_CURRENT_USER_KEY, user.username);
+
+  if (erroEl) {
+    erroEl.style.color = "#16a34a";
+    erroEl.innerText = "✅ Bem-vindo! Redirecionando...";
+  }
+
+  if (btnLogin) {
+    btnLogin.disabled = false;
+    btnLogin.textContent = "Entrar";
+  }
+
+  if (user.must_change_password) {
+    setTimeout(() => abrirModalTrocarSenha(user.username), 300);
+    return;
+  }
+
+  setTimeout(() => {
+    window.location.href = "dashboard.html";
+  }, 600);
+}
+
+function tentarLoginLocal(usuario, senha, erroEl, btnLogin) {
+  const user = findUser(usuario);
+
+  if (!user) {
+    erroEl.innerText = "❌ Usuário não encontrado. Cadastre-se para solicitar acesso.";
+  } else if (user.role === "pending") {
+    erroEl.innerText = "⏳ Sua solicitação está pendente de aprovação. Aguarde.";
+  } else if (user.password !== senha) {
+    erroEl.innerText = "❌ Usuário ou senha inválidos";
+    document.getElementById("senha").value = "";
+    document.getElementById("senha").focus();
+  } else {
+    finalizarLoginComSucesso(user, senha);
+    return true;
+  }
+
+  btnLogin.disabled = false;
+  btnLogin.textContent = "Entrar";
+  return false;
+}
+
 function initLogin() {
   // Local fallback para uso sem servidor.
   seedDefaultUsers();
@@ -109,7 +159,11 @@ function login(event) {
         const body = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          // Erro HTTP do servidor — exibir mensagem diretamente, sem fallback local.
+          if (res.status === 404 && findUser(usuario)) {
+            tentarLoginLocal(usuario, senha, erroEl, btnLogin);
+            return;
+          }
+
           erroEl.innerText = `❌ ${body.error || "Falha ao autenticar"}`;
           btnLogin.disabled = false;
           btnLogin.textContent = "Entrar";
@@ -123,40 +177,11 @@ function login(event) {
           role: "viewer",
         };
 
-        upsertStoredUser(loggedUser, senha);
-        localStorage.setItem(STORAGE_CURRENT_USER_KEY, loggedUser.username || usuario);
-
-        erroEl.style.color = "#16a34a";
-        erroEl.innerText = "✅ Bem-vindo! Redirecionando...";
-        if (loggedUser.must_change_password) {
-          setTimeout(() => abrirModalTrocarSenha(loggedUser.username), 300);
-          return;
-        }
-        setTimeout(() => {
-          window.location.href = "dashboard.html";
-        }, 600);
+        finalizarLoginComSucesso(loggedUser, senha);
       })
       .catch(() => {
         // Apenas erros de rede chegam aqui (servidor inacessível) — fallback local.
-        const user = findUser(usuario);
-        if (!user) {
-          erroEl.innerText = "❌ Usuário não encontrado. Cadastre-se para solicitar acesso.";
-        } else if (user.role === "pending") {
-          erroEl.innerText = "⏳ Sua solicitação está pendente de aprovação. Aguarde.";
-        } else if (user.password !== senha) {
-          erroEl.innerText = "❌ Usuário ou senha inválidos";
-          document.getElementById("senha").value = "";
-          document.getElementById("senha").focus();
-        } else {
-          localStorage.setItem(STORAGE_CURRENT_USER_KEY, user.username);
-          erroEl.style.color = "#16a34a";
-          erroEl.innerText = "✅ Bem-vindo! Redirecionando...";
-          setTimeout(() => {
-            window.location.href = "dashboard.html";
-          }, 600);
-        }
-        btnLogin.disabled = false;
-        btnLogin.textContent = "Entrar";
+        tentarLoginLocal(usuario, senha, erroEl, btnLogin);
       });
 
     return;
@@ -164,40 +189,7 @@ function login(event) {
 
   // Fallback local (sem servidor)
   setTimeout(() => {
-    const user = findUser(usuario);
-
-    if (!user) {
-      erroEl.innerText = "❌ Usuário não encontrado. Cadastre-se para solicitar acesso.";
-      btnLogin.disabled = false;
-      btnLogin.textContent = "Entrar";
-      return;
-    }
-
-    if (user.role === "pending") {
-      erroEl.innerText = "⏳ Sua solicitação está pendente de aprovação. Aguarde.";
-      btnLogin.disabled = false;
-      btnLogin.textContent = "Entrar";
-      return;
-    }
-
-    if (user.password !== senha) {
-      erroEl.innerText = "❌ Usuário ou senha inválidos";
-      btnLogin.disabled = false;
-      btnLogin.textContent = "Entrar";
-      document.getElementById("senha").value = "";
-      document.getElementById("senha").focus();
-      return;
-    }
-
-    // Login bem-sucedido
-    localStorage.setItem(STORAGE_CURRENT_USER_KEY, user.username);
-
-    erroEl.style.color = "#16a34a";
-    erroEl.innerText = "✅ Bem-vindo! Redirecionando...";
-
-    setTimeout(() => {
-      window.location.href = "dashboard.html";
-    }, 600);
+    tentarLoginLocal(usuario, senha, erroEl, btnLogin);
   }, 600);
 }
 
