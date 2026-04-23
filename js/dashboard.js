@@ -6883,32 +6883,15 @@ async function salvarCadastroUsuarioEpo() {
   }
 
   const senhaGerada = 'MDU@2026';
+  let origemCadastro = 'api';
 
-  if (window.location.protocol.startsWith('http')) {
-    try {
-      const res = await fetch('/api/admin/create_epo_user', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: nome, username: login, epo_access: eposEscolhidas, password: senhaGerada })
-      });
-      const body = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        if (resultEl) resultEl.innerHTML = `<span style="color:#dc2626;">⚠️ ${escapeHtml(body.error || 'Erro ao criar usuário.')}</span>`;
-        return;
-      }
-    } catch {
-      if (resultEl) resultEl.innerHTML = '<span style="color:#dc2626;">⚠️ Erro de conexão com o servidor.</span>';
-      return;
-    }
-  } else {
-    // Modo offline: salva localmente
+  const salvarUsuarioEpoLocal = () => {
     const users = getStoredUsers();
-    if (users.find(u => u.username.toLowerCase() === login.toLowerCase())) {
+    if (users.find(u => String(u.username || '').toLowerCase() === login.toLowerCase())) {
       if (resultEl) resultEl.innerHTML = '<span style="color:#dc2626;">⚠️ Usuário já existe.</span>';
-      return;
+      return false;
     }
+
     users.push({
       username: login,
       password: senhaGerada,
@@ -6921,7 +6904,44 @@ async function salvarCadastroUsuarioEpo() {
       approvedAt: new Date().toISOString()
     });
     saveStoredUsers(users);
+    return true;
+  };
+
+  if (window.location.protocol.startsWith('http')) {
+    try {
+      const res = await fetch('/api/admin/create_epo_user', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nome, username: login, epo_access: eposEscolhidas, password: senhaGerada })
+      });
+      const body = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        if (res.status === 404 || res.status >= 500) {
+          const okLocal = salvarUsuarioEpoLocal();
+          if (!okLocal) return;
+          origemCadastro = 'local-fallback';
+        } else {
+          if (resultEl) resultEl.innerHTML = `<span style="color:#dc2626;">⚠️ ${escapeHtml(body.error || 'Erro ao criar usuário.')}</span>`;
+          return;
+        }
+      }
+    } catch {
+      const okLocal = salvarUsuarioEpoLocal();
+      if (!okLocal) return;
+      origemCadastro = 'local-fallback';
+    }
+  } else {
+    // Modo offline: salva localmente
+    const okLocal = salvarUsuarioEpoLocal();
+    if (!okLocal) return;
+    origemCadastro = 'local-fallback';
   }
+
+  const avisoSync = origemCadastro === 'local-fallback'
+    ? '<br><span style="color:#b45309;">⚠️ Cadastro salvo no navegador (fallback). Se quiser compartilhar com todos, mantenha o backend/API online e tente novamente.</span>'
+    : '';
 
   if (resultEl) resultEl.innerHTML = `
     <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px 14px;font-size:12px;line-height:1.7;">
@@ -6930,11 +6950,36 @@ async function salvarCadastroUsuarioEpo() {
       Senha padrão: <strong>${escapeHtml(senhaGerada)}</strong><br>
       EPOs: <strong>${eposEscolhidas.map(e => escapeHtml(e)).join(', ')}</strong><br>
       <span style="color:#64748b;">O usuário deverá trocar a senha no primeiro acesso.</span>
+      ${avisoSync}
+      <div style="margin-top:8px;">
+        <button type="button" class="btn-secondary" onclick="copiarCredenciaisEpo('${escapeHtml(login)}','${escapeHtml(senhaGerada)}')">Copiar login e senha</button>
+      </div>
     </div>
   `;
 
   if (document.getElementById('epo-user-nome')) document.getElementById('epo-user-nome').value = '';
   if (document.getElementById('epo-user-login')) document.getElementById('epo-user-login').value = '';
+}
+
+async function copiarCredenciaisEpo(login, senha) {
+  const texto = `Login: ${login}\nSenha padrão: ${senha}`;
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(texto);
+      alert('✅ Credenciais copiadas para área de transferência.');
+      return;
+    }
+  } catch {
+    // segue fallback abaixo
+  }
+
+  const area = document.createElement('textarea');
+  area.value = texto;
+  document.body.appendChild(area);
+  area.select();
+  document.execCommand('copy');
+  document.body.removeChild(area);
+  alert('✅ Credenciais copiadas para área de transferência.');
 }
 
 function abrirSeletorPlanilhaTecnicosEpo() {
