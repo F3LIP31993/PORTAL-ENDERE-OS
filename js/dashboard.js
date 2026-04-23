@@ -1405,6 +1405,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   await carregarDadosCompartilhados();
   await carregarEpoDatasetsCompartilhados();
   await processarFilaSyncCompartilhada();
+  aplicarRestricaoEpoAccess();
 
   // Preenche os cards/tabelas principais ja na entrada para evitar tela vazia.
   ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede', 'projeto-f'].forEach(carregarDadosCategoria);
@@ -6567,8 +6568,33 @@ function atualizarCountPillsEpo() {
     }
   });
 
+  aplicarRestricaoEpoAccess();
   atualizarResumoEpoSelecionada();
   atualizarRotulosAcoesEpo();
+}
+
+function getEpoAccessDoUsuario() {
+  const user = getCurrentUser();
+  const raw = user?.epo_access;
+  if (!raw) return null; // null = sem restrição (admin ou viewer sem filtro)
+  if (Array.isArray(raw)) return raw.map(e => String(e).trim().toUpperCase()).filter(Boolean);
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(e => String(e).trim().toUpperCase()).filter(Boolean) : null;
+  } catch {
+    return null;
+  }
+}
+
+function aplicarRestricaoEpoAccess() {
+  const permitidas = getEpoAccessDoUsuario();
+  if (!permitidas) return; // sem restrição
+
+  document.querySelectorAll('#epo .epo-pill[data-epo]').forEach(btn => {
+    const epoName = String(btn.dataset.epo || '').trim().toUpperCase();
+    const visivel = permitidas.includes(epoName);
+    btn.style.display = visivel ? '' : 'none';
+  });
 }
 
 function getEpoTecnicosStore() {
@@ -6767,9 +6793,39 @@ function renderListaEquipesEpo() {
   epoTecnicoEditIndex = -1;
 
   const tecnicos = getTecnicosDaEpo(epoSelecionadaAtual);
+  const isAdmin = getCurrentUser()?.role === 'admin';
+  const cadastroUsuarioBtnHtml = isAdmin ? `
+    <button type="button" class="btn-secondary" onclick="toggleCadastroUsuarioEpo()" style="margin-left:8px;">👤 CADASTRAR USUÁRIO EPO</button>
+    <div id="cadastro-usuario-epo-form" class="epo-form-shell" style="display:none;margin-top:12px;">
+      <p style="font-size:12px;font-weight:700;color:#1d4ed8;margin:0 0 10px;">Criar acesso restrito a EPO(s) específica(s)</p>
+      <div class="epo-form-grid">
+        <input id="epo-user-nome" type="text" placeholder="NOME COMPLETO" />
+        <input id="epo-user-login" type="text" placeholder="LOGIN (sem espaços)" />
+      </div>
+      <div style="margin:10px 0 4px;">
+        <label style="font-size:12px;font-weight:700;color:#334155;">EPOs com acesso:</label>
+        <div id="epo-user-pills" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+          ${EPO_PILLS.map(epo => `
+            <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;cursor:pointer;background:#f1f5f9;border:1.5px solid #cbd5e1;border-radius:20px;padding:3px 10px;">
+              <input type="checkbox" value="${epo}" ${epo === epoSelecionadaAtual ? 'checked' : ''} style="margin:0;" />
+              ${escapeHtml(epo)}
+            </label>`).join('')}
+        </div>
+      </div>
+      <div class="epo-form-actions" style="margin-top:12px;">
+        <button type="button" class="btn-primary" onclick="salvarCadastroUsuarioEpo()">CRIAR ACESSO</button>
+        <button type="button" class="btn-secondary" onclick="toggleCadastroUsuarioEpo()">CANCELAR</button>
+      </div>
+      <div id="epo-user-resultado" style="margin-top:10px;font-size:12px;"></div>
+    </div>
+  ` : '';
+
   container.innerHTML = `
     <p class="epo-section-title">${escapeHtml(epoSelecionadaAtual)} • LISTA DE EQUIPES</p>
-    <button type="button" class="btn-primary" onclick="toggleCadastroTecnicoEpo()">CADASTRAR TÉCNICO</button>
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+      <button type="button" class="btn-primary" onclick="toggleCadastroTecnicoEpo()">CADASTRAR TÉCNICO</button>
+      ${cadastroUsuarioBtnHtml}
+    </div>
 
     <div id="cadastro-tecnico-form" class="epo-form-shell" style="display:none;">
       <div class="epo-form-grid">
@@ -6799,6 +6855,86 @@ function toggleCadastroTecnicoEpo() {
   const form = document.getElementById('cadastro-tecnico-form');
   if (!form) return;
   form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleCadastroUsuarioEpo() {
+  const form = document.getElementById('cadastro-usuario-epo-form');
+  if (!form) return;
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function salvarCadastroUsuarioEpo() {
+  const nome = (document.getElementById('epo-user-nome')?.value || '').trim();
+  const login = (document.getElementById('epo-user-login')?.value || '').trim().replace(/\s+/g, '');
+  const checkboxes = document.querySelectorAll('#epo-user-pills input[type="checkbox"]:checked');
+  const eposEscolhidas = Array.from(checkboxes).map(cb => cb.value);
+  const resultEl = document.getElementById('epo-user-resultado');
+
+  if (resultEl) resultEl.textContent = '';
+
+  if (!nome || !login) {
+    if (resultEl) resultEl.innerHTML = '<span style="color:#dc2626;">⚠️ Preencha nome e login.</span>';
+    return;
+  }
+
+  if (!eposEscolhidas.length) {
+    if (resultEl) resultEl.innerHTML = '<span style="color:#dc2626;">⚠️ Selecione ao menos uma EPO.</span>';
+    return;
+  }
+
+  const senhaGerada = 'MDU@2026';
+
+  if (window.location.protocol.startsWith('http')) {
+    try {
+      const res = await fetch('/api/admin/create_epo_user', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nome, username: login, epo_access: eposEscolhidas, password: senhaGerada })
+      });
+      const body = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        if (resultEl) resultEl.innerHTML = `<span style="color:#dc2626;">⚠️ ${escapeHtml(body.error || 'Erro ao criar usuário.')}</span>`;
+        return;
+      }
+    } catch {
+      if (resultEl) resultEl.innerHTML = '<span style="color:#dc2626;">⚠️ Erro de conexão com o servidor.</span>';
+      return;
+    }
+  } else {
+    // Modo offline: salva localmente
+    const users = getStoredUsers();
+    if (users.find(u => u.username.toLowerCase() === login.toLowerCase())) {
+      if (resultEl) resultEl.innerHTML = '<span style="color:#dc2626;">⚠️ Usuário já existe.</span>';
+      return;
+    }
+    users.push({
+      username: login,
+      password: senhaGerada,
+      name: nome,
+      email: `${login}@epo.local`,
+      role: 'viewer',
+      epo_access: eposEscolhidas,
+      must_change_password: true,
+      createdAt: new Date().toISOString(),
+      approvedAt: new Date().toISOString()
+    });
+    saveStoredUsers(users);
+  }
+
+  if (resultEl) resultEl.innerHTML = `
+    <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px 14px;font-size:12px;line-height:1.7;">
+      <strong style="color:#166534;">✅ Acesso criado com sucesso!</strong><br>
+      Login: <strong>${escapeHtml(login)}</strong><br>
+      Senha padrão: <strong>${escapeHtml(senhaGerada)}</strong><br>
+      EPOs: <strong>${eposEscolhidas.map(e => escapeHtml(e)).join(', ')}</strong><br>
+      <span style="color:#64748b;">O usuário deverá trocar a senha no primeiro acesso.</span>
+    </div>
+  `;
+
+  if (document.getElementById('epo-user-nome')) document.getElementById('epo-user-nome').value = '';
+  if (document.getElementById('epo-user-login')) document.getElementById('epo-user-login').value = '';
 }
 
 function abrirSeletorPlanilhaTecnicosEpo() {

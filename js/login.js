@@ -128,6 +128,10 @@ function login(event) {
 
         erroEl.style.color = "#16a34a";
         erroEl.innerText = "✅ Bem-vindo! Redirecionando...";
+        if (loggedUser.must_change_password) {
+          setTimeout(() => abrirModalTrocarSenha(loggedUser.username), 300);
+          return;
+        }
         setTimeout(() => {
           window.location.href = "dashboard.html";
         }, 600);
@@ -198,3 +202,83 @@ function login(event) {
 }
 
 document.addEventListener("DOMContentLoaded", initLogin);
+
+// ===== MODAL TROCA DE SENHA (1º ACESSO) =====
+function abrirModalTrocarSenha(username) {
+  let modal = document.getElementById("modal-troca-senha");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "modal-troca-senha";
+    modal.innerHTML = `
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:14px;padding:36px 30px;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,.22);">
+          <h2 style="margin:0 0 6px;font-size:20px;color:#1e3a5f;">\ud83d\udd11 Defina sua senha</h2>
+          <p style="margin:0 0 22px;font-size:13px;color:#64748b;">Este é seu primeiro acesso. Crie uma senha pessoal para continuar.</p>
+          <div style="margin-bottom:14px;">
+            <label style="font-size:13px;font-weight:600;color:#334155;">Nova senha</label>
+            <input id="troca-senha-nova" type="password" placeholder="Mínimo 4 caracteres" style="display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;" />
+          </div>
+          <div style="margin-bottom:22px;">
+            <label style="font-size:13px;font-weight:600;color:#334155;">Confirmar senha</label>
+            <input id="troca-senha-confirma" type="password" placeholder="Repita a nova senha" style="display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;" />
+          </div>
+          <span id="troca-senha-erro" style="display:block;font-size:12px;color:#dc2626;min-height:16px;margin-bottom:12px;"></span>
+          <button onclick="salvarTrocaSenha('${username}')" style="width:100%;padding:12px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;">Salvar nova senha</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  modal.style.display = "block";
+}
+
+async function salvarTrocaSenha(username) {
+  const novaSenha = (document.getElementById("troca-senha-nova")?.value || "").trim();
+  const confirma = (document.getElementById("troca-senha-confirma")?.value || "").trim();
+  const erroEl = document.getElementById("troca-senha-erro");
+
+  if (erroEl) erroEl.textContent = "";
+
+  if (novaSenha.length < 4) {
+    if (erroEl) erroEl.textContent = "\u26a0\ufe0f A senha deve ter ao menos 4 caracteres.";
+    return;
+  }
+
+  if (novaSenha !== confirma) {
+    if (erroEl) erroEl.textContent = "\u26a0\ufe0f As senhas n\u00e3o coincidem.";
+    return;
+  }
+
+  try {
+    if (window.location.protocol.startsWith("http")) {
+      const res = await fetch("/api/change_password", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ new_password: novaSenha })
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        if (erroEl) erroEl.textContent = `\u26a0\ufe0f ${body.error || "Erro ao salvar senha."}`;
+        return;
+      }
+    }
+
+    // Atualiza localmente
+    const users = getStoredUsers();
+    const idx = users.findIndex(u => u.username.toLowerCase() === username.toLowerCase());
+    if (idx !== -1) {
+      users[idx].password = novaSenha;
+      users[idx].must_change_password = false;
+      saveStoredUsers(users);
+    }
+
+    const modal = document.getElementById("modal-troca-senha");
+    if (modal) modal.remove();
+
+    window.location.href = "dashboard.html";
+  } catch (err) {
+    if (erroEl) erroEl.textContent = "\u26a0\ufe0f Erro de conex\u00e3o. Tente novamente.";
+  }
+}
