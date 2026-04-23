@@ -25,7 +25,6 @@ import ssl
 from email.message import EmailMessage
 from functools import wraps
 
-import pandas as pd
 from flask import Flask, request, jsonify, session, redirect, send_from_directory, send_file, render_template
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -119,6 +118,8 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
     approved_at = db.Column(db.DateTime, nullable=True)
     registration_obs = db.Column(db.Text, nullable=True)
+    epo_access = db.Column(db.Text, nullable=True)  # JSON list de EPOs permitidas, None = todas
+    must_change_password = db.Column(db.Boolean, nullable=False, default=False)
 
 
 class PendenteNote(db.Model):
@@ -187,6 +188,14 @@ def init_db():
         if "registration_obs" not in cols:
             with db.engine.connect() as conn:
                 conn.execute(text("ALTER TABLE users ADD COLUMN registration_obs TEXT"))
+                conn.commit()
+        if "epo_access" not in cols:
+            with db.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN epo_access TEXT"))
+                conn.commit()
+        if "must_change_password" not in cols:
+            with db.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0"))
                 conn.commit()
     except Exception as e:
         app.logger.warning("Migração registration_obs ignorada: %s", e)
@@ -579,12 +588,20 @@ def get_current_user():
         return None
 
     user = User.query.filter(db.func.lower(User.username) == username.lower()).first()
+    if not user:
+        return None
+    try:
+        epo_list = json.loads(user.epo_access or "null")
+    except Exception:
+        epo_list = None
     return {
         "username": user.username,
         "name": user.name,
         "email": user.email,
         "role": user.role,
-    } if user else None
+        "epo_access": epo_list,
+        "must_change_password": bool(getattr(user, 'must_change_password', False)),
+    }
 
 
 def build_notifications_feed(limit: int = 30):
@@ -717,7 +734,18 @@ def api_login():
         return jsonify({"error": "Seu acesso foi recusado. Fale com o administrador do portal"}), 403
 
     session["username"] = user.username
-    return jsonify({"user": {"username": user.username, "name": user.name, "email": user.email, "role": user.role}})
+    try:
+        epo_list = json.loads(user.epo_access or "null")
+    except Exception:
+        epo_list = None
+    return jsonify({"user": {
+        "username": user.username,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
+        "epo_access": epo_list,
+        "must_change_password": bool(getattr(user, 'must_change_password', False)),
+    }})
 
 
 @app.route("/api/logout", methods=["POST"])
@@ -848,6 +876,62 @@ def api_notifications_feed():
     return jsonify(build_notifications_feed(limit))
 
 
+@app.route("/api/admin/create_epo_user", methods=["POST"])
+@require_admin
+def api_create_epo_user():
+    """Admin cria usuário com acesso restrito a EPOs específicas."""
+    data = request.get_json() or {}
+    nome = (data.get("name") or "").strip()
+    username = (data.get("username") or "").strip()
+    epos = data.get("epo_access")  # lista de strings ou None
+    senha_padrao = (data.get("password") or "MDU@2026").strip()
+
+    if not nome or not username:
+        return jsonify({"error": "Nome e usuário são obrigatórios"}), 400
+
+    existing = User.query.filter(db.func.lower(User.username) == username.lower()).first()
+    if existing:
+        return jsonify({"error": "Usuário já existe"}), 409
+
+    epo_json = json.dumps(epos, ensure_ascii=False) if isinstance(epos, list) and epos else None
+
+    user = User(
+        username=username,
+        password=senha_padrao,
+        name=nome,
+        email=f"{username}@epo.local",
+        role="viewer",
+        created_at=datetime.datetime.utcnow(),
+        approved_at=datetime.datetime.utcnow(),
+        epo_access=epo_json,
+        must_change_password=True,
+    )
+    db.session.add(user)
+    db.session.commit()
+
+    return jsonify({"success": True, "username": username, "password": senha_padrao, "epo_access": epos})
+
+
+@app.route("/api/change_password", methods=["POST"])
+@require_login
+def api_change_password():
+    """Usuário logado troca a própria senha."""
+    data = request.get_json() or {}
+    new_password = (data.get("new_password") or "").strip()
+
+    if len(new_password) < 4:
+        return jsonify({"error": "A nova senha deve ter ao menos 4 caracteres"}), 400
+
+    user = User.query.filter(db.func.lower(User.username) == session["username"].lower()).first()
+    if not user:
+        return jsonify({"error": "Usuário não encontrado"}), 404
+
+    user.password = new_password
+    user.must_change_password = False
+    db.session.commit()
+    return jsonify({"success": True})
+
+
 @app.route("/api/approve", methods=["POST"])
 @require_admin
 def api_approve():
@@ -976,6 +1060,7 @@ LOCAL_PROJETO_F = os.path.join(BASE_DIR, "CONSTRU%C3%87%C3%83O%20MDU%20PROJETO_F
 
 def carregar_projeto_f():
     try:
+        import pandas as pd
         import requests
         from io import BytesIO
 
@@ -1011,6 +1096,7 @@ def carregar_projeto_f():
         
         # Fallback: tentar carregara arquivo local se existir
         try:
+            import pandas as pd
             # Procurar por qualquer arquivo .xlsx no diretório
             import glob
             xlsx_files = glob.glob(os.path.join(BASE_DIR, "*.xlsx"))
@@ -1023,6 +1109,7 @@ def carregar_projeto_f():
         
         # Retornar DataFrame vazio com estrutura padrão
         app.logger.error(f"Falha ao carregar Projeto F: {e}")
+        import pandas as pd
         return pd.DataFrame(columns=["CIDADE", "CODGED", "ENDEREÇO", "STATUS MDU", "LIBERAÇÃO CONCLUIDA?", "PARCEIRA", "DT_CONSTRUÇÃO", "OBS", "DDD"])
 
 # ------------------------------------------
