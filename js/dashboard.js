@@ -5864,6 +5864,7 @@ let epoUltimoAceite = null;
 let epoTecnicoEditIndex = -1;
 const STORAGE_EPO_TECNICOS_KEY = 'portalEpoTecnicos';
 const STORAGE_EPO_ACEITES_KEY = 'portalEpoAceites';
+const STORAGE_EPO_USUARIOS_CADASTRADOS_KEY = 'portalEpoUsuariosCadastrados';
 const STORAGE_EPO_GPON_KEY = 'portalEpoGponOngoing';
 const STORAGE_EPO_PROJETOF_KEY = 'portalEpoProjetoF';
 
@@ -6609,6 +6610,78 @@ function saveEpoTecnicosStore(store) {
   localStorage.setItem(STORAGE_EPO_TECNICOS_KEY, JSON.stringify(store || {}));
 }
 
+function getEpoUsuariosCadastradosStore() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_EPO_USUARIOS_CADASTRADOS_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveEpoUsuariosCadastradosStore(lista = []) {
+  localStorage.setItem(STORAGE_EPO_USUARIOS_CADASTRADOS_KEY, JSON.stringify(Array.isArray(lista) ? lista : []));
+}
+
+function registrarUsuarioEpoCadastrado({ nome = '', login = '', epos = [] } = {}) {
+  const loginNorm = String(login || '').trim().toLowerCase();
+  if (!loginNorm) return;
+
+  const lista = getEpoUsuariosCadastradosStore();
+  const idx = lista.findIndex(item => String(item?.login || '').trim().toLowerCase() === loginNorm);
+  const payload = {
+    nome: String(nome || '').trim(),
+    login: String(login || '').trim(),
+    epos: Array.isArray(epos) ? epos : [],
+    updatedAt: new Date().toISOString()
+  };
+
+  if (idx >= 0) {
+    lista[idx] = {
+      ...lista[idx],
+      ...payload,
+      createdAt: lista[idx]?.createdAt || new Date().toISOString()
+    };
+  } else {
+    lista.unshift({
+      ...payload,
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  saveEpoUsuariosCadastradosStore(lista);
+}
+
+function renderHistoricoUsuariosEpoCadastrados() {
+  const lista = getEpoUsuariosCadastradosStore();
+  if (!lista.length) {
+    return '<p style="margin:8px 0 0;font-size:11px;color:#64748b;">Nenhum nome cadastrado ainda.</p>';
+  }
+
+  const itens = lista.slice(0, 30).map((item) => {
+    const nome = escapeHtml(item?.nome || '-');
+    const login = escapeHtml(item?.login || '-');
+    const epos = Array.isArray(item?.epos) && item.epos.length
+      ? escapeHtml(item.epos.join(', '))
+      : '-';
+    const data = formatDateTimeBr(item?.createdAt || item?.updatedAt);
+    return `<li style="margin:0 0 6px;line-height:1.4;"><strong>${nome}</strong> (${login}) • EPO: ${epos} • ${escapeHtml(data)}</li>`;
+  }).join('');
+
+  return `
+    <div style="margin-top:12px;border-top:1px solid #dbeafe;padding-top:10px;">
+      <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:#1e3a8a;">Nomes cadastrados</p>
+      <ul style="margin:0;padding-left:18px;max-height:150px;overflow:auto;font-size:11px;color:#334155;">${itens}</ul>
+    </div>
+  `;
+}
+
+function atualizarHistoricoUsuariosEpoCadastradosNoForm() {
+  const wrap = document.getElementById('epo-user-cadastrados-lista');
+  if (!wrap) return;
+  wrap.innerHTML = renderHistoricoUsuariosEpoCadastrados();
+}
+
 function getEpoAceitesStore() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_EPO_ACEITES_KEY) || '{}');
@@ -6795,9 +6868,9 @@ function renderListaEquipesEpo() {
   const tecnicos = getTecnicosDaEpo(epoSelecionadaAtual);
   const isAdmin = getCurrentUser()?.role === 'admin';
   const cadastroUsuarioBtnHtml = isAdmin ? `
-    <button type="button" class="btn-secondary" onclick="toggleCadastroUsuarioEpo()" style="margin-left:8px;">👤 CADASTRAR USUÁRIO EPO</button>
+    <button type="button" class="btn-secondary" onclick="toggleCadastroUsuarioEpo()" style="margin-left:8px;">👤 CADASTRAR NOME</button>
     <div id="cadastro-usuario-epo-form" class="epo-form-shell" style="display:none;margin-top:12px;">
-      <p style="font-size:12px;font-weight:700;color:#1d4ed8;margin:0 0 10px;">Criar acesso restrito a EPO(s) específica(s)</p>
+      <p style="font-size:12px;font-weight:700;color:#1d4ed8;margin:0 0 10px;">Cadastrar nome com acesso restrito a EPO(s) específica(s)</p>
       <div class="epo-form-grid">
         <input id="epo-user-nome" type="text" placeholder="NOME COMPLETO" />
         <input id="epo-user-login" type="text" placeholder="LOGIN (sem espaços)" />
@@ -6817,6 +6890,7 @@ function renderListaEquipesEpo() {
         <button type="button" class="btn-secondary" onclick="toggleCadastroUsuarioEpo()">CANCELAR</button>
       </div>
       <div id="epo-user-resultado" style="margin-top:10px;font-size:12px;"></div>
+      <div id="epo-user-cadastrados-lista">${renderHistoricoUsuariosEpoCadastrados()}</div>
     </div>
   ` : '';
 
@@ -6956,6 +7030,13 @@ async function salvarCadastroUsuarioEpo() {
       </div>
     </div>
   `;
+
+  registrarUsuarioEpoCadastrado({
+    nome,
+    login,
+    epos: eposEscolhidas
+  });
+  atualizarHistoricoUsuariosEpoCadastradosNoForm();
 
   if (document.getElementById('epo-user-nome')) document.getElementById('epo-user-nome').value = '';
   if (document.getElementById('epo-user-login')) document.getElementById('epo-user-login').value = '';
