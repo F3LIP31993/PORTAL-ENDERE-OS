@@ -416,6 +416,29 @@ async function syncCurrentUserFromServer() {
       setCurrentUserLocally(data.user);
       return data.user;
     }
+    // Sessao expirada (ex: restart do servidor) - tenta re-login silencioso com credenciais salvas
+    const storedUsername = localStorage.getItem(STORAGE_CURRENT_USER_KEY);
+    const storedUser = storedUsername
+      ? getStoredUsers().find(u => u.username.toLowerCase() === storedUsername.toLowerCase())
+      : null;
+    if (storedUser && storedUser.password) {
+      try {
+        const loginRes = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: storedUser.username, password: storedUser.password }),
+          credentials: "include",
+        });
+        if (loginRes.ok) {
+          const loginData = await loginRes.json().catch(() => ({}));
+          if (loginData?.user) {
+            currentUser = loginData.user;
+            setCurrentUserLocally(loginData.user);
+            return loginData.user;
+          }
+        }
+      } catch { /* continuar em modo local */ }
+    }
   } catch (e) {
     // Falha ao conectar com o backend - continuar em modo local
   }
@@ -1388,21 +1411,32 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   applyColumnDensity(localStorage.getItem(STORAGE_COLUMN_DENSITY_KEY) || "compact");
 
-  // Sincronizar usuário com o backend (se estiver rodando)
-  await syncCurrentUserFromServer();
-
-  // Se não há usuário logado, redirecionar para cadastro/login
-  const current = getCurrentUser();
-  if (!current) {
-    window.location.href = "register.html";
-    return;
+  // Verificacao rapida a partir do localStorage (sem esperar o servidor)
+  const quickUser = getCurrentUser();
+  if (!quickUser) {
+    // Sem usuario local - tenta sincronizar com servidor antes de redirecionar
+    await syncCurrentUserFromServer();
+    if (!getCurrentUser()) {
+      window.location.href = "register.html";
+      return;
+    }
   }
 
-  // Atualizar dados de usuário e notificações
+  // Atualizar UI imediatamente com dados locais
   updateUserProfileInfo();
   updateNotificationBadge();
   applyAccessControl();
-  await carregarDadosCompartilhados();
+
+  // Carregar dados e sincronizar com servidor em paralelo
+  const [, ] = await Promise.all([
+    syncCurrentUserFromServer().then(serverUser => {
+      if (serverUser) {
+        updateUserProfileInfo();
+        applyAccessControl();
+      }
+    }).catch(() => {}),
+    carregarDadosCompartilhados(),
+  ]);
   await carregarEpoDatasetsCompartilhados();
   await processarFilaSyncCompartilhada();
   aplicarRestricaoEpoAccess();
