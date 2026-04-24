@@ -31,9 +31,7 @@ const STORAGE_DATASET_CACHE_KEY = "portalDatasetCache";
 const STORAGE_SHARED_SYNC_QUEUE_KEY = "portalSharedSyncRetryQueue";
 const SESSION_ONLY_DATASET_KEYS = [];
 const SHARED_REFRESH_INTERVAL_MS = 120000;
-const MAX_LOCAL_CACHE_ITEMS_BY_CATEGORY = {
-  'projeto-f': 2500,
-};
+const MAX_LOCAL_CACHE_ITEMS_BY_CATEGORY = {};
 const PRIORITY_DATASET_CACHE_KEYS = [
   'projeto-f',
   'liberados',
@@ -8909,6 +8907,15 @@ function carregarDadosCategoria(categoriaId) {
       carregarOngoingDatasetRemotamente('tabela-ongoing');
     }
 
+    if ((!dadosCSVOngoing || dadosCSVOngoing.length === 0)) {
+      const fallbackMdu = getPreferredDataset('mdu-ongoing');
+      if (Array.isArray(fallbackMdu) && fallbackMdu.length) {
+        dadosCSVOngoing = fallbackMdu;
+        dadosCSVOngoingOriginal = fallbackMdu;
+        applyDatasetToState('ongoing', fallbackMdu);
+      }
+    }
+
     if ((!dadosCSVOngoing || dadosCSVOngoing.length === 0) && dadosPorCategoria['ongoing']) {
       dadosCSVOngoing = dadosPorCategoria['ongoing'];
       dadosCSVOngoingOriginal = dadosCSVOngoing;
@@ -9054,10 +9061,30 @@ function carregarOngoingDatasetRemotamente(tabelaId = 'tabela-ongoing') {
             updatedBy: snapshot?.updated_by || snapshot?.updatedBy || '',
             locked: true,
           };
+        } else {
+          const mduSnapshot = payload?.datasets?.['mdu-ongoing'] || {};
+          const mduItems = mduSnapshot?.items;
+          if (Array.isArray(mduItems) && mduItems.length) {
+            rows = mduItems;
+            meta = {
+              source: mduSnapshot?.source || 'fallback-mdu-ongoing',
+              updatedAt: mduSnapshot?.updated_at || mduSnapshot?.updatedAt || new Date().toISOString(),
+              updatedBy: mduSnapshot?.updated_by || mduSnapshot?.updatedBy || '',
+              locked: true,
+            };
+          }
         }
       }
     } catch {
       // Sem bloqueio: mantem a tabela atual.
+    }
+
+    if (!rows.length) {
+      const localMdu = getLocalDatasetCache()?.['mdu-ongoing']?.items;
+      if (Array.isArray(localMdu) && localMdu.length) {
+        rows = localMdu;
+        meta = { source: 'fallback-local-mdu-ongoing', locked: true, updatedAt: new Date().toISOString() };
+      }
     }
 
     if (!rows.length) {
