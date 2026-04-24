@@ -674,6 +674,54 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
 
   const itemsToPersist = slimItemsForStorage(items);
 
+  const normalizeProjetoFRowsForStorage = (rows = []) => {
+    if (!Array.isArray(rows)) return [];
+
+    return rows
+      .map((row) => {
+        const payload = {
+          "COD-MDUGO": getField(row, "COD-MDUGO", "cod-mdugo", "codmdugo"),
+          "CIDADE": getField(row, "CIDADE", "cidade", "Cidade"),
+          "BLOCO": getField(row, "BLOCO", "bloco", "Bloco"),
+          "CODGED": getField(row, "CODGED", "codged", "cod_ged", "COD GED", "CÓD. GED"),
+          "ENDEREÇO": getField(row, "ENDEREÇO", "ENDERECO", "endereco", "endereco_entrada"),
+          "NUMERO": getField(row, "NUMERO", "numero"),
+          "BAIRRO": getField(row, "BAIRRO", "bairro"),
+          "Qtde Blocos": getField(row, "Qtde Blocos", "QTDE_BLOCOS", "QTD_BLOCOS", "qtd_blocos"),
+          "STATUS MDU": getField(row, "STATUS MDU", "STATUS_MDU", "status_mdu"),
+          "STATUS LIBERAÇÃO": getField(row, "STATUS LIBERAÇÃO", "STATUS_LIBERACAO", "status_liberacao"),
+          "ID_NODE": getField(row, "ID_NODE", "id_node"),
+          "Área Recorte": getField(row, "Área Recorte", "Area Recorte", "area_recorte"),
+          "Subiu projnet?": getField(row, "Subiu projnet?", "subiu_projnet"),
+          "Liberação concluida?": getField(row, "Liberação concluida?", "Liberacao Concluida?", "liberacao_concluida"),
+          "DT_CONSTRUÇÃO": getField(row, "DT_CONSTRUÇÃO", "DT_CONSTRUCAO", "dt_construcao"),
+          "PARCEIRA": getField(row, "PARCEIRA", "parceira"),
+          "CLIENTE": getField(row, "CLIENTE", "cliente"),
+          "CONTATO": getField(row, "CONTATO", "contato"),
+          "OBS": getField(row, "OBS", "obs", "observacao", "OBSERVACAO"),
+        };
+
+        const hasRelevantData = [
+          payload["COD-MDUGO"],
+          payload["CODGED"],
+          payload["ENDEREÇO"],
+          payload["CIDADE"],
+          payload["STATUS MDU"],
+          payload["STATUS LIBERAÇÃO"],
+        ].some((value) => String(value || '').trim() !== '');
+
+        return hasRelevantData ? payload : null;
+      })
+      .filter(Boolean);
+  };
+
+  const finalItemsToPersist = (categoria === 'projeto-f')
+    ? (() => {
+        const compactRows = normalizeProjetoFRowsForStorage(itemsToPersist);
+        return compactRows.length ? compactRows : itemsToPersist;
+      })()
+    : itemsToPersist;
+
   const user = getCurrentUser();
   const metaWithUser = {
     ...meta,
@@ -682,7 +730,7 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
   };
 
   // Evita sobrescrever snapshot local não-vazio com payload vazio em sync automático.
-  if (itemsToPersist.length === 0) {
+  if (finalItemsToPersist.length === 0) {
     const localSnapshot = getLocalDatasetCache()?.[categoria];
     const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
     if (localItems.length) {
@@ -691,7 +739,7 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
   }
 
   try {
-    cacheDatasetLocally(categoria, itemsToPersist, metaWithUser);
+    cacheDatasetLocally(categoria, finalItemsToPersist, metaWithUser);
   } catch (cacheError) {
     console.warn(`Falha ao salvar cache local da categoria ${categoria}. Tentando sincronizar no servidor mesmo assim.`, cacheError);
   }
@@ -703,13 +751,13 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
   }
 
   try {
-    await enviarDatasetCompartilhadoParaServidor(categoria, itemsToPersist);
+    await enviarDatasetCompartilhadoParaServidor(categoria, finalItemsToPersist);
     delete sharedSyncRetryQueue[categoria];
     saveSharedSyncRetryQueue();
   } catch (error) {
     sharedSyncRetryQueue[categoria] = {
       categoria,
-      items: itemsToPersist,
+      items: finalItemsToPersist,
       meta: metaWithUser,
       retries: Number(sharedSyncRetryQueue[categoria]?.retries || 0) + 1,
       lastError: error?.message || 'Falha desconhecida',
@@ -2357,12 +2405,10 @@ function importarCSV() {
 
     if (isProjetoF) {
       const dados = processarCSVProjetoF(text, delimiter);
-      dadosPorCategoria['projeto-f'] = dados;
+      applyDatasetToState('projeto-f', dados);
+      cacheDatasetLocally('projeto-f', dados, { source: 'manual', locked: true });
       renderTabelaProjetoF(`tabela-projeto-f`, dados);
-      // Permite que a tabela apareça primeiro e sincroniza em seguida para reduzir latencia percebida.
-      window.requestAnimationFrame(() => {
-        persistirDadosCompartilhados('projeto-f', dados, { source: 'manual', locked: true });
-      });
+      persistirDadosCompartilhados('projeto-f', dados, { source: 'manual', locked: true });
       invalidateVisaoGerenciaCache();
       agendarRenderVisaoGerencia();
       if (statusEl) {
