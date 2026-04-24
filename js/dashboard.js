@@ -17,6 +17,7 @@ let liberadosAbaAtiva = 'projeto-f';
 let liberadosSubcardSelecionado = false;
 const sharedSyncRetryQueue = {};
 let sharedSyncRetryInProgress = false;
+let ongoingDatasetLoadPromise = null;
 let projetoFDatasetLoadPromise = null;
 
 const STORAGE_USERS_KEY = "portalUsers";
@@ -4655,46 +4656,60 @@ function processarCSVOngoingCompartilhado(csv, delimiter = ";") {
     delimiter = ",";
   }
 
-  const cabecalho = cabecalhoRaw.split(delimiter).map(c => c.trim());
+  const cabecalho = _splitCsvLine(cabecalhoRaw, delimiter).map(c => c.trim());
   const dados = [];
 
   for (let i = 1; i < linhas.length; i++) {
     const linha = linhas[i];
     if (!linha || !linha.trim()) continue;
 
-    const colunas = linha.split(delimiter);
-    const item = {};
+    const colunas = _splitCsvLine(linha, delimiter);
+    if (!colunas.some((col) => String(col || '').trim() !== '')) continue;
+    const itemRaw = {};
 
     cabecalho.forEach((cab, j) => {
       const valor = (colunas[j] || "").trim();
-      item[cab] = valor;
+      itemRaw[cab] = valor;
       const normalized = normalizeKey(cab);
       if (normalized) {
-        item[normalized] = valor;
+        itemRaw[normalized] = valor;
       }
     });
 
-    const idDemanda = getField(item, "ID DEMANDA", "iddemanda", "id_demanda", "idDemanda");
-    const fila = getField(item, "FILA", "fila");
-    const tipo = getField(item, "TIPO", "tipo");
-    const endereco = getField(item, "ENDEREÇO", "ENDERECO", "endereco", "endereco_entrada");
-    const aging = getField(item, "AGING", "aging", "aging_total", "aging total");
-    const slaFase = getField(item, "SLA FASE", "SLA_FASE", "sla_fase", "sla fase");
-    const status = getField(item, "STATUS_GERAL", "status_geral", "status geral", "status");
-    const motivo = getField(item, "MOTIVO_GERAL", "motivo_geral", "motivo geral", "motivo");
-    const obs = getField(item, "OBS", "obs", "OBSERVACAO", "observacao");
+    const idDemanda = getField(itemRaw, "ID DEMANDA", "IDDEMANDA", "iddemanda", "id_demanda", "idDemanda");
+    const fila = getField(itemRaw, "FILA", "fila");
+    const tipo = getField(itemRaw, "TIPO", "tipo");
+    const endereco = getField(itemRaw, "ENDEREÇO", "ENDERECO", "endereco", "endereco_entrada");
+    const cidade = getField(itemRaw, "CIDADE", "cidade");
+    const bairro = getField(itemRaw, "BAIRRO", "bairro");
+    const epo = getField(itemRaw, "EPO", "epo", "cluster", "CLUSTER", "regional", "REGIONAL");
+    const codMdugo = getField(itemRaw, "COD-MDUGO", "cod-mdugo", "codmdugo", "codigo");
+    const aging = getField(itemRaw, "Aging arredondado", "AGING", "AGE", "aging", "age", "aging_total", "aging total");
+    const slaFase = getField(itemRaw, "SLA TUDO", "SLA FASE", "SLA_FASE", "sla_tudo", "sla_fase", "sla fase");
+    const status = getField(itemRaw, "STATUS_GERAL", "status_geral", "status geral", "status");
+    const motivo = getField(itemRaw, "MOTIVO_GERAL", "motivo_geral", "motivo geral", "motivo");
+    const obs = getField(itemRaw, "OBS", "obs", "OBSERVACAO", "observacao", "STATUS OBS", "status_obs");
 
-    item["IDDEMANDA"] = idDemanda || "";
-    item["FILA"] = fila || "";
-    item["TIPO"] = tipo || "";
-    item["ENDEREÇO"] = endereco || "";
-    item["AGING"] = aging || "";
-    item["SLA FASE"] = slaFase || "";
-    item["STATUS_GERAL"] = status || "";
-    item["MOTIVO_GERAL"] = motivo || "";
-    item["OBS"] = obs || "";
+    const item = {
+      iddemanda: idDemanda || "",
+      fila: fila || "",
+      tipo: tipo || "",
+      endereco_unico: endereco || "",
+      endereco: endereco || "",
+      cidade: cidade || "",
+      bairro: bairro || "",
+      epo: epo || "",
+      cod_mdugo: codMdugo || "",
+      aging: aging || "",
+      sla_tudo: slaFase || "",
+      status_geral: status || "",
+      motivo_geral: motivo || "",
+      obs: obs || "",
+    };
 
-    dados.push(item);
+    if (item.iddemanda || item.fila || item.endereco || item.status_geral || item.motivo_geral) {
+      dados.push(item);
+    }
   }
 
   return dados;
@@ -8763,6 +8778,10 @@ function carregarDadosCategoria(categoriaId) {
 
   // Caso especial: Ongoing usa um parser diferente e layout de tabela próprio
   if (categoriaId === 'ongoing') {
+    if ((!dadosCSVOngoing || dadosCSVOngoing.length === 0) && window.location.protocol.startsWith('http')) {
+      carregarOngoingDatasetRemotamente('tabela-ongoing');
+    }
+
     if ((!dadosCSVOngoing || dadosCSVOngoing.length === 0) && dadosPorCategoria['ongoing']) {
       dadosCSVOngoing = dadosPorCategoria['ongoing'];
       dadosCSVOngoingOriginal = dadosCSVOngoing;
@@ -8878,6 +8897,63 @@ function carregarDadosCategoria(categoriaId) {
 
   // Atualizar contador na página inicial
   atualizarContadores();
+}
+
+function carregarOngoingDatasetRemotamente(tabelaId = 'tabela-ongoing') {
+  if (ongoingDatasetLoadPromise) {
+    return ongoingDatasetLoadPromise;
+  }
+
+  ongoingDatasetLoadPromise = (async () => {
+    const preferred = getPreferredDataset('ongoing');
+    if (Array.isArray(preferred) && preferred.length) {
+      return preferred;
+    }
+
+    let rows = [];
+    let meta = { source: 'shared', locked: true };
+
+    try {
+      const sharedResp = await fetch('/api/shared_datasets', { credentials: 'include' });
+      if (sharedResp.ok) {
+        const payload = await sharedResp.json().catch(() => ({}));
+        const snapshot = payload?.datasets?.ongoing || {};
+        const sharedItems = snapshot?.items;
+        if (Array.isArray(sharedItems) && sharedItems.length) {
+          rows = sharedItems;
+          meta = {
+            source: snapshot?.source || 'shared',
+            updatedAt: snapshot?.updated_at || snapshot?.updatedAt || new Date().toISOString(),
+            updatedBy: snapshot?.updated_by || snapshot?.updatedBy || '',
+            locked: true,
+          };
+        }
+      }
+    } catch {
+      // Sem bloqueio: mantem a tabela atual.
+    }
+
+    if (!rows.length) {
+      return [];
+    }
+
+    applyDatasetToState('ongoing', rows);
+    dadosCSVOngoing = rows;
+    dadosCSVOngoingOriginal = rows;
+    cacheDatasetLocally('ongoing', rows, meta);
+
+    const tabela = document.getElementById(tabelaId);
+    if (tabela) {
+      renderTabelaOngoing(rows);
+    }
+
+    atualizarContadores();
+    return rows;
+  })().finally(() => {
+    ongoingDatasetLoadPromise = null;
+  });
+
+  return ongoingDatasetLoadPromise;
 }
 
 function carregarProjetoFDatasetRemotamente(tabelaId = 'tabela-projeto-f') {
