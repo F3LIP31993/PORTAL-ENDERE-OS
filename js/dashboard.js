@@ -1680,7 +1680,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (panel && !panel.classList.contains("hidden")) {
       renderNotificationList();
     }
-  }, 30000);
+  }, SHARED_REFRESH_INTERVAL_MS);
 
   // Atualizar badge quando outra aba/máquina mudar os usuários (localStorage)
   window.addEventListener("storage", (event) => {
@@ -3380,6 +3380,7 @@ function popularFiltroCidadeProjetoF() {
 
   const valorAtual = select.value || "";
   const dados = dadosPorCategoria['projeto-f'] || [];
+  const cacheToken = `projeto-f:${getDatasetVersionToken(dados)}:${dados.length}`;
   const sanitizeCidadeProjetoF = (value = '') => {
     let cidade = String(value || '')
       .replace(/\r?\n/g, ' ')
@@ -3405,25 +3406,31 @@ function popularFiltroCidadeProjetoF() {
     return cidade;
   };
 
-  const seen = new Set();
-  const cidadesUnicas = [];
+  let cidadesUnicas = [];
+  if (cacheToken === projetoFCityFilterCacheToken && projetoFCityFilterCacheOptions.length) {
+    cidadesUnicas = projetoFCityFilterCacheOptions.slice();
+  } else {
+    const seen = new Set();
 
-  for (let i = 0; i < dados.length; i += 1) {
-    const cidadeRaw = getField(dados[i], 'CIDADE', 'cidade', 'Cidade') || '';
-    const cidade = sanitizeCidadeProjetoF(cidadeRaw);
-    if (!cidade || cidade.length < 2) continue;
+    for (let i = 0; i < dados.length; i += 1) {
+      const cidadeRaw = getField(dados[i], 'CIDADE', 'cidade', 'Cidade') || '';
+      const cidade = sanitizeCidadeProjetoF(cidadeRaw);
+      if (!cidade || cidade.length < 2) continue;
 
-    const key = normalizeText(cidade).replace(/[^a-z0-9]/g, '');
-    if (!key || seen.has(key)) continue;
+      const key = normalizeText(cidade).replace(/[^a-z0-9]/g, '');
+      if (!key || seen.has(key)) continue;
 
-    seen.add(key);
-    cidadesUnicas.push(cidade);
+      seen.add(key);
+      cidadesUnicas.push(cidade);
 
-    // Evita dropdown gigantesco em bases anômalas e mantém resposta rápida.
-    if (cidadesUnicas.length >= 220) break;
+      // Evita dropdown gigantesco em bases anômalas e mantém resposta rápida.
+      if (cidadesUnicas.length >= 220) break;
+    }
+
+    cidadesUnicas.sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+    projetoFCityFilterCacheToken = cacheToken;
+    projetoFCityFilterCacheOptions = cidadesUnicas.slice();
   }
-
-  cidadesUnicas.sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
 
   select.innerHTML = '';
   const optionTodos = document.createElement('option');
