@@ -5849,12 +5849,61 @@ function extrairAgingOngoing(item = {}) {
     "aging",
     "aging_total",
     "aging total",
+    "AGE GERAL",
+    "age_geral",
     "AGE",
     "age"
   ) || "0";
 
   const match = String(agingRaw).match(/\d+/);
-  return match ? parseInt(match[0], 10) : 0;
+  const parsed = match ? parseInt(match[0], 10) : 0;
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  // Bloqueia valores absurdos vindos de coluna errada (ex.: 46127)
+  if (parsed > 999) return 0;
+  return parsed;
+}
+
+function normalizarLinhaOngoing(item = {}) {
+  const idDemanda = getField(
+    item,
+    "iddemanda", "IDDEMANDA", "ID DEMANDA", "ID_DEMANDA", "id",
+    "COD-MDUGO", "cod-mdugo", "codmdugo", "CODIGO", "CÓDIGO"
+  );
+  const fila = getField(item, "fila", "FILA", "STATUS_GERAL", "status_geral", "STATUS");
+  const tipo = getField(item, "tipo", "TIPO", "SOLICITANTE", "solicitante");
+  const enderecoBase = getField(item, "endereco_unico", "endereco", "ENDEREÇO", "ENDERECO", "endereco_entrada");
+  const numero = getField(item, "NUMERO", "numero", "NUM", "num");
+  const endereco = String(enderecoBase || '').trim();
+  const numeroTxt = String(numero || '').trim();
+  const enderecoCompleto = (endereco && numeroTxt && !endereco.includes(numeroTxt))
+    ? `${endereco}, ${numeroTxt}`
+    : (endereco || '-');
+
+  const epo = getField(item, "epo", "EPO", "regional", "REGIONAL", "cluster", "CLUSTER");
+  const agingNumero = extrairAgingOngoing(item);
+  const sla = getField(item, "SLA TUDO", "SLA FASE", "sla_tudo", "sla_fase", "sla");
+  const status = getField(item, "STATUS_GERAL", "status_geral", "STATUS", "status");
+  const motivo = getField(item, "MOTIVO_GERAL", "motivo_geral", "MOTIVO", "motivo");
+
+  return {
+    ...item,
+    iddemanda: idDemanda || "",
+    IDDEMANDA: idDemanda || "",
+    fila: fila || "",
+    FILA: fila || "",
+    tipo: tipo || "",
+    TIPO: tipo || "",
+    endereco_unico: enderecoCompleto || "",
+    endereco: enderecoCompleto || "",
+    epo: epo || "",
+    EPO: epo || "",
+    aging: String(agingNumero || ""),
+    AGING: String(agingNumero || ""),
+    "Aging arredondado": String(agingNumero || ""),
+    "SLA TUDO": sla || "",
+    STATUS_GERAL: status || "",
+    MOTIVO_GERAL: motivo || "",
+  };
 }
 
 function getAgingBadgeClass(agingNumero) {
@@ -5872,9 +5921,11 @@ function renderTabelaOngoing(dados) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center">Nenhum dado</td></tr>';
     return;
   }
+
+  const dadosNormalizados = (Array.isArray(dados) ? dados : []).map((item) => normalizarLinhaOngoing(item));
   
   // Ordenar por AGING (do maior para o menor)
-  const dadosOrdenados = [...dados].sort((a, b) => extrairAgingOngoing(b) - extrairAgingOngoing(a));
+  const dadosOrdenados = [...dadosNormalizados].sort((a, b) => extrairAgingOngoing(b) - extrairAgingOngoing(a));
   
   // Salvar dados ordenados para uso no modal de detalhes
   dadosTabelaExibida = dadosOrdenados;
@@ -8910,9 +8961,10 @@ function carregarDadosCategoria(categoriaId) {
     if ((!dadosCSVOngoing || dadosCSVOngoing.length === 0)) {
       const fallbackMdu = getPreferredDataset('mdu-ongoing');
       if (Array.isArray(fallbackMdu) && fallbackMdu.length) {
-        dadosCSVOngoing = fallbackMdu;
-        dadosCSVOngoingOriginal = fallbackMdu;
-        applyDatasetToState('ongoing', fallbackMdu);
+        const fallbackNormalizado = fallbackMdu.map((item) => normalizarLinhaOngoing(item));
+        dadosCSVOngoing = fallbackNormalizado;
+        dadosCSVOngoingOriginal = fallbackNormalizado;
+        applyDatasetToState('ongoing', fallbackNormalizado);
       }
     }
 
@@ -9091,14 +9143,16 @@ function carregarOngoingDatasetRemotamente(tabelaId = 'tabela-ongoing') {
       return [];
     }
 
-    applyDatasetToState('ongoing', rows);
-    dadosCSVOngoing = rows;
-    dadosCSVOngoingOriginal = rows;
-    cacheDatasetLocally('ongoing', rows, meta);
+    const rowsNormalizados = rows.map((item) => normalizarLinhaOngoing(item));
+
+    applyDatasetToState('ongoing', rowsNormalizados);
+    dadosCSVOngoing = rowsNormalizados;
+    dadosCSVOngoingOriginal = rowsNormalizados;
+    cacheDatasetLocally('ongoing', rowsNormalizados, meta);
 
     const tabela = document.getElementById(tabelaId);
     if (tabela) {
-      renderTabelaOngoing(rows);
+      renderTabelaOngoing(rowsNormalizados);
     }
 
     atualizarContadores();
