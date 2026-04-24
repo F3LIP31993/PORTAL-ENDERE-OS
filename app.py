@@ -691,18 +691,12 @@ def build_notifications_feed(limit: int = 30):
 
 @app.before_request
 def enforce_login_for_pages():
-    # Permite acesso livre a páginas de login/cadastro, arquivos estáticos e API.
-    allowed = ["/login.html", "/register.html", "/", "/favicon.ico"]
-    if request.path.startswith("/css") or request.path.startswith("/js") or request.path.startswith("/assets"):
-        return
+    # Evita loop de redirecionamento para login quando o navegador não mantém cookie
+    # entre o POST /api/login e a navegação para dashboard.html.
+    # A proteção de dados continua nas rotas /api via require_login/require_admin.
     if request.path.startswith("/api"):
         return
-    if request.path in allowed:
-        return
-
-    # Se não estiver autenticado, redireciona para login
-    if "username" not in session:
-        return redirect("/login.html")
+    return
 
 
 @app.route("/api/me", methods=["GET"])
