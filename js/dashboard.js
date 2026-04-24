@@ -25,6 +25,17 @@ const STORAGE_COLUMN_DENSITY_KEY = "portalColumnDensity";
 const STORAGE_DATASET_CACHE_KEY = "portalDatasetCache";
 const STORAGE_SHARED_SYNC_QUEUE_KEY = "portalSharedSyncRetryQueue";
 const SESSION_ONLY_DATASET_KEYS = [];
+const PRIORITY_DATASET_CACHE_KEYS = [
+  'projeto-f',
+  'liberados',
+  'sar-rede',
+  'epo-gpon-ongoing',
+  'epo-projeto-f',
+  'mdu-ongoing',
+  'empresarial',
+  'pendente-autorizacao',
+  'backlog'
+];
 
 const runtimeDatasetCache = {};
 const runtimeEpoStores = {
@@ -109,7 +120,37 @@ function getLocalDatasetCache() {
 }
 
 function saveLocalDatasetCache(cache) {
-  localStorage.setItem(STORAGE_DATASET_CACHE_KEY, JSON.stringify(stripSessionOnlyDatasets(cache || {})));
+  const sanitized = stripSessionOnlyDatasets(cache || {});
+
+  try {
+    localStorage.setItem(STORAGE_DATASET_CACHE_KEY, JSON.stringify(sanitized));
+    return;
+  } catch (error) {
+    // Em quota excedida, preserva os datasets mais críticos para o portal.
+    const reduced = {};
+    PRIORITY_DATASET_CACHE_KEYS.forEach((key) => {
+      if (sanitized[key]) {
+        reduced[key] = sanitized[key];
+      }
+    });
+
+    // Mantém metadados e reduz listas muito grandes para caber no armazenamento local.
+    Object.entries(reduced).forEach(([key, snapshot]) => {
+      const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
+      if (items.length > 4000) {
+        reduced[key] = {
+          ...snapshot,
+          items: items.slice(0, 4000)
+        };
+      }
+    });
+
+    try {
+      localStorage.setItem(STORAGE_DATASET_CACHE_KEY, JSON.stringify(reduced));
+    } catch {
+      console.warn('Não foi possível salvar cache local completo dos datasets. O portal continuará com sincronização via servidor.', error);
+    }
+  }
 }
 
 function cleanupSessionOnlyDatasetStorage() {
@@ -604,7 +645,11 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
     }
   }
 
-  cacheDatasetLocally(categoria, items, metaWithUser);
+  try {
+    cacheDatasetLocally(categoria, items, metaWithUser);
+  } catch (cacheError) {
+    console.warn(`Falha ao salvar cache local da categoria ${categoria}. Tentando sincronizar no servidor mesmo assim.`, cacheError);
+  }
 
   const isAdmin = user?.role === "admin";
 
