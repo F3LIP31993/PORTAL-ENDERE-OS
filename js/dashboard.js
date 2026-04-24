@@ -3379,30 +3379,10 @@ function popularFiltroCidadeProjetoF() {
   const valorAtual = select.value || "";
   const dados = dadosPorCategoria['projeto-f'] || [];
   const cacheToken = `projeto-f:${getDatasetVersionToken(dados)}:${dados.length}`;
-  const sanitizeCidadeProjetoF = (value = '') => {
-    let cidade = String(value || '')
-      .replace(/\r?\n/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .replace(/^cidade\s+/i, '')
-      .replace(/\s*-\s*[A-Z]{2}\b/i, '')
-      .trim()
-      .slice(0, 42);
-
-    if (!cidade || cidade.length < 2) return '';
-    if (/\d/.test(cidade)) return '';
-
-    const normalized = normalizeText(cidade);
-    const blockedTokens = [
-      'rua', 'avenida', 'numero', 'complement', 'bairro', 'cep',
-      'status', 'liberacao', 'liberacao', 'hps', 'bloco', 'somente',
-      'construcao', 'virtu', 'hotel'
-    ];
-    if (blockedTokens.some((token) => normalized.includes(token))) return '';
-
-    if (!/^[A-Za-zÀ-ÿ'\-\s]+$/.test(cidade)) return '';
-    return cidade;
-  };
+  const sanitizeCidadeProjetoF = (value = '') => String(value || '')
+    .replace(/\r?\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
   let cidadesUnicas = [];
   if (cacheToken === projetoFCityFilterCacheToken && projetoFCityFilterCacheOptions.length) {
@@ -3413,7 +3393,7 @@ function popularFiltroCidadeProjetoF() {
     for (let i = 0; i < dados.length; i += 1) {
       const cidadeRaw = getField(dados[i], 'CIDADE', 'cidade', 'Cidade') || '';
       const cidade = sanitizeCidadeProjetoF(cidadeRaw);
-      if (!cidade || cidade.length < 2) continue;
+      if (!cidade) continue;
 
       const key = normalizeText(cidade).replace(/[^a-z0-9]/g, '');
       if (!key || seen.has(key)) continue;
@@ -3421,8 +3401,8 @@ function popularFiltroCidadeProjetoF() {
       seen.add(key);
       cidadesUnicas.push(cidade);
 
-      // Mantém praticamente todas as cidades válidas sem cortes agressivos.
-      if (cidadesUnicas.length >= 5000) break;
+      // Segurança para evitar loop infinito em entradas anômalas.
+      if (cidadesUnicas.length >= 50000) break;
     }
 
     cidadesUnicas.sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
@@ -3482,12 +3462,10 @@ function filtrarProjetoFPorCidade() {
     const cidade = String(getField(item, 'CIDADE', 'cidade', 'Cidade') || '')
       .replace(/\r?\n/g, ' ')
       .replace(/\s+/g, ' ')
-      .replace(/^cidade\s+/i, '')
-      .replace(/\s*-\s*[A-Z]{2}\b/i, '')
       .toLowerCase()
       .trim();
-    if (!cidade || /\d/.test(cidade)) return false;
-    return cidade.includes(filtroCidade);
+    if (!cidade) return false;
+    return cidade === filtroCidade;
   });
 }
 
