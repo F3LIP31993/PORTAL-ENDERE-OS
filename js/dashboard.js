@@ -674,33 +674,30 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
 
   const itemsToPersist = slimItemsForStorage(items);
 
-  const normalizeProjetoFRowsForStorage = (rows = []) => {
-    if (!Array.isArray(rows)) return [];
+  const normalizeProjetoFRowsForStorage = async (rows = []) => {
+    if (!Array.isArray(rows) || !rows.length) return [];
 
-    return rows
-      .map((row) => {
-        const payload = {
-          "COD-MDUGO": getField(row, "COD-MDUGO", "cod-mdugo", "codmdugo"),
-          "CIDADE": getField(row, "CIDADE", "cidade", "Cidade"),
-          "BLOCO": getField(row, "BLOCO", "bloco", "Bloco"),
-          "CODGED": getField(row, "CODGED", "codged", "cod_ged", "COD GED", "CÓD. GED"),
-          "ENDEREÇO": getField(row, "ENDEREÇO", "ENDERECO", "endereco", "endereco_entrada"),
-          "NUMERO": getField(row, "NUMERO", "numero"),
-          "BAIRRO": getField(row, "BAIRRO", "bairro"),
-          "Qtde Blocos": getField(row, "Qtde Blocos", "QTDE_BLOCOS", "QTD_BLOCOS", "qtd_blocos"),
-          "STATUS MDU": getField(row, "STATUS MDU", "STATUS_MDU", "status_mdu"),
-          "STATUS LIBERAÇÃO": getField(row, "STATUS LIBERAÇÃO", "STATUS_LIBERACAO", "status_liberacao"),
-          "ID_NODE": getField(row, "ID_NODE", "id_node"),
-          "Área Recorte": getField(row, "Área Recorte", "Area Recorte", "area_recorte"),
-          "Subiu projnet?": getField(row, "Subiu projnet?", "subiu_projnet"),
-          "Liberação concluida?": getField(row, "Liberação concluida?", "Liberacao Concluida?", "liberacao_concluida"),
-          "DT_CONSTRUÇÃO": getField(row, "DT_CONSTRUÇÃO", "DT_CONSTRUCAO", "dt_construcao"),
-          "PARCEIRA": getField(row, "PARCEIRA", "parceira"),
-          "CLIENTE": getField(row, "CLIENTE", "cliente"),
-          "CONTATO": getField(row, "CONTATO", "contato"),
-          "OBS": getField(row, "OBS", "obs", "observacao", "OBSERVACAO"),
-        };
+    const compact = [];
+    const chunkSize = 700;
 
+    const buildPayload = (row) => ({
+      "COD-MDUGO": getField(row, "COD-MDUGO", "cod-mdugo", "codmdugo"),
+      "CIDADE": getField(row, "CIDADE", "cidade", "Cidade"),
+      "BLOCO": getField(row, "BLOCO", "bloco", "Bloco"),
+      "CODGED": getField(row, "CODGED", "codged", "cod_ged", "COD GED", "CÓD. GED"),
+      "ENDEREÇO": getField(row, "ENDEREÇO", "ENDERECO", "endereco", "endereco_entrada"),
+      "Qtde Blocos": getField(row, "Qtde Blocos", "QTDE_BLOCOS", "QTD_BLOCOS", "qtd_blocos"),
+      "STATUS MDU": getField(row, "STATUS MDU", "STATUS_MDU", "status_mdu"),
+      "STATUS LIBERAÇÃO": getField(row, "STATUS LIBERAÇÃO", "STATUS_LIBERACAO", "status_liberacao"),
+      "DT_CONSTRUÇÃO": getField(row, "DT_CONSTRUÇÃO", "DT_CONSTRUCAO", "dt_construcao"),
+      "PARCEIRA": getField(row, "PARCEIRA", "parceira"),
+    });
+
+    let start = 0;
+    while (start < rows.length) {
+      const end = Math.min(start + chunkSize, rows.length);
+      for (let i = start; i < end; i += 1) {
+        const payload = buildPayload(rows[i]);
         const hasRelevantData = [
           payload["COD-MDUGO"],
           payload["CODGED"],
@@ -709,15 +706,19 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
           payload["STATUS MDU"],
           payload["STATUS LIBERAÇÃO"],
         ].some((value) => String(value || '').trim() !== '');
+        if (hasRelevantData) compact.push(payload);
+      }
 
-        return hasRelevantData ? payload : null;
-      })
-      .filter(Boolean);
+      start = end;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    return compact;
   };
 
   const finalItemsToPersist = (categoria === 'projeto-f')
-    ? (() => {
-        const compactRows = normalizeProjetoFRowsForStorage(itemsToPersist);
+    ? await (async () => {
+        const compactRows = await normalizeProjetoFRowsForStorage(itemsToPersist);
         return compactRows.length ? compactRows : itemsToPersist;
       })()
     : itemsToPersist;
@@ -2408,7 +2409,12 @@ function importarCSV() {
       applyDatasetToState('projeto-f', dados);
       cacheDatasetLocally('projeto-f', dados, { source: 'manual', locked: true });
       renderTabelaProjetoF(`tabela-projeto-f`, dados);
-      persistirDadosCompartilhados('projeto-f', dados, { source: 'manual', locked: true });
+      // Evita travamento perceptível da UI logo após importação grande.
+      window.requestAnimationFrame(() => {
+        window.setTimeout(() => {
+          persistirDadosCompartilhados('projeto-f', dados, { source: 'manual', locked: true });
+        }, 0);
+      });
       invalidateVisaoGerenciaCache();
       agendarRenderVisaoGerencia();
       if (statusEl) {
@@ -3331,18 +3337,37 @@ function popularFiltroCidadeProjetoF() {
 
   const valorAtual = select.value || "";
   const dados = dadosPorCategoria['projeto-f'] || [];
-  const sanitizeCidade = (value = '') => String(value || '')
-    .replace(/\r?\n/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 42);
+  const sanitizeCidadeProjetoF = (value = '') => {
+    let cidade = String(value || '')
+      .replace(/\r?\n/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^cidade\s+/i, '')
+      .replace(/\s*-\s*[A-Z]{2}\b/i, '')
+      .trim()
+      .slice(0, 42);
+
+    if (!cidade || cidade.length < 2) return '';
+    if (/\d/.test(cidade)) return '';
+
+    const normalized = normalizeText(cidade);
+    const blockedTokens = [
+      'rua', 'avenida', 'numero', 'complement', 'bairro', 'cep',
+      'status', 'liberacao', 'liberacao', 'hps', 'bloco', 'somente',
+      'construcao', 'virtu', 'hotel'
+    ];
+    if (blockedTokens.some((token) => normalized.includes(token))) return '';
+
+    if (!/^[A-Za-zÀ-ÿ'\-\s]+$/.test(cidade)) return '';
+    return cidade;
+  };
 
   const seen = new Set();
   const cidadesUnicas = [];
 
   for (let i = 0; i < dados.length; i += 1) {
     const cidadeRaw = getField(dados[i], 'CIDADE', 'cidade', 'Cidade') || '';
-    const cidade = sanitizeCidade(cidadeRaw);
+    const cidade = sanitizeCidadeProjetoF(cidadeRaw);
     if (!cidade || cidade.length < 2) continue;
 
     const key = normalizeText(cidade).replace(/[^a-z0-9]/g, '');
@@ -3409,8 +3434,11 @@ function filtrarProjetoFPorCidade() {
     const cidade = String(getField(item, 'CIDADE', 'cidade', 'Cidade') || '')
       .replace(/\r?\n/g, ' ')
       .replace(/\s+/g, ' ')
+      .replace(/^cidade\s+/i, '')
+      .replace(/\s*-\s*[A-Z]{2}\b/i, '')
       .toLowerCase()
       .trim();
+    if (!cidade || /\d/.test(cidade)) return false;
     return cidade.includes(filtroCidade);
   });
 }
