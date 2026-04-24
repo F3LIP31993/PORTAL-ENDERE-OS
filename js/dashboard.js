@@ -6021,7 +6021,7 @@ function getEpoStore(actionKey = 'gpon-ongoing') {
   const snapshot = getLocalDatasetCache()?.[cfg.sharedKey] || {};
   const rows = Array.isArray(snapshot?.items) ? snapshot.items : [];
   if (rows.length) {
-    const restored = buildEpoNovosStoreFromRows(rows);
+    const restored = buildEpoNovosStoreFromRows(rows, actionKey);
     runtimeEpoStores[actionKey] = restored;
     return restored;
   }
@@ -6058,10 +6058,10 @@ function flattenEpoNovosStore(store = {}) {
   return linhas;
 }
 
-function buildEpoNovosStoreFromRows(rows = []) {
+function buildEpoNovosStoreFromRows(rows = [], actionKey = 'gpon-ongoing') {
   const byEpo = {};
   (Array.isArray(rows) ? rows : []).forEach(item => {
-    const key = String(item?.__epoBucket || _resolverEpoDaLinha(item, 'gpon-ongoing') || '').trim().toUpperCase();
+    const key = String(item?.__epoBucket || _resolverEpoDaLinha(item, actionKey) || '').trim().toUpperCase();
     if (!key) return;
     if (!byEpo[key]) byEpo[key] = [];
     byEpo[key].push(item);
@@ -6077,7 +6077,7 @@ function derivarStoreEpoProjetoFDoDatasetBase() {
   const baseProjetoF = getPreferredDataset('projeto-f');
   if (!Array.isArray(baseProjetoF) || !baseProjetoF.length) return null;
 
-  const store = buildEpoNovosStoreFromRows(baseProjetoF.map((item) => ({ ...item })));
+  const store = buildEpoNovosStoreFromRows(baseProjetoF.map((item) => ({ ...item })), 'projeto-f');
   return Object.keys(store).length ? store : null;
 }
 
@@ -6186,7 +6186,7 @@ async function carregarEpoDatasetsCompartilhados() {
 
       if (!Array.isArray(rows) || !rows.length) {
         if (localSnapshotRows.length) {
-          const localStore = buildEpoNovosStoreFromRows(localSnapshotRows);
+          const localStore = buildEpoNovosStoreFromRows(localSnapshotRows, actionKey);
           saveEpoStore(actionKey, localStore);
           updateEpoImportStatus(actionKey, 'carregado do cache local');
           return;
@@ -6215,7 +6215,7 @@ async function carregarEpoDatasetsCompartilhados() {
         locked: true,
       });
 
-      const store = buildEpoNovosStoreFromRows(rows);
+      const store = buildEpoNovosStoreFromRows(rows, actionKey);
       saveEpoStore(actionKey, store);
       updateEpoImportStatus(actionKey);
     });
