@@ -63,10 +63,12 @@ if not DATABASE_URL:
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_MB", "8")) * 1024 * 1024
 
 # Modo read-only (apenas visualização, sem edições)
 READ_ONLY_MODE = os.environ.get("READ_ONLY_MODE", "false").lower() == "true"
 READ_ONLY_SHARED_TOKEN = os.environ.get("READ_ONLY_SHARED_TOKEN", None)
+ENABLE_LEGACY_PROJETO_F_LOADER = os.environ.get("ENABLE_LEGACY_PROJETO_F_LOADER", "false").lower() == "true"
 
 # Email / SMTP configuration (optionally set via environment variables)
 SMTP_HOST = os.environ.get("SMTP_HOST")
@@ -1004,6 +1006,17 @@ def api_get_shared_datasets():
     return jsonify({"datasets": datasets})
 
 
+def get_shared_dataset_items(category: str):
+    row = SharedDataset.query.filter_by(category=category).first()
+    if not row:
+        return []
+    try:
+        parsed = json.loads(row.data_json or "[]")
+        return parsed if isinstance(parsed, list) else []
+    except Exception:
+        return []
+
+
 @app.route("/api/shared_datasets/<categoria>", methods=["POST"])
 @require_admin
 def api_save_shared_dataset(categoria):
@@ -1028,8 +1041,16 @@ def api_save_shared_dataset(categoria):
 
 @app.route("/api/projeto_f_dataset", methods=["GET"])
 def api_projeto_f_dataset():
-    """Retorna dados do Projeto F para qualquer usuario autenticado."""
+    """Retorna dados do Projeto F priorizando snapshot compartilhado leve."""
     try:
+        shared_items = get_shared_dataset_items("projeto-f")
+        if shared_items:
+            return jsonify({"items": shared_items, "source": "shared"})
+
+        if not ENABLE_LEGACY_PROJETO_F_LOADER:
+            # Evita carregar pandas/openpyxl em instancias pequenas (Render free 512MB).
+            return jsonify({"items": [], "source": "disabled"})
+
         df = carregar_projeto_f()
         if df is None or df.empty:
             return jsonify({"items": []})
@@ -1059,6 +1080,11 @@ URL_PROJETO_F = "https://corpclarobr-my.sharepoint.com/:x:/g/personal/wellington
 LOCAL_PROJETO_F = os.path.join(BASE_DIR, "CONSTRU%C3%87%C3%83O%20MDU%20PROJETO_F.xlsx")
 
 def carregar_projeto_f():
+    if not ENABLE_LEGACY_PROJETO_F_LOADER:
+        # Modo seguro por padrão para evitar OOM em ambientes de baixa memória.
+        import pandas as pd
+        return pd.DataFrame(columns=["CIDADE", "CODGED", "ENDEREÇO", "STATUS MDU", "LIBERAÇÃO CONCLUIDA?", "PARCEIRA", "DT_CONSTRUÇÃO", "OBS", "DDD"])
+
     try:
         import pandas as pd
         import requests
