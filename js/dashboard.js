@@ -17,6 +17,7 @@ let liberadosAbaAtiva = 'projeto-f';
 let liberadosSubcardSelecionado = false;
 const sharedSyncRetryQueue = {};
 let sharedSyncRetryInProgress = false;
+let projetoFDatasetLoadPromise = null;
 
 const STORAGE_USERS_KEY = "portalUsers";
 const STORAGE_CURRENT_USER_KEY = "portalCurrentUser";
@@ -5443,7 +5444,7 @@ function processarCSVProjetoF(csv, delimiter = ";") {
     delimiter = ",";
   }
 
-  const cabecalho = cabecalhoRaw.split(delimiter).map(c => c.trim());
+  const cabecalho = _splitCsvLine(cabecalhoRaw, delimiter).map(c => c.replace(/^\uFEFF/, '').trim());
   const headerIndex = {};
   cabecalho.forEach((c, idx) => {
     const normalized = normalizeKey(c);
@@ -5457,8 +5458,8 @@ function processarCSVProjetoF(csv, delimiter = ";") {
     const linha = linhas[i];
     if (!linha || !linha.trim()) continue;
 
-    const colunas = linha.split(delimiter);
-    if (colunas.length < cabecalho.length) continue;
+    const colunas = _splitCsvLine(linha, delimiter);
+    if (!colunas.some(col => String(col || '').trim() !== '')) continue;
 
     const item = {};
     cabecalho.forEach((cab, j) => {
@@ -5964,11 +5965,23 @@ function getEpoStore(actionKey = 'gpon-ongoing') {
   const cfg = getEpoDatasetConfig(actionKey);
   try {
     const parsed = JSON.parse(localStorage.getItem(cfg.storageKey) || '{}');
-    runtimeEpoStores[actionKey] = parsed;
-    return parsed;
+    if (parsed && typeof parsed === 'object' && Object.keys(parsed).length) {
+      runtimeEpoStores[actionKey] = parsed;
+      return parsed;
+    }
   } catch {
-    return {};
+    // Continua com fallback abaixo.
   }
+
+  const snapshot = getLocalDatasetCache()?.[cfg.sharedKey] || {};
+  const rows = Array.isArray(snapshot?.items) ? snapshot.items : [];
+  if (rows.length) {
+    const restored = buildEpoNovosStoreFromRows(rows);
+    runtimeEpoStores[actionKey] = restored;
+    return restored;
+  }
+
+  return {};
 }
 
 function saveEpoStore(actionKey = 'gpon-ongoing', store = {}) {
@@ -5976,9 +5989,9 @@ function saveEpoStore(actionKey = 'gpon-ongoing', store = {}) {
 
   const cfg = getEpoDatasetConfig(actionKey);
   try {
-    localStorage.removeItem(cfg.storageKey);
+    localStorage.setItem(cfg.storageKey, JSON.stringify(store || {}));
   } catch {
-    // Ignora: EPO agora prioriza memória de sessão para evitar quota exceeded.
+    // Se houver limite de quota, mantém em memória e segue via snapshot compartilhado.
   }
 }
 
@@ -8713,18 +8726,7 @@ function carregarDadosCategoria(categoriaId) {
       }
     } else if (categoriaId === 'projeto-f') {
       if ((!dados || dados.length === 0) && window.location.protocol.startsWith('http')) {
-        fetch('/api/shared_datasets', { credentials: 'include' })
-          .then(resp => resp.ok ? resp.json() : null)
-          .then(sharedPayload => {
-            const itensCompartilhados = sharedPayload?.datasets?.['projeto-f']?.items;
-            if (Array.isArray(itensCompartilhados) && itensCompartilhados.length) {
-              applyDatasetToState('projeto-f', itensCompartilhados);
-              cacheDatasetLocally('projeto-f', itensCompartilhados, { source: 'shared', locked: true });
-              renderTabelaProjetoF(tabelaId, itensCompartilhados);
-              atualizarContadores();
-            }
-          })
-          .catch(() => {});
+        carregarProjetoFDatasetRemotamente(tabelaId);
       }
 
       if (Array.isArray(dados) && dados.length) {
@@ -8744,6 +8746,91 @@ function carregarDadosCategoria(categoriaId) {
 
   // Atualizar contador na página inicial
   atualizarContadores();
+}
+
+function carregarProjetoFDatasetRemotamente(tabelaId = 'tabela-projeto-f') {
+  if (projetoFDatasetLoadPromise) {
+    return projetoFDatasetLoadPromise;
+  }
+
+  projetoFDatasetLoadPromise = (async () => {
+    const preferred = getPreferredDataset('projeto-f');
+    if (Array.isArray(preferred) && preferred.length) {
+      return preferred;
+    }
+
+    let rows = [];
+    let meta = { source: 'shared', locked: true };
+
+    try {
+      const sharedResp = await fetch('/api/shared_datasets', { credentials: 'include' });
+      if (sharedResp.ok) {
+        const sharedPayload = await sharedResp.json().catch(() => ({}));
+        const snapshot = sharedPayload?.datasets?.['projeto-f'] || {};
+        const sharedItems = snapshot?.items;
+        if (Array.isArray(sharedItems) && sharedItems.length) {
+          rows = sharedItems;
+          meta = {
+            source: snapshot?.source || 'shared',
+            updatedAt: snapshot?.updated_at || snapshot?.updatedAt || new Date().toISOString(),
+            updatedBy: snapshot?.updated_by || snapshot?.updatedBy || '',
+            locked: true,
+          };
+        }
+      }
+    } catch {
+      // Segue para fallback do endpoint especifico.
+    }
+
+    if (!rows.length) {
+      try {
+        const projetoResp = await fetch('/api/projeto_f_dataset', { credentials: 'include' });
+        if (projetoResp.ok) {
+          const projetoPayload = await projetoResp.json().catch(() => ({}));
+          const projetoItems = projetoPayload?.items;
+          if (Array.isArray(projetoItems) && projetoItems.length) {
+            rows = projetoItems;
+            meta = {
+              source: projetoPayload?.source || 'api-projeto-f',
+              updatedAt: new Date().toISOString(),
+              updatedBy: getCurrentUser()?.username || '',
+              locked: true,
+            };
+          }
+        }
+      } catch {
+        // Sem bloqueio: mantem tabela atual.
+      }
+    }
+
+    if (!rows.length) {
+      return [];
+    }
+
+    applyDatasetToState('projeto-f', rows);
+    cacheDatasetLocally('projeto-f', rows, meta);
+
+    if (meta.source !== 'shared' && getCurrentUser()?.role === 'admin') {
+      persistirDadosCompartilhados('projeto-f', rows, {
+        source: meta.source,
+        locked: true,
+      });
+    }
+
+    const tabela = document.getElementById(tabelaId);
+    if (tabela) {
+      renderTabelaProjetoF(tabelaId, rows);
+    }
+
+    garantirEpoProjetoFDerivado({ persistShared: getCurrentUser()?.role === 'admin' });
+    atualizarCountPillsEpo();
+    atualizarContadores();
+    return rows;
+  })().finally(() => {
+    projetoFDatasetLoadPromise = null;
+  });
+
+  return projetoFDatasetLoadPromise;
 }
 
 // Filtrar dados por status
