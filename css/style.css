@@ -3925,6 +3925,30 @@ td:first-child {
   overflow-x: auto;
 }
 
+/* Evita cabeçalhos/colunas estourados em PROJETO F e SAR REDE */
+#projeto-f .card,
+#sar-rede .card {
+  overflow-x: auto;
+}
+
+#projeto-f .card table,
+#sar-rede .card table {
+  min-width: 1280px;
+}
+
+#projeto-f table th,
+#sar-rede table th {
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+#projeto-f table td,
+#sar-rede table td {
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
 .table-address-cell {
   display: block;
   width: 100%;
