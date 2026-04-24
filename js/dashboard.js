@@ -6661,14 +6661,54 @@ function atualizarCountPillsEpo() {
 function getEpoAccessDoUsuario() {
   const user = getCurrentUser();
   const raw = user?.epo_access;
-  if (!raw) return null; // null = sem restrição (admin ou viewer sem filtro)
-  if (Array.isArray(raw)) return raw.map(e => String(e).trim().toUpperCase()).filter(Boolean);
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(e => String(e).trim().toUpperCase()).filter(Boolean) : null;
-  } catch {
-    return null;
+  if (Array.isArray(raw)) {
+    const parsedArray = raw.map(e => String(e).trim().toUpperCase()).filter(Boolean);
+    if (parsedArray.length) return parsedArray;
   }
+
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const parsedList = parsed.map(e => String(e).trim().toUpperCase()).filter(Boolean);
+        if (parsedList.length) return parsedList;
+      }
+    } catch {
+      const normalized = normalizarNomeEpoParaPill(raw);
+      if (normalized) return [normalized];
+    }
+  }
+
+  // Fallback 1: cadastro local de usuários EPO (quando sessão/API oscila)
+  const loginNorm = String(user?.username || '').trim().toLowerCase();
+  const localCadastro = getEpoUsuariosCadastradosStore()
+    .find(item => String(item?.login || '').trim().toLowerCase() === loginNorm);
+  if (localCadastro && Array.isArray(localCadastro.epos) && localCadastro.epos.length) {
+    return localCadastro.epos.map(e => String(e).trim().toUpperCase()).filter(Boolean);
+  }
+
+  // Fallback 2: inferir pelo próprio nome/login do usuário (ex.: usuário ANTEC)
+  const candidatos = [user?.username, user?.name, user?.email]
+    .map(v => String(v || '').trim())
+    .filter(Boolean);
+
+  const inferidas = EPO_PILLS.filter((epo) => {
+    const epoNorm = normalizeText(epo).replace(/[^a-z0-9]/g, '');
+    return candidatos.some((candidate) => {
+      const candNorm = normalizeText(candidate).replace(/[^a-z0-9]/g, '');
+      return candNorm.includes(epoNorm) || epoNorm.includes(candNorm);
+    });
+  });
+
+  if (inferidas.length) {
+    return inferidas;
+  }
+
+  if (user?.role === 'viewer') {
+    return [];
+  }
+
+  return null; // null = sem restrição (admin)
 }
 
 function aplicarRestricaoEpoAccess() {
