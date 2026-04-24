@@ -102,6 +102,12 @@ function upsertStoredUser(user, password = "") {
     name: user.name || users[idx]?.name || user.username,
     email: user.email || users[idx]?.email || "",
     role: user.role || users[idx]?.role || "viewer",
+    epo_access: Array.isArray(user.epo_access)
+      ? user.epo_access
+      : (users[idx]?.epo_access || null),
+    must_change_password: typeof user.must_change_password === "boolean"
+      ? user.must_change_password
+      : Boolean(users[idx]?.must_change_password),
     createdAt: users[idx]?.createdAt || now,
     approvedAt: user.approvedAt || users[idx]?.approvedAt || now,
   };

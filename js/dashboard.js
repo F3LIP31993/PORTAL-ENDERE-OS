@@ -394,6 +394,8 @@ function setCurrentUserLocally(user) {
       name: user.name || user.username,
       email: user.email || "",
       role: user.role || "viewer",
+      epo_access: Array.isArray(user.epo_access) ? user.epo_access : null,
+      must_change_password: Boolean(user.must_change_password),
       createdAt: dateNow,
       approvedAt: dateNow,
     });
@@ -401,6 +403,12 @@ function setCurrentUserLocally(user) {
     users[idx].name = user.name || users[idx].name;
     users[idx].email = user.email || users[idx].email;
     users[idx].role = user.role || users[idx].role;
+    if (Array.isArray(user.epo_access)) {
+      users[idx].epo_access = user.epo_access;
+    }
+    if (typeof user.must_change_password === 'boolean') {
+      users[idx].must_change_password = user.must_change_password;
+    }
   }
 
   saveStoredUsers(users);
@@ -6667,11 +6675,21 @@ function aplicarRestricaoEpoAccess() {
   const permitidas = getEpoAccessDoUsuario();
   if (!permitidas) return; // sem restrição
 
+  let primeiraPermitida = '';
   document.querySelectorAll('#epo .epo-pill[data-epo]').forEach(btn => {
     const epoName = String(btn.dataset.epo || '').trim().toUpperCase();
     const visivel = permitidas.includes(epoName);
     btn.style.display = visivel ? '' : 'none';
+    if (visivel && !primeiraPermitida) {
+      primeiraPermitida = epoName;
+    }
   });
+
+  if (permitidas.length && (!epoSelecionadaAtual || !permitidas.includes(epoSelecionadaAtual))) {
+    if (primeiraPermitida) {
+      selecionarEpo(primeiraPermitida);
+    }
+  }
 }
 
 function getEpoTecnicosStore() {
