@@ -5706,7 +5706,7 @@ function filtrarPorFila(fila) {
   let dadosFiltrados = dadosCSVOngoingOriginal;
   if (fila !== "todos") {
     dadosFiltrados = dadosCSVOngoingOriginal.filter(item => {
-      const filaItem = (item["fila"] || "").toLowerCase().trim();
+      const filaItem = String(getField(item, "fila", "FILA") || "").toLowerCase().trim();
       return filaItem.includes(fila.toLowerCase());
     });
   }
@@ -5760,12 +5760,15 @@ function renderTabelaOngoing(dados) {
   tbody.innerHTML = dadosOrdenados.map((item, idx) => {
     const agingNumero = extrairAgingOngoing(item);
     const badgeClass = getAgingBadgeClass(agingNumero);
+    const idDemanda = getField(item, "iddemanda", "IDDEMANDA", "ID_DEMANDA", "id");
+    const fila = getField(item, "fila", "FILA");
+    const tipo = getField(item, "tipo", "TIPO");
 
     return `
       <tr>
-        <td>${item["iddemanda"] || "-"}</td>
-        <td>${item["fila"] || "-"}</td>
-        <td>${item["tipo"] || "-"}</td>
+        <td>${idDemanda || "-"}</td>
+        <td>${fila || "-"}</td>
+        <td>${tipo || "-"}</td>
         <td>${getField(item, "endereco_unico", "endereco", "endereço", "endereco_entrada") || "-"}</td>
         <td>${getField(item, "epo", "EPO", "regional", "REGIONAL", "cluster", "CLUSTER") || "-"}</td>
         <td><span class="${badgeClass}">${agingNumero}</span></td>
@@ -5820,7 +5823,7 @@ function buscarPorIDOngoing() {
   }
 
   const resultado = dadosCSVOngoingOriginal.filter(item => {
-    return (item["iddemanda"] || "").toString().includes(id);
+    return String(getField(item, "iddemanda", "IDDEMANDA", "ID_DEMANDA", "id") || "").includes(id);
   });
 
   if (resultado.length === 0) {
