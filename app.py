@@ -50,6 +50,7 @@ app.secret_key = os.environ.get("PORTAL_SECRET_KEY", "troque-essa-chave")
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true"
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 CORS(app, supports_credentials=True, origins=CORS_ALLOWED_ORIGINS)
 
 # Use DATABASE_URL para PostgreSQL (ou outro DB compatível com SQLAlchemy).
@@ -69,6 +70,23 @@ app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_MB", "8")) * 1
 READ_ONLY_MODE = os.environ.get("READ_ONLY_MODE", "false").lower() == "true"
 READ_ONLY_SHARED_TOKEN = os.environ.get("READ_ONLY_SHARED_TOKEN", None)
 ENABLE_LEGACY_PROJETO_F_LOADER = os.environ.get("ENABLE_LEGACY_PROJETO_F_LOADER", "false").lower() == "true"
+
+
+@app.after_request
+def disable_browser_cache(response):
+    path = (request.path or "").lower()
+    should_disable_cache = (
+        path == "/"
+        or path.endswith((".html", ".js", ".css"))
+        or path.startswith("/api/")
+    )
+
+    if should_disable_cache:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+
+    return response
 
 # Email / SMTP configuration (optionally set via environment variables)
 SMTP_HOST = os.environ.get("SMTP_HOST")
