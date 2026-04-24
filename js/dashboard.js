@@ -3240,10 +3240,31 @@ function popularFiltroCidadeProjetoF() {
 
   const valorAtual = select.value || "";
   const dados = dadosPorCategoria['projeto-f'] || [];
-  const cidadesUnicas = [...new Set(dados
-    .map(item => (getField(item, 'CIDADE') || '').trim())
-    .filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+  const sanitizeCidade = (value = '') => String(value || '')
+    .replace(/\r?\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 42);
+
+  const seen = new Set();
+  const cidadesUnicas = [];
+
+  for (let i = 0; i < dados.length; i += 1) {
+    const cidadeRaw = getField(dados[i], 'CIDADE', 'cidade', 'Cidade') || '';
+    const cidade = sanitizeCidade(cidadeRaw);
+    if (!cidade || cidade.length < 2) continue;
+
+    const key = normalizeText(cidade).replace(/[^a-z0-9]/g, '');
+    if (!key || seen.has(key)) continue;
+
+    seen.add(key);
+    cidadesUnicas.push(cidade);
+
+    // Evita dropdown gigantesco em bases anômalas e mantém resposta rápida.
+    if (cidadesUnicas.length >= 220) break;
+  }
+
+  cidadesUnicas.sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
 
   select.innerHTML = '';
   const optionTodos = document.createElement('option');
@@ -3294,7 +3315,11 @@ function filtrarProjetoFPorCidade() {
   }
 
   return dados.filter(item => {
-    const cidade = (getField(item, 'CIDADE') || '').toLowerCase().trim();
+    const cidade = String(getField(item, 'CIDADE', 'cidade', 'Cidade') || '')
+      .replace(/\r?\n/g, ' ')
+      .replace(/\s+/g, ' ')
+      .toLowerCase()
+      .trim();
     return cidade.includes(filtroCidade);
   });
 }
