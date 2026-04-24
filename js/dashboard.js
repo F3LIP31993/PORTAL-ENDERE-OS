@@ -629,6 +629,50 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
     return;
   }
 
+  const slimItemsForStorage = (rows = []) => {
+    if (!Array.isArray(rows)) return [];
+
+    return rows.map((row) => {
+      if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
+
+      const keys = Object.keys(row);
+      const byNorm = {};
+      keys.forEach((key) => {
+        const norm = normalizeKey(key || '');
+        if (!norm) return;
+        if (!Array.isArray(byNorm[norm])) byNorm[norm] = [];
+        byNorm[norm].push(key);
+      });
+
+      const slim = {};
+      keys.forEach((key) => {
+        const norm = normalizeKey(key || '');
+        const value = row[key];
+
+        if (!norm) {
+          slim[key] = value;
+          return;
+        }
+
+        const siblings = byNorm[norm] || [];
+        const isLikelyNormalizedKey = key === norm;
+        if (isLikelyNormalizedKey && siblings.length > 1) {
+          const hasOriginalTwin = siblings.some((other) => {
+            if (other === key) return false;
+            return row[other] === value && other !== normalizeKey(other || '');
+          });
+          if (hasOriginalTwin) return;
+        }
+
+        slim[key] = value;
+      });
+
+      return slim;
+    });
+  };
+
+  const itemsToPersist = slimItemsForStorage(items);
+
   const user = getCurrentUser();
   const metaWithUser = {
     ...meta,
@@ -637,7 +681,7 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
   };
 
   // Evita sobrescrever snapshot local não-vazio com payload vazio em sync automático.
-  if (items.length === 0) {
+  if (itemsToPersist.length === 0) {
     const localSnapshot = getLocalDatasetCache()?.[categoria];
     const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
     if (localItems.length) {
@@ -646,7 +690,7 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
   }
 
   try {
-    cacheDatasetLocally(categoria, items, metaWithUser);
+    cacheDatasetLocally(categoria, itemsToPersist, metaWithUser);
   } catch (cacheError) {
     console.warn(`Falha ao salvar cache local da categoria ${categoria}. Tentando sincronizar no servidor mesmo assim.`, cacheError);
   }
@@ -658,13 +702,13 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
   }
 
   try {
-    await enviarDatasetCompartilhadoParaServidor(categoria, items);
+    await enviarDatasetCompartilhadoParaServidor(categoria, itemsToPersist);
     delete sharedSyncRetryQueue[categoria];
     saveSharedSyncRetryQueue();
   } catch (error) {
     sharedSyncRetryQueue[categoria] = {
       categoria,
-      items,
+      items: itemsToPersist,
       meta: metaWithUser,
       retries: Number(sharedSyncRetryQueue[categoria]?.retries || 0) + 1,
       lastError: error?.message || 'Falha desconhecida',
