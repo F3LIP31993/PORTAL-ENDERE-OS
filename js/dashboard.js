@@ -2314,7 +2314,10 @@ function importarCSV() {
       const dados = processarCSVProjetoF(text, delimiter);
       dadosPorCategoria['projeto-f'] = dados;
       renderTabelaProjetoF(`tabela-projeto-f`, dados);
-      persistirDadosCompartilhados('projeto-f', dados, { source: 'manual', locked: true });
+      // Permite que a tabela apareça primeiro e sincroniza em seguida para reduzir latencia percebida.
+      window.requestAnimationFrame(() => {
+        persistirDadosCompartilhados('projeto-f', dados, { source: 'manual', locked: true });
+      });
       invalidateVisaoGerenciaCache();
       agendarRenderVisaoGerencia();
       if (statusEl) {
@@ -2883,9 +2886,11 @@ function renderTabelaProjetoF(id, lista) {
     return;
   }
 
-  window.__projetoFModalData = Array.isArray(lista) ? [...lista] : [];
+  const dados = Array.isArray(lista) ? lista : [];
+  window.__projetoFModalData = dados;
 
-  const rows = lista.map((i, index) => {
+  const buildRows = (startIndex, endIndex) => dados.slice(startIndex, endIndex).map((i, localIndex) => {
+    const index = startIndex + localIndex;
     const codigo = getField(i, "COD-MDUGO", "cod-mdugo", "codmdugo");
     const codged = getField(i, "CODGED", "codged", "cod_ged");
     const cidade = getField(i, "CIDADE", "cidade");
@@ -2909,7 +2914,24 @@ function renderTabelaProjetoF(id, lista) {
       </tr>`;
   }).join('');
 
-  tbody.innerHTML = rows;
+  const initialBatchSize = 220;
+  const chunkSize = 500;
+
+  tbody.innerHTML = buildRows(0, Math.min(initialBatchSize, dados.length));
+
+  if (dados.length > initialBatchSize) {
+    let nextStart = initialBatchSize;
+    const appendChunk = () => {
+      const end = Math.min(nextStart + chunkSize, dados.length);
+      tbody.insertAdjacentHTML('beforeend', buildRows(nextStart, end));
+      nextStart = end;
+      if (nextStart < dados.length) {
+        window.requestAnimationFrame(appendChunk);
+      }
+    };
+    window.requestAnimationFrame(appendChunk);
+  }
+
   popularFiltroCidadeProjetoF();
 }
 

@@ -3930,7 +3930,7 @@ td:first-child {
 }
 
 #projeto-f .card table {
-  min-width: 1280px;
+  min-width: 980px;
 }
 
 #sar-rede .card table {
@@ -3948,6 +3948,55 @@ td:first-child {
 #sar-rede table td {
   word-break: normal;
   overflow-wrap: anywhere;
+}
+
+#projeto-f table th:nth-child(1),
+#projeto-f table td:nth-child(1) {
+  min-width: 90px;
+  max-width: 120px;
+}
+
+#projeto-f table th:nth-child(2),
+#projeto-f table td:nth-child(2) {
+  min-width: 78px;
+  max-width: 110px;
+}
+
+#projeto-f table th:nth-child(3),
+#projeto-f table td:nth-child(3) {
+  min-width: 92px;
+  max-width: 120px;
+}
+
+#projeto-f table th:nth-child(4),
+#projeto-f table td:nth-child(4) {
+  min-width: 220px;
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#projeto-f table th:nth-child(5),
+#projeto-f table td:nth-child(5) {
+  min-width: 82px;
+  max-width: 96px;
+  text-align: center;
+}
+
+#projeto-f table th:nth-child(6),
+#projeto-f table td:nth-child(6),
+#projeto-f table th:nth-child(7),
+#projeto-f table td:nth-child(7) {
+  min-width: 120px;
+  max-width: 150px;
+}
+
+#projeto-f table th:last-child,
+#projeto-f table td:last-child {
+  min-width: 108px;
+  max-width: 108px;
+  width: 108px;
 }
 
 #sar-rede table th:nth-child(2),
