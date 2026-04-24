@@ -3395,7 +3395,8 @@ function popularFiltroCidadeProjetoF() {
 
   const valorAtual = select.value || "";
   const dados = dadosPorCategoria['projeto-f'] || [];
-  const cacheToken = `projeto-f:${getDatasetVersionToken(dados)}:${dados.length}`;
+  const dadosCidadesLen = (dadosPorCategoria['projeto-f-cities'] || []).length;
+  const cacheToken = `projeto-f:${getDatasetVersionToken(dados)}:${dados.length}:${dadosCidadesLen}`;
   const sanitizeCidadeProjetoF = (value = '') => String(value || '')
     .replace(/\r?\n/g, ' ')
     .replace(/\s+/g, ' ')
