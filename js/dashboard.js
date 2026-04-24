@@ -271,6 +271,7 @@ function updateImportLockInfo(categoriaId = categoriaAtualParaImport) {
   const snapshotItems = Array.isArray(snapshot.items) ? snapshot.items : [];
   const stateItems = Array.isArray(dadosPorCategoria?.[categoriaId]) ? dadosPorCategoria[categoriaId] : [];
   const items = snapshotItems.length ? snapshotItems : stateItems;
+  const displayCount = Number(snapshot?.fullCount || items.length || 0);
   const sourceText = snapshot.source || (stateItems.length ? 'estado' : 'local');
 
   if (!items.length) {
@@ -279,7 +280,7 @@ function updateImportLockInfo(categoriaId = categoriaAtualParaImport) {
   }
 
   const details = [
-    `📌 Base ativa: ${items.length} registro(s)`,
+    `📌 Base ativa: ${displayCount} registro(s)`,
     (snapshot.locked || (categoriaId === 'projeto-f' && items.length > 0)) ? 'travado' : 'não travado',
     sourceText ? `origem ${sourceText}` : '',
   ].filter(Boolean).join(' • ');
@@ -542,35 +543,44 @@ async function syncCurrentUserFromServer() {
 }
 
 async function carregarDadosCompartilhados() {
+  if (carregarDadosCompartilhadosInProgress) return;
+  carregarDadosCompartilhadosInProgress = true;
+
   const localCache = getLocalDatasetCache();
 
-  if (!window.location.protocol.startsWith("http")) {
-    Object.entries(localCache).forEach(([categoria, snapshot]) => {
-      const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
-      applyDatasetToState(categoria, items);
-    });
-
-    const backlogLocal = dadosPorCategoria['backlog'] || [];
-    if (backlogLocal.length) {
-      syncDerivedCategoriesFromBacklog(backlogLocal, false);
-    }
-
-    atualizarContadores();
-    const secaoAtiva = document.querySelector('.secao.ativa')?.id;
-    if (secaoAtiva) {
-      carregarDadosCategoria(secaoAtiva);
-    }
-    updateImportLockInfo();
-    agendarRenderVisaoGerencia(true);
-    return;
-  }
-
   try {
+    if (!window.location.protocol.startsWith("http")) {
+      Object.entries(localCache).forEach(([categoria, snapshot]) => {
+        const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
+        applyDatasetToState(categoria, items);
+      });
+
+      const backlogLocal = dadosPorCategoria['backlog'] || [];
+      if (backlogLocal.length) {
+        syncDerivedCategoriesFromBacklog(backlogLocal, false);
+      }
+
+      atualizarContadores();
+      const secaoAtiva = document.querySelector('.secao.ativa')?.id;
+      if (secaoAtiva) {
+        carregarDadosCategoria(secaoAtiva);
+      }
+      updateImportLockInfo();
+      agendarRenderVisaoGerencia(true);
+      return;
+    }
+
     const res = await fetch("/api/shared_datasets", { credentials: "include" });
     if (!res.ok) return;
 
     const payload = await res.json().catch(() => ({}));
     const datasets = payload?.datasets || {};
+    const nextToken = buildSharedDatasetsToken(datasets);
+    const hasSyncQueue = Object.keys(sharedSyncRetryQueue || {}).length > 0;
+    if (nextToken && nextToken === sharedDatasetsVersionToken && !hasSyncQueue) {
+      updateImportLockInfo();
+      return;
+    }
     const isAdmin = getCurrentUser()?.role === 'admin';
 
     Object.entries(datasets).forEach(([categoria, snapshot]) => {
@@ -578,9 +588,14 @@ async function carregarDadosCompartilhados() {
       const existingItems = Array.isArray(dadosPorCategoria[categoria]) ? dadosPorCategoria[categoria] : [];
       const localSnapshot = localCache?.[categoria] || {};
       const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
+      const localUpdatedAt = Date.parse(localSnapshot?.updatedAt || '') || 0;
+      const sharedUpdatedAt = Date.parse(snapshot?.updated_at || snapshot?.updatedAt || '') || 0;
+      const localIsTruncated = Boolean(localSnapshot?.truncated);
       const shouldKeepLockedLocal = ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'projeto-f', 'sar-rede', 'ongoing'].includes(categoria)
         && Boolean(localSnapshot?.locked)
-        && localItems.length;
+        && localItems.length
+        && !localIsTruncated
+        && (!items.length || localUpdatedAt >= sharedUpdatedAt);
 
       if (shouldKeepLockedLocal) {
         applyDatasetToState(categoria, localItems);
@@ -634,6 +649,8 @@ async function carregarDadosCompartilhados() {
       syncDerivedCategoriesFromBacklog(backlogCompartilhado, isAdmin);
     }
 
+    sharedDatasetsVersionToken = nextToken;
+
     atualizarContadores();
 
     const secaoAtiva = document.querySelector(".secao.ativa")?.id;
@@ -646,6 +663,8 @@ async function carregarDadosCompartilhados() {
   } catch (error) {
     console.warn("Não foi possível carregar os dados compartilhados do portal.", error);
     updateImportLockInfo();
+  } finally {
+    carregarDadosCompartilhadosInProgress = false;
   }
 }
 
