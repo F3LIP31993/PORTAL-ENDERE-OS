@@ -22,7 +22,8 @@ const STORAGE_USERS_KEY = "portalUsers";
 const STORAGE_CURRENT_USER_KEY = "portalCurrentUser";
 const STORAGE_COLUMN_DENSITY_KEY = "portalColumnDensity";
 const STORAGE_DATASET_CACHE_KEY = "portalDatasetCache";
-const SESSION_ONLY_DATASET_KEYS = ['epo-gpon-ongoing', 'epo-projeto-f'];
+const STORAGE_SHARED_SYNC_QUEUE_KEY = "portalSharedSyncRetryQueue";
+const SESSION_ONLY_DATASET_KEYS = [];
 
 const runtimeDatasetCache = {};
 const runtimeEpoStores = {
@@ -37,6 +38,26 @@ function stripSessionOnlyDatasets(cache = {}) {
   });
   return sanitized;
 }
+
+function loadSharedSyncRetryQueue() {
+  try {
+    const raw = localStorage.getItem(STORAGE_SHARED_SYNC_QUEUE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSharedSyncRetryQueue() {
+  try {
+    localStorage.setItem(STORAGE_SHARED_SYNC_QUEUE_KEY, JSON.stringify(sharedSyncRetryQueue || {}));
+  } catch {
+    // Sem bloqueio: fila continua em memória.
+  }
+}
+
+Object.assign(sharedSyncRetryQueue, loadSharedSyncRetryQueue());
 
 const BACKLOG_EMPRESARIAL_STATUS = [
   "1.VISTORIA", "2.PROJETO_INTERNO", "3.PROJETO_REDE", "4.CONSTRUCAO_REDE", "5.CONSTRUCAO", "7.LIBERACAO"
@@ -593,6 +614,7 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
   try {
     await enviarDatasetCompartilhadoParaServidor(categoria, items);
     delete sharedSyncRetryQueue[categoria];
+    saveSharedSyncRetryQueue();
   } catch (error) {
     sharedSyncRetryQueue[categoria] = {
       categoria,
@@ -602,6 +624,7 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
       lastError: error?.message || 'Falha desconhecida',
       queuedAt: new Date().toISOString()
     };
+    saveSharedSyncRetryQueue();
 
     console.warn(`Falha ao salvar dados compartilhados da categoria ${categoria}.`, error);
     const statusEl = document.getElementById('import-status');
@@ -650,6 +673,7 @@ async function processarFilaSyncCompartilhada() {
       try {
         await enviarDatasetCompartilhadoParaServidor(categoria, items);
         delete sharedSyncRetryQueue[categoria];
+        saveSharedSyncRetryQueue();
       } catch (error) {
         sharedSyncRetryQueue[categoria] = {
           ...entry,
@@ -657,6 +681,7 @@ async function processarFilaSyncCompartilhada() {
           lastError: error?.message || 'Falha desconhecida',
           queuedAt: entry?.queuedAt || new Date().toISOString()
         };
+        saveSharedSyncRetryQueue();
       }
     }
   } finally {
@@ -6088,6 +6113,7 @@ async function carregarEpoDatasetsCompartilhados() {
       const rows = epoSnapshot?.items;
 
       const localSnapshot = getLocalDatasetCache()?.[cfg.sharedKey] || {};
+      const localSnapshotRows = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
       const localRows = getEpoRowsByAction(actionKey);
       const localUpdatedAt = Date.parse(localSnapshot?.updatedAt || '') || 0;
       const sharedUpdatedAt = Date.parse(epoSnapshot?.updated_at || epoSnapshot?.updatedAt || '') || 0;
@@ -6101,6 +6127,13 @@ async function carregarEpoDatasetsCompartilhados() {
       }
 
       if (!Array.isArray(rows) || !rows.length) {
+        if (localSnapshotRows.length) {
+          const localStore = buildEpoNovosStoreFromRows(localSnapshotRows);
+          saveEpoStore(actionKey, localStore);
+          updateEpoImportStatus(actionKey, 'carregado do cache local');
+          return;
+        }
+
         if (actionKey === 'projeto-f') {
           const storeDerivado = garantirEpoProjetoFDerivado({ persistShared: true });
           if (storeDerivado) {
