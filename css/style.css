@@ -3898,8 +3898,6 @@ td:first-child {
 #pendente-autorizacao table td:nth-child(2),
 #empresarial table th:nth-child(2),
 #empresarial table td:nth-child(2),
-#sar-rede table th:nth-child(2),
-#sar-rede table td:nth-child(2),
 #mdu-ongoing table th:nth-child(2),
 #mdu-ongoing table td:nth-child(2),
 #ongoing table th:nth-child(4),
@@ -3931,9 +3929,12 @@ td:first-child {
   overflow-x: auto;
 }
 
-#projeto-f .card table,
-#sar-rede .card table {
+#projeto-f .card table {
   min-width: 1280px;
+}
+
+#sar-rede .card table {
+  min-width: 1080px;
 }
 
 #projeto-f table th,
@@ -3947,6 +3948,37 @@ td:first-child {
 #sar-rede table td {
   word-break: normal;
   overflow-wrap: anywhere;
+}
+
+#sar-rede table th:nth-child(2),
+#sar-rede table td:nth-child(2) {
+  min-width: 56px;
+  max-width: 64px;
+  width: 60px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+#sar-rede table th:nth-child(4),
+#sar-rede table td:nth-child(4) {
+  min-width: 260px;
+  max-width: 420px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#sar-rede table th:last-child,
+#sar-rede table td:last-child {
+  min-width: 112px;
+  max-width: 112px;
+  width: 112px;
+}
+
+#sar-rede td .btn-visualizar {
+  min-width: 88px;
+  display: inline-flex;
+  justify-content: center;
 }
 
 .table-address-cell {
