@@ -3421,8 +3421,8 @@ function popularFiltroCidadeProjetoF() {
       seen.add(key);
       cidadesUnicas.push(cidade);
 
-      // Evita dropdown gigantesco em bases anômalas e mantém resposta rápida.
-      if (cidadesUnicas.length >= 220) break;
+      // Mantém praticamente todas as cidades válidas sem cortes agressivos.
+      if (cidadesUnicas.length >= 5000) break;
     }
 
     cidadesUnicas.sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
