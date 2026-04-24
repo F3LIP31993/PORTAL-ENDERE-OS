@@ -269,7 +269,8 @@ function updateImportLockInfo(categoriaId = categoriaAtualParaImport) {
   const snapshotItems = Array.isArray(snapshot.items) ? snapshot.items : [];
   const stateItems = Array.isArray(dadosPorCategoria?.[categoriaId]) ? dadosPorCategoria[categoriaId] : [];
   const items = snapshotItems.length ? snapshotItems : stateItems;
-  const displayCount = Number(snapshot?.fullCount || items.length || 0);
+  // Prioriza contagem do estado (dados completos importados) sobre o cache local (pode estar truncado)
+  const displayCount = stateItems.length || Number(snapshot?.fullCount || items.length || 0);
   const sourceText = snapshot.source || (stateItems.length ? 'estado' : 'local');
 
   if (!items.length) {
@@ -3390,10 +3391,11 @@ function popularFiltroStatusMdu() {
 }
 
 function popularFiltroCidadeProjetoF() {
-  const select = document.getElementById('filtro-cidade-projeto-f');
-  if (!select) return;
+  // Popula o datalist de autocomplete (o input de texto não precisa de rebuild de options)
+  const datalist = document.getElementById('filtro-cidade-projeto-f-list');
+  if (!datalist) return;
 
-  const valorAtual = select.value || "";
+  const valorAtual = '';
   const dados = dadosPorCategoria['projeto-f'] || [];
   const dadosCidadesLen = (dadosPorCategoria['projeto-f-cities'] || []).length;
   const cacheToken = `projeto-f:${getDatasetVersionToken(dados)}:${dados.length}:${dadosCidadesLen}`;
@@ -3437,24 +3439,7 @@ function popularFiltroCidadeProjetoF() {
     projetoFCityFilterCacheOptions = cidadesUnicas.slice();
   }
 
-  select.innerHTML = '';
-  const optionTodos = document.createElement('option');
-  optionTodos.value = '';
-  optionTodos.textContent = 'Todas';
-  select.appendChild(optionTodos);
-
-  cidadesUnicas.forEach(cidade => {
-    const option = document.createElement('option');
-    option.value = cidade;
-    option.textContent = cidade;
-    select.appendChild(option);
-  });
-
-  if (cidadesUnicas.includes(valorAtual)) {
-    select.value = valorAtual;
-  } else {
-    select.value = '';
-  }
+  datalist.innerHTML = cidadesUnicas.map(c => `<option value="${c}"></option>`).join('');
 }
 
 function filtrarMduOngoingPorStatus() {
@@ -3478,7 +3463,7 @@ function atualizarFiltroStatusMdu() {
 }
 
 function filtrarProjetoFPorCidade() {
-  const filtroCidade = document.getElementById('filtro-cidade-projeto-f')?.value?.toLowerCase().trim() || '';
+  const filtroCidade = (document.getElementById('filtro-cidade-projeto-f')?.value || '').toLowerCase().trim();
   const dados = dadosPorCategoria['projeto-f'] || [];
 
   if (!filtroCidade) {
@@ -3491,8 +3476,7 @@ function filtrarProjetoFPorCidade() {
       .replace(/\s+/g, ' ')
       .toLowerCase()
       .trim();
-    if (!cidade) return false;
-    return cidade === filtroCidade;
+    return cidade.includes(filtroCidade);
   });
 }
 

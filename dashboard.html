@@ -430,9 +430,8 @@
         <div class="filtros-projeto-f">
           <div class="filtro-item">
             <label for="filtro-cidade-projeto-f">Filtrar Cidade:</label>
-            <select id="filtro-cidade-projeto-f" onchange="aplicarFiltrosProjetoF()">
-              <option value="">Todas</option>
-            </select>
+            <input type="text" id="filtro-cidade-projeto-f" placeholder="Digite a cidade..." oninput="aplicarFiltrosProjetoF()" autocomplete="off" list="filtro-cidade-projeto-f-list" />
+            <datalist id="filtro-cidade-projeto-f-list"></datalist>
           </div>
           <div class="filtro-item">
             <label for="filtro-endereco-projeto-f">Buscar Endereço:</label>
