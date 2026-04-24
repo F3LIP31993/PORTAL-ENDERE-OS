@@ -7229,7 +7229,6 @@ async function salvarCadastroUsuarioEpo() {
   }
 
   const senhaGerada = 'MDU@2026';
-  let origemCadastro = 'api';
 
   const salvarUsuarioEpoLocal = () => {
     const users = getStoredUsers();
@@ -7264,30 +7263,27 @@ async function salvarCadastroUsuarioEpo() {
       const body = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        if (res.status === 404 || res.status >= 500) {
-          const okLocal = salvarUsuarioEpoLocal();
-          if (!okLocal) return;
-          origemCadastro = 'local-fallback';
-        } else {
-          if (resultEl) resultEl.innerHTML = `<span style="color:#dc2626;">⚠️ ${escapeHtml(body.error || 'Erro ao criar usuário.')}</span>`;
-          return;
+        const serverMsg = body.error || 'Não foi possível criar usuário no servidor.';
+        if (resultEl) {
+          resultEl.innerHTML = `<span style="color:#dc2626;">⚠️ ${escapeHtml(serverMsg)}<br>O acesso não foi criado para uso geral. Verifique conexão/API e tente novamente.</span>`;
         }
+        return;
       }
     } catch {
-      const okLocal = salvarUsuarioEpoLocal();
-      if (!okLocal) return;
-      origemCadastro = 'local-fallback';
+      if (resultEl) {
+        resultEl.innerHTML = '<span style="color:#dc2626;">⚠️ Falha de conexão com a API. O acesso não foi criado no servidor.</span>';
+      }
+      return;
     }
   } else {
     // Modo offline: salva localmente
     const okLocal = salvarUsuarioEpoLocal();
     if (!okLocal) return;
-    origemCadastro = 'local-fallback';
   }
 
-  const avisoSync = origemCadastro === 'local-fallback'
-    ? '<br><span style="color:#b45309;">⚠️ Cadastro salvo no navegador (fallback). Se quiser compartilhar com todos, mantenha o backend/API online e tente novamente.</span>'
-    : '';
+  const avisoSync = window.location.protocol.startsWith('http')
+    ? ''
+    : '<br><span style="color:#b45309;">⚠️ Cadastro salvo apenas neste navegador (modo local/offline).</span>';
 
   if (resultEl) resultEl.innerHTML = `
     <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px 14px;font-size:12px;line-height:1.7;">
