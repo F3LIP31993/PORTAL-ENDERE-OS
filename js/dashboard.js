@@ -17,8 +17,12 @@ let liberadosAbaAtiva = 'projeto-f';
 let liberadosSubcardSelecionado = false;
 const sharedSyncRetryQueue = {};
 let sharedSyncRetryInProgress = false;
+let sharedDatasetsVersionToken = '';
+let carregarDadosCompartilhadosInProgress = false;
 let ongoingDatasetLoadPromise = null;
 let projetoFDatasetLoadPromise = null;
+let projetoFCityFilterCacheToken = '';
+let projetoFCityFilterCacheOptions = [];
 
 const STORAGE_USERS_KEY = "portalUsers";
 const STORAGE_CURRENT_USER_KEY = "portalCurrentUser";
@@ -26,6 +30,10 @@ const STORAGE_COLUMN_DENSITY_KEY = "portalColumnDensity";
 const STORAGE_DATASET_CACHE_KEY = "portalDatasetCache";
 const STORAGE_SHARED_SYNC_QUEUE_KEY = "portalSharedSyncRetryQueue";
 const SESSION_ONLY_DATASET_KEYS = [];
+const SHARED_REFRESH_INTERVAL_MS = 120000;
+const MAX_LOCAL_CACHE_ITEMS_BY_CATEGORY = {
+  'projeto-f': 2500,
+};
 const PRIORITY_DATASET_CACHE_KEYS = [
   'projeto-f',
   'liberados',
@@ -177,12 +185,17 @@ function cacheDatasetLocally(categoria, items, meta = {}) {
   const previous = cache[categoria] || {};
   const currentUser = getCurrentUser();
   const inferredUpdatedBy = currentUser?.username || currentUser?.name || '';
+  const maxLocalItems = Number(MAX_LOCAL_CACHE_ITEMS_BY_CATEGORY[categoria] || 0);
+  const shouldTruncate = maxLocalItems > 0 && items.length > maxLocalItems;
+  const cachedItems = shouldTruncate ? items.slice(0, maxLocalItems) : items;
   const snapshot = {
-    items,
+    items: cachedItems,
     updatedAt: meta.updatedAt || new Date().toISOString(),
     source: meta.source || previous.source || 'shared',
     locked: typeof meta.locked === 'boolean' ? meta.locked : Boolean(previous.locked),
     updatedBy: meta.updatedBy || meta.updated_by || previous.updatedBy || inferredUpdatedBy,
+    truncated: shouldTruncate,
+    fullCount: shouldTruncate ? items.length : undefined,
   };
 
   if (SESSION_ONLY_DATASET_KEYS.includes(categoria)) {
@@ -202,6 +215,17 @@ function formatDatasetTimestampBr(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '';
   return parsed.toLocaleString('pt-BR');
+}
+
+function buildSharedDatasetsToken(datasets = {}) {
+  const entries = Object.entries(datasets || {})
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([categoria, snapshot]) => {
+      const updatedAt = snapshot?.updated_at || snapshot?.updatedAt || '';
+      const count = Array.isArray(snapshot?.items) ? snapshot.items.length : 0;
+      return `${categoria}:${updatedAt}:${count}`;
+    });
+  return entries.join('|');
 }
 
 function getOrCreateImportLockInfoElement() {
