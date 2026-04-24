@@ -2452,8 +2452,25 @@ function importarCSV() {
       renderTabelaProjetoF(`tabela-projeto-f`, dados);
       // Evita travamento perceptível da UI logo após importação grande.
       window.requestAnimationFrame(() => {
-        window.setTimeout(() => {
-          persistirDadosCompartilhados('projeto-f', dados, { source: 'manual', locked: true });
+        window.setTimeout(async () => {
+          await persistirDadosCompartilhados('projeto-f', dados, { source: 'manual', locked: true });
+          // Salva lista compacta de cidades para garantir dropdown completo em outros dispositivos.
+          const seenCities = new Set();
+          const cityRows = [];
+          for (const row of dados) {
+            const c = String(getField(row, 'CIDADE', 'cidade', 'Cidade') || '').replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
+            if (!c) continue;
+            const ck = normalizeText(c).replace(/[^a-z0-9]/g, '');
+            if (!ck || seenCities.has(ck)) continue;
+            seenCities.add(ck);
+            cityRows.push({ CIDADE: c });
+          }
+          if (cityRows.length) {
+            applyDatasetToState('projeto-f-cities', cityRows);
+            cacheDatasetLocally('projeto-f-cities', cityRows, { source: 'derived', locked: true });
+            await persistirDadosCompartilhados('projeto-f-cities', cityRows, { source: 'derived', locked: true });
+            projetoFCityFilterCacheToken = null; // força rebuild do dropdown
+          }
         }, 0);
       });
       invalidateVisaoGerenciaCache();
@@ -3390,19 +3407,28 @@ function popularFiltroCidadeProjetoF() {
   } else {
     const seen = new Set();
 
+    // 1) Cidades das linhas carregadas
     for (let i = 0; i < dados.length; i += 1) {
       const cidadeRaw = getField(dados[i], 'CIDADE', 'cidade', 'Cidade') || '';
       const cidade = sanitizeCidadeProjetoF(cidadeRaw);
       if (!cidade) continue;
-
       const key = normalizeText(cidade).replace(/[^a-z0-9]/g, '');
       if (!key || seen.has(key)) continue;
-
       seen.add(key);
       cidadesUnicas.push(cidade);
-
-      // Segurança para evitar loop infinito em entradas anômalas.
       if (cidadesUnicas.length >= 50000) break;
+    }
+
+    // 2) Cidades do dataset compacto (salvo na importação)
+    const dadosCidades = dadosPorCategoria['projeto-f-cities'] || [];
+    for (let i = 0; i < dadosCidades.length; i += 1) {
+      const cidadeRaw = getField(dadosCidades[i], 'CIDADE', 'cidade', 'Cidade') || '';
+      const cidade = sanitizeCidadeProjetoF(cidadeRaw);
+      if (!cidade) continue;
+      const key = normalizeText(cidade).replace(/[^a-z0-9]/g, '');
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      cidadesUnicas.push(cidade);
     }
 
     cidadesUnicas.sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
