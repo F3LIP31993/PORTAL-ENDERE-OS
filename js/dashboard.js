@@ -675,7 +675,7 @@ async function carregarDadosCompartilhados() {
 
 async function persistirDadosCompartilhados(categoria, items, meta = {}) {
   if (!categoria || !Array.isArray(items)) {
-    return;
+    return { synced: false, skipped: true };
   }
 
   const slimItemsForStorage = (rows = []) => {
@@ -764,6 +764,47 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
     return compact;
   };
 
+  const normalizeOngoingRowsForStorage = async (rows = []) => {
+    if (!Array.isArray(rows) || !rows.length) return [];
+
+    const compact = [];
+    const chunkSize = 1000;
+
+    const buildPayload = (row) => ({
+      'IDDEMANDA': getField(row, 'IDDEMANDA', 'iddemanda', 'ID DEMANDA', 'ID_DEMANDA', 'id'),
+      'FILA': getField(row, 'FILA', 'fila'),
+      'TIPO': getField(row, 'TIPO', 'tipo', 'SOLICITANTE', 'solicitante'),
+      'ENDEREÇO': getField(row, 'ENDEREÇO', 'ENDERECO', 'endereco_unico', 'endereco', 'endereco_entrada'),
+      'EPO': getField(row, 'EPO', 'epo', 'regional', 'REGIONAL', 'cluster', 'CLUSTER'),
+      'AGING': getField(row, 'AGING', 'aging', 'Aging arredondado', 'aging_total', 'AGE'),
+      'SLA TUDO': getField(row, 'SLA TUDO', 'SLA FASE', 'sla_tudo', 'sla_fase', 'sla'),
+      'STATUS_GERAL': getField(row, 'STATUS_GERAL', 'status_geral', 'STATUS', 'status'),
+      'MOTIVO_GERAL': getField(row, 'MOTIVO_GERAL', 'motivo_geral', 'MOTIVO', 'motivo'),
+      'OBS': getField(row, 'OBS', 'obs', 'OBSERVACAO', 'observacao', 'STATUS OBS', 'status_obs')
+    });
+
+    let start = 0;
+    while (start < rows.length) {
+      const end = Math.min(start + chunkSize, rows.length);
+      for (let i = start; i < end; i += 1) {
+        const payload = buildPayload(rows[i]);
+        const hasRelevantData = [
+          payload['IDDEMANDA'],
+          payload['FILA'],
+          payload['ENDEREÇO'],
+          payload['STATUS_GERAL'],
+          payload['MOTIVO_GERAL']
+        ].some((value) => String(value || '').trim() !== '');
+        if (hasRelevantData) compact.push(payload);
+      }
+
+      start = end;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    return compact;
+  };
+
   const normalizeLiberadosRowsForStorage = async (rows = []) => {
     if (!Array.isArray(rows) || !rows.length) return [];
 
@@ -812,6 +853,11 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
         const compactRows = await normalizeProjetoFRowsForStorage(itemsToPersist);
         return compactRows.length ? compactRows : itemsToPersist;
       })()
+    : (categoria === 'ongoing')
+      ? await (async () => {
+          const compactRows = await normalizeOngoingRowsForStorage(itemsToPersist);
+          return compactRows.length ? compactRows : itemsToPersist;
+        })()
     : (categoria === 'liberados')
       ? await (async () => {
           const compactRows = await normalizeLiberadosRowsForStorage(itemsToPersist);
@@ -831,7 +877,7 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
     const localSnapshot = getLocalDatasetCache()?.[categoria];
     const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
     if (localItems.length) {
-      return;
+      return { synced: false, skipped: true };
     }
   }
 
@@ -844,13 +890,14 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
   const isAdmin = user?.role === "admin";
 
   if (!window.location.protocol.startsWith("http") || !isAdmin) {
-    return;
+    return { synced: false, localOnly: true };
   }
 
   try {
     await enviarDatasetCompartilhadoParaServidor(categoria, finalItemsToPersist);
     delete sharedSyncRetryQueue[categoria];
     saveSharedSyncRetryQueue();
+    return { synced: true, queued: false };
   } catch (error) {
     sharedSyncRetryQueue[categoria] = {
       categoria,
@@ -867,6 +914,7 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
     if (statusEl) {
       statusEl.textContent = `⚠️ Dados salvos localmente. A sincronização compartilhada de ${categoria} será tentada novamente automaticamente.`;
     }
+    return { synced: false, queued: true, error: error?.message || 'Falha desconhecida' };
   }
 }
 
@@ -2462,9 +2510,11 @@ function importarCSV() {
 
       renderTabelaOngoing(dadosCSVOngoing);
       cacheDatasetLocally('ongoing', dados, { source: 'manual', locked: true });
-      persistirDadosCompartilhados('ongoing', dados, { source: 'manual', locked: true });
+      const persistResult = await persistirDadosCompartilhados('ongoing', dados, { source: 'manual', locked: true });
       if (statusEl) {
-        statusEl.textContent = `✅ Importado ${dados.length} registro(s)`;
+        statusEl.textContent = persistResult?.queued
+          ? `✅ Importado ${dados.length} registro(s) • sincronização compartilhada pendente`
+          : `✅ Importado ${dados.length} registro(s)`;
       }
       const fileNameDisplay = document.getElementById('file-name');
       if (fileNameDisplay) {
@@ -5571,14 +5621,14 @@ function importarCSVOngoing() {
   }
   
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
     const csv = e.target.result;
     // Processar CSV com delimitador ponto-e-vírgula e encoding ISO-8859-1
     debugCSVOngoing(csv); // Debug: exibir estrutura
     dadosCSVOngoing = processarCSVOngoing(csv);
     dadosCSVOngoingOriginal = dadosCSVOngoing; // Salvar cópia dos dados originais
     cacheDatasetLocally('ongoing', dadosCSVOngoing, { source: 'manual', locked: dadosCSVOngoing.length > 0 });
-    persistirDadosCompartilhados('ongoing', dadosCSVOngoing, { source: 'manual', locked: dadosCSVOngoing.length > 0 });
+    const persistResult = await persistirDadosCompartilhados('ongoing', dadosCSVOngoing, { source: 'manual', locked: dadosCSVOngoing.length > 0 });
     filtroFilaAtivo = "todos"; // Resetar filtro
     
     if (dadosCSVOngoing.length === 0) {
@@ -5599,7 +5649,11 @@ function importarCSVOngoing() {
     
     // Mostrar nome do arquivo
     document.getElementById("file-name-ongoing").textContent = `Arquivo: ${file.name}`;
-    alert(`✅ ${dadosCSVOngoing.length} registros importados!`);
+    if (persistResult?.queued) {
+      alert(`✅ ${dadosCSVOngoing.length} registros importados! Sincronização compartilhada pendente.`);
+    } else {
+      alert(`✅ ${dadosCSVOngoing.length} registros importados!`);
+    }
   };
   
   reader.readAsText(file, "ISO-8859-1");
@@ -6922,8 +6976,9 @@ function importarPlanilhaEpoGponOngoing() {
       atualizarCountPillsEpo();
       atualizarResumoEpoSelecionada();
       atualizarContadores();
-      persistirDadosCompartilhados('epo-gpon-ongoing', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
-      cacheDatasetLocally('epo-gpon-ongoing', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
+      const linhasPersistencia = flattenEpoNovosStore(byEpo);
+      const persistResult = await persistirDadosCompartilhados('epo-gpon-ongoing', linhasPersistencia, { source: 'manual', locked: true });
+      cacheDatasetLocally('epo-gpon-ongoing', linhasPersistencia, { source: 'manual', locked: true });
 
       const total = linhasAno.length;
       const descartadasAno = linhasValidas.length - linhasAno.length;
@@ -6933,7 +6988,11 @@ function importarPlanilhaEpoGponOngoing() {
         ? (descartadasAno > 0 ? ` • ${descartadasAno} fora de ${EPO_IMPORT_TARGET_YEAR}` : '')
         : ' • ano não identificado na planilha (filtro desativado)';
 
-      if (statusEl) statusEl.textContent = `✅ ${total} linhas de ${EPO_IMPORT_TARGET_YEAR} distribuídas por EPO${ignoredText}${yearFilterText}`;
+      if (statusEl) {
+        statusEl.textContent = persistResult?.queued
+          ? `✅ ${total} linhas de ${EPO_IMPORT_TARGET_YEAR} distribuídas por EPO${ignoredText}${yearFilterText} • sync pendente`
+          : `✅ ${total} linhas de ${EPO_IMPORT_TARGET_YEAR} distribuídas por EPO${ignoredText}${yearFilterText}`;
+      }
       const resultEl = document.getElementById('epo-action-result');
       if (resultEl) resultEl.textContent = `✅ Importado GPON ONGOING (${EPO_IMPORT_TARGET_YEAR}): ${resumo}${ignoredText}`;
 
@@ -7018,8 +7077,10 @@ function importarPlanilhaEpoProjetoF() {
       saveEpoStore('projeto-f', byEpo);
       atualizarCountPillsEpo();
       atualizarResumoEpoSelecionada();
-      persistirDadosCompartilhados('epo-projeto-f', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
-      cacheDatasetLocally('epo-projeto-f', flattenEpoNovosStore(byEpo), { source: 'manual', locked: true });
+      const linhasPersistencia = flattenEpoNovosStore(byEpo);
+      const persistResult = await persistirDadosCompartilhados('epo-projeto-f', linhasPersistencia, { source: 'manual', locked: true });
+      cacheDatasetLocally('epo-projeto-f', linhasPersistencia, { source: 'manual', locked: true });
+      atualizarContadores();
 
       const total = linhasAno.length;
       const descartadasAno = linhasValidas.length - linhasAno.length;
@@ -7029,7 +7090,11 @@ function importarPlanilhaEpoProjetoF() {
         ? (descartadasAno > 0 ? ` • ${descartadasAno} fora de ${EPO_IMPORT_TARGET_YEAR}` : '')
         : ' • ano não identificado na planilha (filtro desativado)';
 
-      if (statusEl) statusEl.textContent = `✅ ${total} linhas de ${EPO_IMPORT_TARGET_YEAR} distribuídas por PARCEIRA${ignoredText}${yearFilterText}`;
+      if (statusEl) {
+        statusEl.textContent = persistResult?.queued
+          ? `✅ ${total} linhas de ${EPO_IMPORT_TARGET_YEAR} distribuídas por PARCEIRA${ignoredText}${yearFilterText} • sync pendente`
+          : `✅ ${total} linhas de ${EPO_IMPORT_TARGET_YEAR} distribuídas por PARCEIRA${ignoredText}${yearFilterText}`;
+      }
       const resultEl = document.getElementById('epo-action-result');
       if (resultEl) resultEl.textContent = `✅ Importado PROJETO F (${EPO_IMPORT_TARGET_YEAR}): ${resumo}${ignoredText}`;
 
