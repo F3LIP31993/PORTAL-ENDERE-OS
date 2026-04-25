@@ -764,11 +764,59 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
     return compact;
   };
 
+  const normalizeLiberadosRowsForStorage = async (rows = []) => {
+    if (!Array.isArray(rows) || !rows.length) return [];
+
+    const compact = [];
+    const chunkSize = 1000;
+
+    const buildPayload = (row) => ({
+      "TIPO_REDE": getField(row, "TIPO_REDE", "TIPO REDE", "tipo_rede"),
+      "SOLICITANTE": getField(row, "SOLICITANTE", "solicitante"),
+      "DDD": getField(row, "DDD", "ddd"),
+      "CIDADE": getField(row, "CIDADE", "cidade", "Cidade"),
+      "ENDEREÇO": getField(row, "ENDEREÇO", "ENDERECO", "endereco", "endereco_entrada"),
+      "BLOCOS": getField(row, "BLOCOS", "BLOCO", "blocos", "bloco"),
+      "HP": getField(row, "HP", "HPS", "hp", "hps"),
+      "STATUS": getField(row, "STATUS", "STATUS_GERAL", "status", "status_geral"),
+      "DT_CONCLUIDO": getField(row, "DT_CONCLUIDO", "DT CONCLUIDO", "DATA_CONCLUIDO", "data_concluido"),
+      "COD_IMOVEL": getField(row, "COD_IMOVEL", "COD IMOVEL", "ID IMOVEL", "cod_imovel"),
+      "_aba_liberados": normalizeLiberadosAba(getField(row, "_aba_liberados") || inferirAbaLiberadosPorRegistro(row, "projeto-f"))
+    });
+
+    let start = 0;
+    while (start < rows.length) {
+      const end = Math.min(start + chunkSize, rows.length);
+      for (let i = start; i < end; i += 1) {
+        const payload = buildPayload(rows[i]);
+        const hasRelevantData = [
+          payload["TIPO_REDE"],
+          payload["SOLICITANTE"],
+          payload["CIDADE"],
+          payload["ENDEREÇO"],
+          payload["STATUS"],
+          payload["COD_IMOVEL"],
+        ].some((value) => String(value || '').trim() !== '');
+        if (hasRelevantData) compact.push(payload);
+      }
+
+      start = end;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    return compact;
+  };
+
   const finalItemsToPersist = (categoria === 'projeto-f')
     ? await (async () => {
         const compactRows = await normalizeProjetoFRowsForStorage(itemsToPersist);
         return compactRows.length ? compactRows : itemsToPersist;
       })()
+    : (categoria === 'liberados')
+      ? await (async () => {
+          const compactRows = await normalizeLiberadosRowsForStorage(itemsToPersist);
+          return compactRows.length ? compactRows : itemsToPersist;
+        })()
     : itemsToPersist;
 
   const user = getCurrentUser();
@@ -2250,8 +2298,9 @@ function getDadosLiberadosDaAba(base = [], aba = liberadosAbaAtiva) {
   return estrutura[normalizeLiberadosAba(aba)] || [];
 }
 
-function importarLiberadosPorAba(abaDestino = 'projeto-f', linhas = [], delimiter = ';', file = null, statusEl = null) {
+async function importarLiberadosPorAba(abaDestino = 'projeto-f', linhas = [], delimiter = ';', file = null, statusEl = null) {
   const aba = normalizeLiberadosAba(abaDestino);
+  await carregarLiberadosDatasetRemotamente();
   const dadosAtuais = getPreferredDataset('liberados');
   const estruturaAtual = getDadosLiberadosEstruturados(dadosAtuais || []);
   const novosDadosImportados = parseLiberadosCsvRows(linhas, delimiter, aba)
@@ -2266,7 +2315,7 @@ function importarLiberadosPorAba(abaDestino = 'projeto-f', linhas = [], delimite
 
   applyDatasetToState('liberados', consolidados);
   cacheDatasetLocally('liberados', consolidados, { source: 'manual', locked: true });
-  persistirDadosCompartilhados('liberados', consolidados, { source: 'manual', locked: true });
+  await persistirDadosCompartilhados('liberados', consolidados, { source: 'manual', locked: true });
 
   renderTabelaLiberados('tabela-liberados', dadosAbaAtiva);
   atualizarBadgesLiberados();
@@ -2287,16 +2336,16 @@ function importarLiberadosPorAba(abaDestino = 'projeto-f', linhas = [], delimite
   }
 }
 
-function importarLiberadosProjetoF(linhas = [], delimiter = ';', file = null, statusEl = null) {
-  importarLiberadosPorAba('projeto-f', linhas, delimiter, file, statusEl);
+async function importarLiberadosProjetoF(linhas = [], delimiter = ';', file = null, statusEl = null) {
+  await importarLiberadosPorAba('projeto-f', linhas, delimiter, file, statusEl);
 }
 
-function importarLiberadosGponHfc(linhas = [], delimiter = ';', file = null, statusEl = null) {
-  importarLiberadosPorAba('gpon-hfc', linhas, delimiter, file, statusEl);
+async function importarLiberadosGponHfc(linhas = [], delimiter = ';', file = null, statusEl = null) {
+  await importarLiberadosPorAba('gpon-hfc', linhas, delimiter, file, statusEl);
 }
 
-function importarLiberadosGreenfield(linhas = [], delimiter = ';', file = null, statusEl = null) {
-  importarLiberadosPorAba('greenfield', linhas, delimiter, file, statusEl);
+async function importarLiberadosGreenfield(linhas = [], delimiter = ';', file = null, statusEl = null) {
+  await importarLiberadosPorAba('greenfield', linhas, delimiter, file, statusEl);
 }
 
 function importarCSV() {
@@ -2322,7 +2371,7 @@ function importarCSV() {
   }
 
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     // Remover BOM se presente (muito comum em CSV exportado pelo Excel)
     const text = e.target.result.replace(/^\uFEFF/, "");
     const linhas = text.split(/\r?\n/);
@@ -2496,11 +2545,11 @@ function importarCSV() {
     if (isLiberados) {
       const abaSelecionada = normalizeLiberadosAba(liberadosAbaAtiva);
       if (abaSelecionada === 'projeto-f') {
-        importarLiberadosProjetoF(linhas, delimiter, file, statusEl);
+        await importarLiberadosProjetoF(linhas, delimiter, file, statusEl);
       } else if (abaSelecionada === 'greenfield') {
-        importarLiberadosGreenfield(linhas, delimiter, file, statusEl);
+        await importarLiberadosGreenfield(linhas, delimiter, file, statusEl);
       } else {
-        importarLiberadosGponHfc(linhas, delimiter, file, statusEl);
+        await importarLiberadosGponHfc(linhas, delimiter, file, statusEl);
       }
       return;
     }
