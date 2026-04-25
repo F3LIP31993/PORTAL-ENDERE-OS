@@ -6396,6 +6396,15 @@ function getEpoStore(actionKey = 'gpon-ongoing') {
   }
 
   const cfg = getEpoDatasetConfig(actionKey);
+
+  const snapshot = getLocalDatasetCache()?.[cfg.sharedKey] || {};
+  const rows = Array.isArray(snapshot?.items) ? snapshot.items : [];
+  if (rows.length) {
+    const restoredFromShared = buildEpoNovosStoreFromRows(rows, actionKey);
+    runtimeEpoStores[actionKey] = restoredFromShared;
+    return restoredFromShared;
+  }
+
   try {
     const parsed = JSON.parse(localStorage.getItem(cfg.storageKey) || '{}');
     if (parsed && typeof parsed === 'object' && Object.keys(parsed).length) {
@@ -6404,14 +6413,6 @@ function getEpoStore(actionKey = 'gpon-ongoing') {
     }
   } catch {
     // Continua com fallback abaixo.
-  }
-
-  const snapshot = getLocalDatasetCache()?.[cfg.sharedKey] || {};
-  const rows = Array.isArray(snapshot?.items) ? snapshot.items : [];
-  if (rows.length) {
-    const restored = buildEpoNovosStoreFromRows(rows, actionKey);
-    runtimeEpoStores[actionKey] = restored;
-    return restored;
   }
 
   return {};
@@ -6493,10 +6494,6 @@ function garantirEpoProjetoFDerivado(options = {}) {
 function getEpoRowsForEpo(actionKey = 'gpon-ongoing', nomeEpo = '') {
   const key = String(nomeEpo || '').trim().toUpperCase();
   if (!key) return [];
-
-  if (actionKey === 'projeto-f') {
-    garantirEpoProjetoFDerivado();
-  }
 
   const store = getEpoStore(actionKey);
   if (Array.isArray(store[key])) return store[key];
@@ -6584,6 +6581,13 @@ async function carregarEpoDatasetsCompartilhados() {
         }
 
         if (actionKey === 'projeto-f') {
+          const user = getCurrentUser();
+          if (user?.role === 'viewer') {
+            saveEpoStore(actionKey, {});
+            updateEpoImportStatus(actionKey, 'aguardando base compartilhada');
+            return;
+          }
+
           const storeDerivado = garantirEpoProjetoFDerivado({ persistShared: true });
           if (storeDerivado) {
             updateEpoImportStatus(actionKey, 'derivado do PROJETO F');
