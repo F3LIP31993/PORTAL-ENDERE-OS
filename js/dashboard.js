@@ -21,6 +21,7 @@ let sharedDatasetsVersionToken = '';
 let carregarDadosCompartilhadosInProgress = false;
 let ongoingDatasetLoadPromise = null;
 let projetoFDatasetLoadPromise = null;
+let liberadosDatasetLoadPromise = null;
 let projetoFCityFilterCacheToken = '';
 let projetoFCityFilterCacheOptions = [];
 
@@ -3133,6 +3134,7 @@ function atualizarLayoutLiberados() {
   const detalhesCard = document.getElementById('liberados-detalhes-card');
   const gridCards = document.querySelector('#liberados .liberados-subcards-grid');
   const botaoTrocar = document.getElementById('liberados-reset-selecao');
+  const canImport = usuarioPodeImportar();
   const isLiberadosAtivo = Boolean(secaoLiberados?.classList.contains('ativa'));
   const mostrarDetalhes = isLiberadosAtivo && liberadosSubcardSelecionado;
 
@@ -3150,8 +3152,9 @@ function atualizarLayoutLiberados() {
 
   const globalImport = document.getElementById('global-import-section');
   if (globalImport && isLiberadosAtivo) {
-    globalImport.style.display = mostrarDetalhes ? 'block' : 'none';
-    globalImport.classList.toggle('liberados-import-premium', mostrarDetalhes);
+    const mostrarImport = canImport && mostrarDetalhes;
+    globalImport.style.display = mostrarImport ? 'block' : 'none';
+    globalImport.classList.toggle('liberados-import-premium', mostrarImport);
   } else if (globalImport) {
     globalImport.classList.remove('liberados-import-premium');
   }
@@ -8982,6 +8985,11 @@ function carregarDadosCategoria(categoriaId) {
     atualizarBotoesAbaLiberados();
     atualizarBadgesLiberados();
 
+    const baseAtual = getPreferredDataset('liberados');
+    if ((!baseAtual || baseAtual.length === 0) && window.location.protocol.startsWith('http')) {
+      carregarLiberadosDatasetRemotamente();
+    }
+
     if (!liberadosSubcardSelecionado) {
       const infoElInicial = document.getElementById('liberados-aba-info');
       if (infoElInicial) {
@@ -8995,7 +9003,7 @@ function carregarDadosCategoria(categoriaId) {
     let dadosAba = getDadosLiberadosDaAba(baseLiberados || [], liberadosAbaAtiva);
 
     // Fallback de compatibilidade para bases antigas derivadas de Projeto F.
-    if ((!baseLiberados || !baseLiberados.length) && !dadosAba.length) {
+    if ((!baseLiberados || !baseLiberados.length) && !dadosAba.length && liberadosAbaAtiva === 'projeto-f') {
       const baseProjetoF = getPreferredDataset('projeto-f');
       dadosAba = getDadosLiberadosProjetoF(baseProjetoF || []).map(item => ({ ...item, _aba_liberados: 'projeto-f' }));
     }
@@ -9162,6 +9170,76 @@ function carregarOngoingDatasetRemotamente(tabelaId = 'tabela-ongoing') {
   });
 
   return ongoingDatasetLoadPromise;
+}
+
+function carregarLiberadosDatasetRemotamente() {
+  if (liberadosDatasetLoadPromise) {
+    return liberadosDatasetLoadPromise;
+  }
+
+  liberadosDatasetLoadPromise = (async () => {
+    const preferred = getPreferredDataset('liberados');
+    if (Array.isArray(preferred) && preferred.length) {
+      return preferred;
+    }
+
+    let rows = [];
+    let meta = { source: 'shared', locked: true };
+
+    try {
+      const sharedResp = await fetch('/api/shared_datasets', { credentials: 'include' });
+      if (sharedResp.ok) {
+        const payload = await sharedResp.json().catch(() => ({}));
+        const snapshot = payload?.datasets?.['liberados'] || {};
+        const sharedItems = snapshot?.items;
+        if (Array.isArray(sharedItems) && sharedItems.length) {
+          rows = sharedItems;
+          meta = {
+            source: snapshot?.source || 'shared',
+            updatedAt: snapshot?.updated_at || snapshot?.updatedAt || new Date().toISOString(),
+            updatedBy: snapshot?.updated_by || snapshot?.updatedBy || '',
+            locked: true,
+          };
+        }
+      }
+    } catch {
+      // Sem bloqueio: manter fallback local.
+    }
+
+    if (!rows.length) {
+      const localRows = getLocalDatasetCache()?.['liberados']?.items;
+      if (Array.isArray(localRows) && localRows.length) {
+        rows = localRows;
+        meta = { source: 'local-fallback', locked: true, updatedAt: new Date().toISOString() };
+      }
+    }
+
+    if (!rows.length) {
+      return [];
+    }
+
+    applyDatasetToState('liberados', rows);
+    cacheDatasetLocally('liberados', rows, meta);
+
+    if (document.querySelector('#liberados.secao.ativa')) {
+      atualizarBadgesLiberados();
+      const dadosAbaAtiva = getDadosLiberadosDaAba(rows, liberadosAbaAtiva);
+      renderTabelaLiberados('tabela-liberados', dadosAbaAtiva);
+
+      const infoEl = document.getElementById('liberados-aba-info');
+      if (infoEl) {
+        infoEl.textContent = `Aba ativa: ${getLiberadosAbaLabel(liberadosAbaAtiva)} • ${dadosAbaAtiva.length} registro(s)`;
+      }
+
+      atualizarContadores();
+    }
+
+    return rows;
+  })().finally(() => {
+    liberadosDatasetLoadPromise = null;
+  });
+
+  return liberadosDatasetLoadPromise;
 }
 
 function carregarProjetoFDatasetRemotamente(tabelaId = 'tabela-projeto-f') {
