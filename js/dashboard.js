@@ -2411,6 +2411,7 @@ function importarCSV() {
       });
 
       renderTabelaOngoing(dadosCSVOngoing);
+      cacheDatasetLocally('ongoing', dados, { source: 'manual', locked: true });
       persistirDadosCompartilhados('ongoing', dados, { source: 'manual', locked: true });
       if (statusEl) {
         statusEl.textContent = `✅ Importado ${dados.length} registro(s)`;
@@ -5854,8 +5855,8 @@ function extrairAgingOngoing(item = {}) {
   const match = String(agingRaw).match(/\d+/);
   const parsed = match ? parseInt(match[0], 10) : 0;
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
-  // Bloqueia valores absurdos vindos de coluna errada (ex.: 46127)
-  if (parsed > 999) return 0;
+  // Bloqueia apenas valores claramente absurdos (ex.: seriais de data Excel > 40000)
+  if (parsed > 9999) return 0;
   return parsed;
 }
 
