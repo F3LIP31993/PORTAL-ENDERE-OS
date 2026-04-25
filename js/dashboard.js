@@ -6563,7 +6563,10 @@ async function carregarEpoDatasetsCompartilhados() {
       const localRows = getEpoRowsByAction(actionKey);
       const localUpdatedAt = Date.parse(localSnapshot?.updatedAt || '') || 0;
       const sharedUpdatedAt = Date.parse(epoSnapshot?.updated_at || epoSnapshot?.updatedAt || '') || 0;
+      const localSource = String(localSnapshot?.source || '').toLowerCase();
+      const localCanOverrideShared = localSource.includes('manual') || localSource.includes('local');
       const shouldKeepLockedLocal = Boolean(localSnapshot?.locked)
+        && localCanOverrideShared
         && localRows.length
         && (!Array.isArray(rows) || !rows.length || localUpdatedAt >= sharedUpdatedAt);
 
