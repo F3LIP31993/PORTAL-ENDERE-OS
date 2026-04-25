@@ -258,6 +258,12 @@ function updateImportLockInfo(categoriaId = categoriaAtualParaImport) {
     return;
   }
 
+  if (categoriaId === 'ongoing') {
+    lockInfoEl.textContent = '';
+    lockInfoEl.style.display = 'none';
+    return;
+  }
+
   const categoriaNorm = normalizeText(categoriaId || '').replace(/[^a-z0-9]/g, '-');
   if (categoriaId === 'sar-rede' || categoriaNorm === 'sar-rede' || categoriaNorm.includes('sar') && categoriaNorm.includes('rede')) {
     lockInfoEl.textContent = '';
@@ -623,7 +629,6 @@ async function carregarDadosCompartilhados() {
       const localUpdatedAt = Date.parse(snapshot?.updatedAt || '') || 0;
       const serverUpdatedAt = Date.parse(serverSnapshot?.updated_at || serverSnapshot?.updatedAt || '') || 0;
       const shouldPreferLocal = items.length && (
-        snapshot?.locked ||
         !serverItems.length ||
         localUpdatedAt > serverUpdatedAt
       );
@@ -5519,6 +5524,8 @@ function importarCSVOngoing() {
     debugCSVOngoing(csv); // Debug: exibir estrutura
     dadosCSVOngoing = processarCSVOngoing(csv);
     dadosCSVOngoingOriginal = dadosCSVOngoing; // Salvar cópia dos dados originais
+    cacheDatasetLocally('ongoing', dadosCSVOngoing, { source: 'manual', locked: dadosCSVOngoing.length > 0 });
+    persistirDadosCompartilhados('ongoing', dadosCSVOngoing, { source: 'manual', locked: dadosCSVOngoing.length > 0 });
     filtroFilaAtivo = "todos"; // Resetar filtro
     
     if (dadosCSVOngoing.length === 0) {
@@ -5556,15 +5563,15 @@ function processarCSVOngoing(csv, delimiter = ";") {
     delimiter = ",";
   }
 
-  const cabecalho = cabecalhoRaw.split(delimiter).map(c => c.trim());
+  const cabecalho = _splitCsvLine(cabecalhoRaw, delimiter).map(c => c.trim());
   const dados = [];
 
   for (let i = 1; i < linhas.length; i++) {
     const linha = linhas[i];
     if (!linha || !linha.trim()) continue;
 
-    const colunas = linha.split(delimiter);
-    if (colunas.length < cabecalho.length) continue;
+    const colunas = _splitCsvLine(linha, delimiter);
+    if (!colunas.some(col => String(col || '').trim() !== '')) continue;
 
     const item = {};
     cabecalho.forEach((cab, j) => {
@@ -5576,29 +5583,16 @@ function processarCSVOngoing(csv, delimiter = ";") {
       }
     });
 
-    const idDemanda = getField(item, "iddemanda", "id_demanda", "id demanda", "id", "ID Demanda");
-    const fila = getField(item, "fila", "Fila");
-    const tipo = getField(item, "tipo", "Tipo");
-    const endereco = getField(item, "endereco_entrada", "endereco_entrada", "endereco_unico", "endereco", "endereço", "endereco entrada", "Endereço");
-    const epo = getField(item, "epo", "EPO");
-    const aging = getField(item, "aging", "Aging", "age");
-    const slaTudo = getField(item, "SLA TUDO", "sla tudo", "sla_fase", "sla fase", "sla_tudo", "sla", "SLA TUDO");
-    const status = getField(item, "STATUS_GERAL", "status_geral", "status", "Status");
-    const motivo = getField(item, "MOTIVO_GERAL", "motivo_geral", "motivo", "Motiv", "Motivo");
+    const normalizado = normalizarLinhaOngoing(item);
 
-    item["iddemanda"] = idDemanda || "";
-    item["fila"] = fila || "";
-    item["tipo"] = tipo || "";
-    item["endereco_unico"] = endereco || "";
-    item["endereco"] = endereco || "";
-    item["epo"] = epo || "";
-    item["Aging arredondado"] = aging || "";
-    item["SLA TUDO"] = slaTudo || "";
-    item["STATUS_GERAL"] = status || "";
-    item["MOTIVO_GERAL"] = motivo || "";
-
-    if (idDemanda || fila || endereco || status || motivo) {
-      dados.push(item);
+    if (
+      normalizado["iddemanda"] ||
+      normalizado["fila"] ||
+      normalizado["endereco"] ||
+      normalizado["STATUS_GERAL"] ||
+      normalizado["MOTIVO_GERAL"]
+    ) {
+      dados.push(normalizado);
     }
   }
 
@@ -5801,6 +5795,20 @@ function debugCSVOngoing(csv) {
 let dadosCSVOngoingOriginal = [];
 let filtroFilaAtivo = "todos";
 
+function matchesOngoingFila(item = {}, fila = "") {
+  const alvo = normalizeText(fila);
+  if (!alvo) return true;
+
+  const textos = [
+    getField(item, "fila", "FILA"),
+    getField(item, "tipo", "TIPO", "SOLICITANTE", "solicitante"),
+    getField(item, "STATUS_GERAL", "status_geral", "STATUS", "status"),
+    getField(item, "MOTIVO_GERAL", "motivo_geral", "MOTIVO", "motivo")
+  ].map(valor => normalizeText(valor)).filter(Boolean);
+
+  return textos.some(texto => texto.includes(alvo));
+}
+
 // Filtrar tabela ONGOING por fila (VISTORIA, BACKBONE)
 function filtrarPorFila(fila) {
   filtroFilaAtivo = fila;
@@ -5817,8 +5825,7 @@ function filtrarPorFila(fila) {
   let dadosFiltrados = dadosCSVOngoingOriginal;
   if (fila !== "todos") {
     dadosFiltrados = dadosCSVOngoingOriginal.filter(item => {
-      const filaItem = String(getField(item, "fila", "FILA") || "").toLowerCase().trim();
-      return filaItem.includes(fila.toLowerCase());
+      return matchesOngoingFila(item, fila);
     });
   }
   
@@ -5858,7 +5865,10 @@ function normalizarLinhaOngoing(item = {}) {
     "iddemanda", "IDDEMANDA", "ID DEMANDA", "ID_DEMANDA", "id",
     "COD-MDUGO", "cod-mdugo", "codmdugo", "CODIGO", "CÓDIGO"
   );
-  const fila = getField(item, "fila", "FILA", "STATUS_GERAL", "status_geral", "STATUS");
+  const filaOriginal = getField(item, "fila", "FILA");
+  const fila = filaOriginal || (matchesOngoingFila(item, 'vistoria')
+    ? 'VISTORIA'
+    : (matchesOngoingFila(item, 'backbone') ? 'BACKBONE' : getField(item, "STATUS_GERAL", "status_geral", "STATUS")));
   const tipo = getField(item, "tipo", "TIPO", "SOLICITANTE", "solicitante");
   const enderecoBase = getField(item, "endereco_unico", "endereco", "ENDEREÇO", "ENDERECO", "endereco_entrada");
   const numero = getField(item, "NUMERO", "numero", "NUM", "num");
