@@ -302,16 +302,16 @@
       </div>
 
       <div class="pendente-tabs">
-        <button id="tab-vistoria" class="btn-primary pendente-tab-btn" style="flex:1;" onclick="setPendenteTab('vistoria')">PENDENTE VISTORIA</button>
-        <button id="tab-backbone" class="btn-primary pendente-tab-btn" style="flex:1;" onclick="setPendenteTab('backbone')">PENDENTE BACKBONE</button>
+        <button id="tab-vistoria" class="btn-primary pendente-tab-btn" style="flex:1;" onclick="setPendenteTab('vistoria')">PENDENTE VISTORIA (0)</button>
+        <button id="tab-backbone" class="btn-primary pendente-tab-btn" style="flex:1;" onclick="setPendenteTab('backbone')">PENDENTE BACKBONE (0)</button>
       </div>
 
       <div class="card">
         <div class="filtros-pendente">
-          <div class="filtro-item">
+          <div class="filtro-item filtro-item-cidade-pendente">
             <label for="filtro-cidade-pendente">Filtrar Cidade:</label>
-            <input type="text" id="filtro-cidade-pendente" placeholder="Digite a cidade..." oninput="aplicarFiltrosPendenteAutorizacao()" autocomplete="off" list="filtro-cidade-pendente-list" />
-            <datalist id="filtro-cidade-pendente-list"></datalist>
+            <input type="text" id="filtro-cidade-pendente" placeholder="Digite a cidade..." oninput="aplicarFiltrosPendenteAutorizacao()" onfocus="mostrarSugestoesCidadePendente()" autocomplete="off" />
+            <div id="filtro-cidade-pendente-sugestoes" class="filtro-cidade-pendente-sugestoes hidden"></div>
           </div>
           <div class="filtro-item filtro-item-acoes">
             <label>Ações</label>
@@ -696,7 +696,7 @@
 
 
       <div class="card">
-        <h2>Dados ONGOING</h2>
+        <h2>AGING</h2>
         
         <!-- Botões de Filtro por Fila -->
         <div class="filtro-fila">
