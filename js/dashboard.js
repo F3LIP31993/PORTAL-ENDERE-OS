@@ -3658,6 +3658,17 @@ function popularFiltroCidadeProjetoF() {
     .replace(/\s+/g, ' ')
     .trim();
 
+  // Valida se o valor parece um nome de cidade real (rejeita emails, URLs, textos longos, etc.)
+  const ehCidadeValida = (cidade = '') => {
+    if (!cidade || cidade.length < 2 || cidade.length > 60) return false;
+    if (/@|\/\/|https?:|www\.|\.com|\.br/.test(cidade)) return false;
+    // Deve conter apenas letras (incluindo acentuadas), espaços e hífens
+    if (/[^a-zA-ZÀ-ÿ\u00C0-\u017E\s'\-]/.test(cidade)) return false;
+    // Não pode ter mais de 4 palavras (cidades brasileiras raramente têm mais)
+    if (cidade.trim().split(/\s+/).length > 5) return false;
+    return true;
+  };
+
   let cidadesUnicas = [];
   if (cacheToken === projetoFCityFilterCacheToken && projetoFCityFilterCacheOptions.length) {
     cidadesUnicas = projetoFCityFilterCacheOptions.slice();
@@ -3668,7 +3679,7 @@ function popularFiltroCidadeProjetoF() {
     for (let i = 0; i < dados.length; i += 1) {
       const cidadeRaw = getField(dados[i], 'CIDADE', 'cidade', 'Cidade') || '';
       const cidade = sanitizeCidadeProjetoF(cidadeRaw);
-      if (!cidade) continue;
+      if (!cidade || !ehCidadeValida(cidade)) continue;
       const key = normalizeText(cidade).replace(/[^a-z0-9]/g, '');
       if (!key || seen.has(key)) continue;
       seen.add(key);
@@ -3681,7 +3692,7 @@ function popularFiltroCidadeProjetoF() {
     for (let i = 0; i < dadosCidades.length; i += 1) {
       const cidadeRaw = getField(dadosCidades[i], 'CIDADE', 'cidade', 'Cidade') || '';
       const cidade = sanitizeCidadeProjetoF(cidadeRaw);
-      if (!cidade) continue;
+      if (!cidade || !ehCidadeValida(cidade)) continue;
       const key = normalizeText(cidade).replace(/[^a-z0-9]/g, '');
       if (!key || seen.has(key)) continue;
       seen.add(key);
