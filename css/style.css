@@ -3431,6 +3431,22 @@ td:first-child {
   font-weight: 700 !important;
 }
 
+.filtros-liberados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 12px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+#filtro-cidade-liberados {
+  min-width: 180px;
+  max-width: 260px;
+}
+
 #liberados #global-import-section {
   border: 1px solid #c9daf5;
   box-shadow: 0 14px 28px rgba(30, 64, 175, 0.12);
