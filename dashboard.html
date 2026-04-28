@@ -302,8 +302,14 @@
       </div>
 
       <div class="pendente-tabs">
-        <button id="tab-vistoria" class="btn-primary pendente-tab-btn" style="flex:1;" onclick="setPendenteTab('vistoria')">PENDENTE VISTORIA (0)</button>
-        <button id="tab-backbone" class="btn-primary pendente-tab-btn" style="flex:1;" onclick="setPendenteTab('backbone')">PENDENTE BACKBONE (0)</button>
+        <button id="tab-vistoria" class="btn-primary pendente-tab-btn" style="flex:1;" onclick="setPendenteTab('vistoria')">
+          <span class="pendente-tab-label">PENDENTE VISTORIA</span>
+          <span id="tab-vistoria-badge" class="pendente-tab-badge">0</span>
+        </button>
+        <button id="tab-backbone" class="btn-primary pendente-tab-btn" style="flex:1;" onclick="setPendenteTab('backbone')">
+          <span class="pendente-tab-label">PENDENTE BACKBONE</span>
+          <span id="tab-backbone-badge" class="pendente-tab-badge">0</span>
+        </button>
       </div>
 
       <div class="card card-pendente-filtros">
