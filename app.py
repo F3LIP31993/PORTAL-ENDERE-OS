@@ -72,6 +72,21 @@ READ_ONLY_SHARED_TOKEN = os.environ.get("READ_ONLY_SHARED_TOKEN", None)
 ENABLE_LEGACY_PROJETO_F_LOADER = os.environ.get("ENABLE_LEGACY_PROJETO_F_LOADER", "false").lower() == "true"
 
 
+def resolve_build_version() -> str:
+    for env_key in ("APP_BUILD_VERSION", "RENDER_GIT_COMMIT", "SOURCE_VERSION"):
+        value = (os.environ.get(env_key) or "").strip()
+        if value:
+            return value[:40]
+
+    try:
+        return str(int(os.path.getmtime(__file__)))
+    except Exception:
+        return datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+
+
+APP_BUILD_VERSION = resolve_build_version()
+
+
 @app.after_request
 def disable_browser_cache(response):
     path = (request.path or "").lower()
@@ -992,6 +1007,7 @@ def api_config():
     return jsonify({
         "readOnly": READ_ONLY_MODE,
         "version": "1.0",
+        "buildVersion": APP_BUILD_VERSION,
         "portalName": "Portal de Endereços",
         "apiBaseUrl": request.host_url.rstrip("/"),
         "allowedOrigins": CORS_ALLOWED_ORIGINS,
