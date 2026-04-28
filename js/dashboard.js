@@ -8870,19 +8870,73 @@ function getPendenteRowsByTab(tab = pendenteActiveTab) {
   return (dadosPorCategoria['pendente-autorizacao'] || []).filter(item => item.__pendenteTipo === tab);
 }
 
-function popularFiltroCidadePendente() {
-  const datalist = document.getElementById('filtro-cidade-pendente-list');
-  const input = document.getElementById('filtro-cidade-pendente');
-  if (!datalist || !input) return;
-
-  const valorAtual = input.value || '';
-  const cidades = [...new Set(getPendenteRowsByTab()
+function getPendenteCityOptions(tab = pendenteActiveTab) {
+  return [...new Set(getPendenteRowsByTab(tab)
     .map(item => String(getField(item, 'CIDADE', 'cidade') || '').trim())
     .filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+}
 
-  datalist.innerHTML = cidades.map(cidade => `<option value="${cidade}"></option>`).join('');
+function atualizarContadoresTabsPendente() {
+  const vistoriaCount = getPendenteRowsByTab('vistoria').length;
+  const backboneCount = getPendenteRowsByTab('backbone').length;
+
+  const btnVistoria = document.getElementById('tab-vistoria');
+  const btnBackbone = document.getElementById('tab-backbone');
+
+  if (btnVistoria) {
+    btnVistoria.textContent = `PENDENTE VISTORIA (${vistoriaCount})`;
+  }
+
+  if (btnBackbone) {
+    btnBackbone.textContent = `PENDENTE BACKBONE (${backboneCount})`;
+  }
+}
+
+function popularFiltroCidadePendente() {
+  const input = document.getElementById('filtro-cidade-pendente');
+  const sugestoes = document.getElementById('filtro-cidade-pendente-sugestoes');
+  if (!input || !sugestoes) return;
+
+  const valorAtual = input.value || '';
+  const filtro = valorAtual.toLowerCase().trim();
+  const cidades = getPendenteCityOptions()
+    .filter(cidade => !filtro || cidade.toLowerCase().includes(filtro))
+    .slice(0, 12);
+
+  if (!cidades.length) {
+    sugestoes.innerHTML = '<div class="filtro-cidade-pendente-vazio">Nenhuma cidade encontrada</div>';
+    sugestoes.classList.remove('hidden');
+    input.value = valorAtual;
+    return;
+  }
+
+  sugestoes.innerHTML = cidades.map(cidade => `
+    <button type="button" class="filtro-cidade-pendente-opcao" onclick="selecionarCidadePendente(${JSON.stringify(cidade)})">${escapeHtml(cidade)}</button>
+  `).join('');
+
+  sugestoes.classList.remove('hidden');
   input.value = valorAtual;
+}
+
+function mostrarSugestoesCidadePendente() {
+  popularFiltroCidadePendente();
+}
+
+function ocultarSugestoesCidadePendente() {
+  const sugestoes = document.getElementById('filtro-cidade-pendente-sugestoes');
+  if (sugestoes) {
+    sugestoes.classList.add('hidden');
+  }
+}
+
+function selecionarCidadePendente(cidade) {
+  const input = document.getElementById('filtro-cidade-pendente');
+  if (input) {
+    input.value = cidade || '';
+  }
+  ocultarSugestoesCidadePendente();
+  renderPendenteAutorizacao();
 }
 
 function getPendenteRowsFiltrados() {
@@ -8900,6 +8954,7 @@ function getPendenteRowsFiltrados() {
 }
 
 function aplicarFiltrosPendenteAutorizacao() {
+  popularFiltroCidadePendente();
   renderPendenteAutorizacao();
 }
 
@@ -8908,6 +8963,7 @@ function limparFiltroCidadePendenteAutorizacao() {
   if (input) {
     input.value = '';
   }
+  ocultarSugestoesCidadePendente();
   renderPendenteAutorizacao();
 }
 
@@ -8937,6 +8993,7 @@ function setPendenteTab(tab) {
 }
 
 function renderPendenteAutorizacao() {
+  atualizarContadoresTabsPendente();
   popularFiltroCidadePendente();
 
   const dados = getPendenteRowsFiltrados();
@@ -8946,6 +9003,15 @@ function renderPendenteAutorizacao() {
   const tabelaId = pendenteActiveTab === 'vistoria' ? 'tabela-pendente-vistoria' : 'tabela-pendente-backbone';
   renderTabelaPendente(tabelaId, dadosParaRender);
 }
+
+document.addEventListener('click', (event) => {
+  const filtroWrap = document.querySelector('.filtro-item-cidade-pendente');
+  if (!filtroWrap) return;
+
+  if (!filtroWrap.contains(event.target)) {
+    ocultarSugestoesCidadePendente();
+  }
+});
 
 function getStorageKeyObs(codigo) {
   return `pendente_obs_${codigo}`;
