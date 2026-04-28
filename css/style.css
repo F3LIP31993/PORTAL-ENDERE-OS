@@ -1538,6 +1538,47 @@ h1 {
   box-shadow: 0 18px 40px rgba(30, 64, 175, 0.14);
 }
 
+.filtro-cidade-pendente-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+  border: 1px solid #bfdbfe;
+}
+
+.filtro-cidade-pendente-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.filtro-cidade-pendente-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #1e3a8a;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.filtro-cidade-pendente-count {
+  margin-left: auto;
+  min-width: 28px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #1d4ed8;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.filtro-cidade-pendente-list {
+  display: grid;
+  gap: 4px;
+}
+
 .filtro-cidade-pendente-sugestoes.hidden {
   display: none;
 }
@@ -4360,14 +4401,38 @@ td:first-child {
 }
 
 .pendente-tab-btn.btn-primary {
-  padding: 8px 12px;
-  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
   background: transparent;
   color: #1e3a8a;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.03em;
   box-shadow: none;
+}
+
+.pendente-tab-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pendente-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .pendente-tab-btn.btn-primary:hover {
@@ -4380,6 +4445,12 @@ td:first-child {
   background: linear-gradient(135deg, #2563eb, #1e40af);
   color: #ffffff;
   box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
+}
+
+.pendente-tab-btn.btn-primary.active .pendente-tab-badge {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
 }
 
 #pendente-autorizacao .card {
