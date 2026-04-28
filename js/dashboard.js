@@ -7026,12 +7026,9 @@ function importarPlanilhaEpoGponOngoing() {
       }
 
       const filtroAno = filtrarLinhasPorAno(linhasValidas, EPO_IMPORT_TARGET_YEAR);
-      const linhasAno = filtroAno.linhasFiltradas;
-      if (!linhasAno.length) {
-        if (statusEl) statusEl.textContent = `⚠️ Nenhum registro do ano ${EPO_IMPORT_TARGET_YEAR} encontrado.`;
-        alert(`⚠️ Nenhum registro do ano ${EPO_IMPORT_TARGET_YEAR} encontrado para GPON ONGOING.`);
-        return;
-      }
+      // Se o filtro de ano não encontrar registros do ano alvo, usa todos os registros válidos
+      const linhasAno = filtroAno.linhasFiltradas.length > 0 ? filtroAno.linhasFiltradas : linhasValidas;
+      const filtroAnoIgnorado = filtroAno.filtroAplicado && filtroAno.linhasFiltradas.length === 0;
 
       if (statusEl) statusEl.textContent = `Processando 0/${linhasAno.length} (0%)...`;
       const { byEpo, semCorrespondencia } = await distribuirLinhasPorEpoEmLotes(linhasAno, 'gpon-ongoing', statusEl);
@@ -7045,20 +7042,22 @@ function importarPlanilhaEpoGponOngoing() {
       cacheDatasetLocally('epo-gpon-ongoing', linhasPersistencia, { source: 'manual', locked: true });
 
       const total = linhasAno.length;
-      const descartadasAno = linhasValidas.length - linhasAno.length;
+      const descartadasAno = filtroAnoIgnorado ? 0 : (linhasValidas.length - linhasAno.length);
       const resumo = formatarResumoEpoCompleto(byEpo);
       const ignoredText = semCorrespondencia.length ? ` • ${semCorrespondencia.length} sem EPO` : '';
-      const yearFilterText = filtroAno.filtroAplicado
-        ? (descartadasAno > 0 ? ` • ${descartadasAno} fora de ${EPO_IMPORT_TARGET_YEAR}` : '')
-        : ' • ano não identificado na planilha (filtro desativado)';
+      const yearFilterText = filtroAnoIgnorado
+        ? ' • todos os anos incluídos'
+        : (filtroAno.filtroAplicado
+          ? (descartadasAno > 0 ? ` • ${descartadasAno} fora de ${EPO_IMPORT_TARGET_YEAR}` : '')
+          : ' • ano não identificado na planilha');
 
       if (statusEl) {
         statusEl.textContent = persistResult?.queued
-          ? `✅ ${total} linhas de ${EPO_IMPORT_TARGET_YEAR} distribuídas por EPO${ignoredText}${yearFilterText} • sync pendente`
-          : `✅ ${total} linhas de ${EPO_IMPORT_TARGET_YEAR} distribuídas por EPO${ignoredText}${yearFilterText}`;
+          ? `✅ ${total} linhas distribuídas por EPO${ignoredText}${yearFilterText} • sync pendente`
+          : `✅ ${total} linhas distribuídas por EPO${ignoredText}${yearFilterText}`;
       }
       const resultEl = document.getElementById('epo-action-result');
-      if (resultEl) resultEl.textContent = `✅ Importado GPON ONGOING (${EPO_IMPORT_TARGET_YEAR}): ${resumo}${ignoredText}`;
+      if (resultEl) resultEl.textContent = `✅ Importado GPON ONGOING: ${resumo}${ignoredText}`;
 
       updateEpoImportStatus('gpon-ongoing');
 
@@ -7144,12 +7143,9 @@ function importarPlanilhaEpoProjetoF() {
       }
 
       const filtroAno = filtrarLinhasPorAno(linhasValidas, EPO_IMPORT_TARGET_YEAR);
-      const linhasAno = filtroAno.linhasFiltradas;
-      if (!linhasAno.length) {
-        if (statusEl) statusEl.textContent = `⚠️ Nenhum registro do ano ${EPO_IMPORT_TARGET_YEAR} encontrado.`;
-        alert(`⚠️ Nenhum registro do ano ${EPO_IMPORT_TARGET_YEAR} encontrado para PROJETO F.`);
-        return;
-      }
+      // Se o filtro de ano não encontrar registros do ano alvo, usa todos os registros válidos
+      const linhasAno = filtroAno.linhasFiltradas.length > 0 ? filtroAno.linhasFiltradas : linhasValidas;
+      const filtroAnoIgnorado = filtroAno.filtroAplicado && filtroAno.linhasFiltradas.length === 0;
 
       if (statusEl) statusEl.textContent = `Processando 0/${linhasAno.length} (0%)...`;
       const { byEpo, semCorrespondencia } = await distribuirLinhasPorEpoEmLotes(linhasAno, 'projeto-f', statusEl);
@@ -7163,20 +7159,22 @@ function importarPlanilhaEpoProjetoF() {
       atualizarContadores();
 
       const total = linhasAno.length;
-      const descartadasAno = linhasValidas.length - linhasAno.length;
+      const descartadasAno = filtroAnoIgnorado ? 0 : (linhasValidas.length - linhasAno.length);
       const resumo = formatarResumoEpoCompleto(byEpo);
       const ignoredText = semCorrespondencia.length ? ` • ${semCorrespondencia.length} sem PARCEIRA` : '';
-      const yearFilterText = filtroAno.filtroAplicado
-        ? (descartadasAno > 0 ? ` • ${descartadasAno} fora de ${EPO_IMPORT_TARGET_YEAR}` : '')
-        : ' • ano não identificado na planilha (filtro desativado)';
+      const yearFilterText = filtroAnoIgnorado
+        ? ' • todos os anos incluídos'
+        : (filtroAno.filtroAplicado
+          ? (descartadasAno > 0 ? ` • ${descartadasAno} fora de ${EPO_IMPORT_TARGET_YEAR}` : '')
+          : ' • ano não identificado na planilha');
 
       if (statusEl) {
         statusEl.textContent = persistResult?.queued
-          ? `✅ ${total} linhas de ${EPO_IMPORT_TARGET_YEAR} distribuídas por PARCEIRA${ignoredText}${yearFilterText} • sync pendente`
-          : `✅ ${total} linhas de ${EPO_IMPORT_TARGET_YEAR} distribuídas por PARCEIRA${ignoredText}${yearFilterText}`;
+          ? `✅ ${total} linhas distribuídas por PARCEIRA${ignoredText}${yearFilterText} • sync pendente`
+          : `✅ ${total} linhas distribuídas por PARCEIRA${ignoredText}${yearFilterText}`;
       }
       const resultEl = document.getElementById('epo-action-result');
-      if (resultEl) resultEl.textContent = `✅ Importado PROJETO F (${EPO_IMPORT_TARGET_YEAR}): ${resumo}${ignoredText}`;
+      if (resultEl) resultEl.textContent = `✅ Importado PROJETO F: ${resumo}${ignoredText}`;
 
       updateEpoImportStatus('projeto-f');
 
