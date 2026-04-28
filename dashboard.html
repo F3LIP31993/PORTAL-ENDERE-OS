@@ -306,6 +306,23 @@
         <button id="tab-backbone" class="btn-primary pendente-tab-btn" style="flex:1;" onclick="setPendenteTab('backbone')">PENDENTE BACKBONE</button>
       </div>
 
+      <div class="card">
+        <div class="filtros-pendente">
+          <div class="filtro-item">
+            <label for="filtro-cidade-pendente">Filtrar Cidade:</label>
+            <input type="text" id="filtro-cidade-pendente" placeholder="Digite a cidade..." oninput="aplicarFiltrosPendenteAutorizacao()" autocomplete="off" list="filtro-cidade-pendente-list" />
+            <datalist id="filtro-cidade-pendente-list"></datalist>
+          </div>
+          <div class="filtro-item filtro-item-acoes">
+            <label>Ações</label>
+            <div class="filtro-pendente-acoes">
+              <button type="button" class="btn-primary" onclick="exportarPendenteAutorizacao()">Exportar Planilha</button>
+              <button type="button" class="btn-secondary" onclick="limparFiltroCidadePendenteAutorizacao()">Limpar Filtro</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div id="card-pendente-vistoria" class="card">
         <h2 style="margin-top:0;">Pendente Vistoria</h2>
         <table>
