@@ -7013,6 +7013,22 @@ function getEpoCountsByName(epoName = '') {
   const key = String(epoName || '').trim().toUpperCase();
   if (!key) return { gpon: 0, projetoF: 0 };
 
+  const buildCountMapFromStore = (actionKey = 'gpon-ongoing') => {
+    const rows = getEpoRowsByAction(actionKey);
+    const map = {};
+
+    (Array.isArray(rows) ? rows : []).forEach((item) => {
+      const epo = String(item?.__epoBucket || _resolverEpoDaLinha(item, actionKey) || '').trim().toUpperCase();
+      if (!epo) return;
+      map[epo] = (map[epo] || 0) + 1;
+    });
+
+    return {
+      map,
+      hasStoreData: Array.isArray(rows) && rows.length > 0,
+    };
+  };
+
   const buildCountMapFromBase = (actionKey = 'gpon-ongoing') => {
     const categoriaBase = actionKey === 'projeto-f' ? 'projeto-f' : 'mdu-ongoing';
     const rows = getPreferredDataset(categoriaBase);
@@ -7030,14 +7046,20 @@ function getEpoCountsByName(epoName = '') {
     };
   };
 
+  const gponStore = buildCountMapFromStore('gpon-ongoing');
+  const projetoFStore = buildCountMapFromStore('projeto-f');
   const gponBase = buildCountMapFromBase('gpon-ongoing');
   const projetoFBase = buildCountMapFromBase('projeto-f');
 
   return {
-    gpon: gponBase.hasBaseData
+    gpon: gponStore.hasStoreData
+      ? (gponStore.map[key] || 0)
+      : gponBase.hasBaseData
       ? (gponBase.map[key] || 0)
       : getEpoRowsForEpo('gpon-ongoing', key).length,
-    projetoF: projetoFBase.hasBaseData
+    projetoF: projetoFStore.hasStoreData
+      ? (projetoFStore.map[key] || 0)
+      : projetoFBase.hasBaseData
       ? (projetoFBase.map[key] || 0)
       : getEpoRowsForEpo('projeto-f', key).length
   };
