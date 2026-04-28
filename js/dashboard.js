@@ -8989,8 +8989,18 @@ function getPendenteCityOptions(tab = pendenteActiveTab) {
 }
 
 function atualizarContadoresTabsPendente() {
-  const vistoriaCount = getPendenteRowsByTab('vistoria').length;
-  const backboneCount = getPendenteRowsByTab('backbone').length;
+  const filtroCidade = (document.getElementById('filtro-cidade-pendente')?.value || '').toLowerCase().trim();
+
+  const filtrarPorCidade = (rows) => {
+    if (!filtroCidade) return rows;
+    return rows.filter(item => {
+      const cidade = String(getField(item, 'CIDADE', 'cidade') || '').toLowerCase().trim();
+      return cidade.includes(filtroCidade);
+    });
+  };
+
+  const vistoriaCount = filtrarPorCidade(getPendenteRowsByTab('vistoria')).length;
+  const backboneCount = filtrarPorCidade(getPendenteRowsByTab('backbone')).length;
 
   const btnVistoria = document.getElementById('tab-vistoria');
   const btnBackbone = document.getElementById('tab-backbone');
@@ -9025,7 +9035,6 @@ function popularFiltroCidadePendente() {
     <div class="filtro-cidade-pendente-head">
       <span class="filtro-cidade-pendente-icon" aria-hidden="true">📍</span>
       <span class="filtro-cidade-pendente-title">Cidades</span>
-      <span class="filtro-cidade-pendente-count">${cidadesFiltradas.length}</span>
     </div>
   `;
 
