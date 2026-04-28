@@ -8883,12 +8883,18 @@ function atualizarContadoresTabsPendente() {
 
   const btnVistoria = document.getElementById('tab-vistoria');
   const btnBackbone = document.getElementById('tab-backbone');
+  const badgeVistoria = document.getElementById('tab-vistoria-badge');
+  const badgeBackbone = document.getElementById('tab-backbone-badge');
 
-  if (btnVistoria) {
+  if (badgeVistoria) {
+    badgeVistoria.textContent = String(vistoriaCount);
+  } else if (btnVistoria) {
     btnVistoria.textContent = `PENDENTE VISTORIA (${vistoriaCount})`;
   }
 
-  if (btnBackbone) {
+  if (badgeBackbone) {
+    badgeBackbone.textContent = String(backboneCount);
+  } else if (btnBackbone) {
     btnBackbone.textContent = `PENDENTE BACKBONE (${backboneCount})`;
   }
 }
@@ -8900,20 +8906,28 @@ function popularFiltroCidadePendente() {
 
   const valorAtual = input.value || '';
   const filtro = valorAtual.toLowerCase().trim();
-  const cidades = getPendenteCityOptions()
-    .filter(cidade => !filtro || cidade.toLowerCase().includes(filtro))
-    .slice(0, 12);
+  const cidadesFiltradas = getPendenteCityOptions()
+    .filter(cidade => !filtro || cidade.toLowerCase().includes(filtro));
+  const cidades = cidadesFiltradas.slice(0, 12);
+
+  const headHtml = `
+    <div class="filtro-cidade-pendente-head">
+      <span class="filtro-cidade-pendente-icon" aria-hidden="true">📍</span>
+      <span class="filtro-cidade-pendente-title">Cidades</span>
+      <span class="filtro-cidade-pendente-count">${cidadesFiltradas.length}</span>
+    </div>
+  `;
 
   if (!cidades.length) {
-    sugestoes.innerHTML = '<div class="filtro-cidade-pendente-vazio">Nenhuma cidade encontrada</div>';
+    sugestoes.innerHTML = `${headHtml}<div class="filtro-cidade-pendente-vazio">Nenhuma cidade encontrada</div>`;
     sugestoes.classList.remove('hidden');
     input.value = valorAtual;
     return;
   }
 
-  sugestoes.innerHTML = cidades.map(cidade => `
+  sugestoes.innerHTML = `${headHtml}<div class="filtro-cidade-pendente-list">${cidades.map(cidade => `
     <button type="button" class="filtro-cidade-pendente-opcao" onclick='selecionarCidadePendente(${JSON.stringify(cidade)})'>${escapeHtml(cidade)}</button>
-  `).join('');
+  `).join('')}</div>`;
 
   sugestoes.classList.remove('hidden');
   input.value = valorAtual;
