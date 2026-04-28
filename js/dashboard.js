@@ -249,6 +249,10 @@ function updateImportLockInfo(categoriaId = categoriaAtualParaImport) {
   const lockInfoEl = getOrCreateImportLockInfoElement();
   if (!lockInfoEl) return;
 
+  lockInfoEl.textContent = '';
+  lockInfoEl.style.display = 'none';
+  return;
+
   lockInfoEl.style.display = 'flex';
   lockInfoEl.style.flexBasis = '100%';
   lockInfoEl.style.width = '100%';
@@ -8862,6 +8866,63 @@ function renderTabelaPendente(tabelaId, lista) {
   tbody.innerHTML = html;
 }
 
+function getPendenteRowsByTab(tab = pendenteActiveTab) {
+  return (dadosPorCategoria['pendente-autorizacao'] || []).filter(item => item.__pendenteTipo === tab);
+}
+
+function popularFiltroCidadePendente() {
+  const datalist = document.getElementById('filtro-cidade-pendente-list');
+  const input = document.getElementById('filtro-cidade-pendente');
+  if (!datalist || !input) return;
+
+  const valorAtual = input.value || '';
+  const cidades = [...new Set(getPendenteRowsByTab()
+    .map(item => String(getField(item, 'CIDADE', 'cidade') || '').trim())
+    .filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+
+  datalist.innerHTML = cidades.map(cidade => `<option value="${cidade}"></option>`).join('');
+  input.value = valorAtual;
+}
+
+function getPendenteRowsFiltrados() {
+  const filtroCidade = (document.getElementById('filtro-cidade-pendente')?.value || '').toLowerCase().trim();
+  const rows = getPendenteRowsByTab();
+
+  if (!filtroCidade) {
+    return rows;
+  }
+
+  return rows.filter(item => {
+    const cidade = String(getField(item, 'CIDADE', 'cidade') || '').toLowerCase().trim();
+    return cidade.includes(filtroCidade);
+  });
+}
+
+function aplicarFiltrosPendenteAutorizacao() {
+  renderPendenteAutorizacao();
+}
+
+function limparFiltroCidadePendenteAutorizacao() {
+  const input = document.getElementById('filtro-cidade-pendente');
+  if (input) {
+    input.value = '';
+  }
+  renderPendenteAutorizacao();
+}
+
+function exportarPendenteAutorizacao() {
+  const dadosParaExportar = getPendenteRowsFiltrados();
+  if (!dadosParaExportar.length) {
+    alert('⚠️ Nenhum registro disponível para exportar no filtro atual.');
+    return;
+  }
+
+  const csv = converterParaCSV(dadosParaExportar);
+  const dataAtual = new Date().toISOString().slice(0, 10);
+  baixarCSV(`pendente_autorizacao_${pendenteActiveTab}_${dataAtual}.csv`, csv);
+}
+
 function setPendenteTab(tab) {
   pendenteActiveTab = tab;
   document.getElementById('tab-vistoria')?.classList.toggle('active', tab === 'vistoria');
@@ -8876,18 +8937,11 @@ function setPendenteTab(tab) {
 }
 
 function renderPendenteAutorizacao() {
-  const dados = (dadosPorCategoria['pendente-autorizacao'] || []).filter(item => item.__pendenteTipo === pendenteActiveTab);
+  popularFiltroCidadePendente();
+
+  const dados = getPendenteRowsFiltrados();
   const MAX_DISPLAY = 2500;
   const dadosParaRender = dados.length > MAX_DISPLAY ? dados.slice(0, MAX_DISPLAY) : dados;
-
-  const statusMsgEl = document.getElementById('import-status');
-  if (statusMsgEl) {
-    if (dados.length > MAX_DISPLAY) {
-      statusMsgEl.textContent = `⚠️ Mostrando os primeiros ${MAX_DISPLAY} de ${dados.length} registros. Use o filtro para refinar.`;
-    } else {
-      statusMsgEl.textContent = `✅ Importado ${dados.length} registro(s)`;
-    }
-  }
 
   const tabelaId = pendenteActiveTab === 'vistoria' ? 'tabela-pendente-vistoria' : 'tabela-pendente-backbone';
   renderTabelaPendente(tabelaId, dadosParaRender);
