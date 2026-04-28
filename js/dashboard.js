@@ -6385,6 +6385,7 @@ const EPO_DATASET_CONFIG = {
 };
 
 const EPO_PILLS = ['ACESSO','ANTEC','ARCAD','BASIC','CANTOIA','CSC','DANLEX','ELETRONET','PSNET','SCRIPT_CALL','VISIUM'];
+let epoImportInProgressKey = '';
 
 function getEpoDatasetConfig(actionKey = 'gpon-ongoing') {
   return EPO_DATASET_CONFIG[actionKey] || EPO_DATASET_CONFIG['gpon-ongoing'];
@@ -6582,15 +6583,20 @@ async function carregarEpoDatasetsCompartilhados() {
 
         if (actionKey === 'projeto-f') {
           const user = getCurrentUser();
-          if (user?.role === 'viewer') {
-            saveEpoStore(actionKey, {});
-            updateEpoImportStatus(actionKey, 'aguardando base compartilhada');
+          const storeDerivado = garantirEpoProjetoFDerivado({
+            persistShared: user?.role === 'admin'
+          });
+          if (storeDerivado) {
+            const origemDerivada = user?.role === 'admin'
+              ? 'derivado do PROJETO F'
+              : 'derivado da base compartilhada PROJETO F';
+            updateEpoImportStatus(actionKey, origemDerivada);
             return;
           }
 
-          const storeDerivado = garantirEpoProjetoFDerivado({ persistShared: true });
-          if (storeDerivado) {
-            updateEpoImportStatus(actionKey, 'derivado do PROJETO F');
+          if (user?.role === 'viewer') {
+            saveEpoStore(actionKey, {});
+            updateEpoImportStatus(actionKey, 'aguardando base compartilhada');
             return;
           }
         }
@@ -6932,6 +6938,43 @@ function parseEpoImportRowsRobusto(text = '') {
   return bestRows;
 }
 
+function buildRowHeaderFingerprint(rows = []) {
+  const headerSet = new Set();
+  const sample = Array.isArray(rows) ? rows.slice(0, 50) : [];
+
+  sample.forEach((item) => {
+    if (!item || typeof item !== 'object') return;
+    Object.keys(item).forEach((key) => {
+      const normalized = normalizeText(String(key || '')).replace(/[^a-z0-9]/g, '');
+      if (normalized) headerSet.add(normalized);
+    });
+  });
+
+  return headerSet;
+}
+
+function detectEpoImportDatasetType(rows = []) {
+  const headers = buildRowHeaderFingerprint(rows);
+
+  const ongoingSignals = [
+    'statusgeral', 'motivogeral', 'solicitante', 'fila', 'iddemanda',
+    'codmdugo', 'endereco', 'aging', 'slatudo'
+  ];
+  const projetoFSignals = [
+    'statusmdu', 'statusliberacao', 'codged', 'qtdeblocos',
+    'qtdeblocos', 'bloco', 'parceira', 'dtconstrucao'
+  ];
+
+  const ongoingScore = ongoingSignals.reduce((acc, signal) => acc + (headers.has(signal) ? 1 : 0), 0);
+  const projetoFScore = projetoFSignals.reduce((acc, signal) => acc + (headers.has(signal) ? 1 : 0), 0);
+
+  return {
+    ongoingScore,
+    projetoFScore,
+    inferredType: ongoingScore >= projetoFScore ? 'gpon-ongoing' : 'projeto-f'
+  };
+}
+
 function importarPlanilhaEpoGponOngoing() {
   if (!usuarioPodeImportar()) {
     alert('Apenas o administrador pode anexar/importar arquivos.');
@@ -6942,6 +6985,13 @@ function importarPlanilhaEpoGponOngoing() {
   const statusEl = document.getElementById('epo-gpon-import-status');
   const file = input?.files?.[0];
   if (!file) return;
+
+  if (epoImportInProgressKey) {
+    if (statusEl) statusEl.textContent = `⚠️ Aguarde a conclusão da importação ${epoImportInProgressKey}.`;
+    return;
+  }
+
+  epoImportInProgressKey = 'gpon-ongoing';
   if (statusEl) statusEl.textContent = 'Importando...';
 
   const processarTexto = async (text) => {
@@ -6958,6 +7008,13 @@ function importarPlanilhaEpoGponOngoing() {
       if (!linhas.length) {
         if (statusEl) statusEl.textContent = '⚠️ Nenhuma linha válida encontrada. Verifique se a planilha foi exportada em CSV.';
         alert('⚠️ Nenhuma linha válida encontrada para GPON ONGOING. Verifique cabeçalho e exporte em CSV.');
+        return;
+      }
+
+      const detect = detectEpoImportDatasetType(linhas);
+      if (detect.projetoFScore > detect.ongoingScore && detect.projetoFScore >= 2) {
+        if (statusEl) statusEl.textContent = '⚠️ Esta planilha parece ser de PROJETO F. Use o importador correto.';
+        alert('⚠️ Arquivo identificado como PROJETO F. Importe no botão de PROJETO F para evitar mistura de dados.');
         return;
       }
 
@@ -7010,6 +7067,8 @@ function importarPlanilhaEpoGponOngoing() {
     } catch (err) {
       console.error('[EPO][GPON ONGOING] Erro ao processar importação:', err);
       if (statusEl) statusEl.textContent = `⚠️ Erro ao processar importação: ${err?.message || 'desconhecido'}`;
+    } finally {
+      epoImportInProgressKey = '';
     }
   };
 
@@ -7044,6 +7103,13 @@ function importarPlanilhaEpoProjetoF() {
   const statusEl = document.getElementById('epo-projetof-import-status');
   const file = input?.files?.[0];
   if (!file) return;
+
+  if (epoImportInProgressKey) {
+    if (statusEl) statusEl.textContent = `⚠️ Aguarde a conclusão da importação ${epoImportInProgressKey}.`;
+    return;
+  }
+
+  epoImportInProgressKey = 'projeto-f';
   if (statusEl) statusEl.textContent = 'Importando...';
 
   const processarTexto = async (text) => {
@@ -7060,6 +7126,13 @@ function importarPlanilhaEpoProjetoF() {
       if (!linhas.length) {
         if (statusEl) statusEl.textContent = '⚠️ Nenhuma linha válida encontrada. Verifique se a planilha foi exportada em CSV.';
         alert('⚠️ Nenhuma linha válida encontrada para PROJETO F. Verifique cabeçalho e exporte em CSV.');
+        return;
+      }
+
+      const detect = detectEpoImportDatasetType(linhas);
+      if (detect.ongoingScore > detect.projetoFScore && detect.ongoingScore >= 2) {
+        if (statusEl) statusEl.textContent = '⚠️ Esta planilha parece ser de GPON ONGOING. Use o importador correto.';
+        alert('⚠️ Arquivo identificado como GPON ONGOING. Importe no botão de GPON ONGOING para evitar mistura de dados.');
         return;
       }
 
@@ -7112,6 +7185,8 @@ function importarPlanilhaEpoProjetoF() {
     } catch (err) {
       console.error('[EPO][PROJETO F] Erro ao processar importação:', err);
       if (statusEl) statusEl.textContent = `⚠️ Erro ao processar importação: ${err?.message || 'desconhecido'}`;
+    } finally {
+      epoImportInProgressKey = '';
     }
   };
 
@@ -7878,11 +7953,52 @@ function getBacklogParaNovosEntrantes() {
   return [];
 }
 
+function isLikelyEpoOngoingRow(item) {
+  if (!item || typeof item !== 'object') return false;
+
+  const score = [
+    getField(item, 'STATUS_GERAL', 'STATUS', 'status', 'Status Geral'),
+    getField(item, 'MOTIVO_GERAL', 'MOTIVO', 'motivo', 'Motivo Geral'),
+    getField(item, 'SOLICITANTE', 'solicitante'),
+    getField(item, 'IDDEMANDA', 'ID DEMANDA', 'id'),
+    getField(item, 'COD-MDUGO', 'cod-mdugo', 'codmdugo')
+  ].filter((value) => String(value || '').trim() !== '').length;
+
+  const projetoFHints = [
+    getField(item, 'STATUS MDU', 'STATUS_MDU', 'status_mdu'),
+    getField(item, 'STATUS LIBERAÇÃO', 'STATUS LIBERACAO', 'STATUS_LIBERACAO', 'status_liberacao'),
+    getField(item, 'CODGED', 'codged', 'cod_ged')
+  ].filter((value) => String(value || '').trim() !== '').length;
+
+  return score >= 2 && score >= projetoFHints;
+}
+
+function isLikelyEpoProjetoFRow(item) {
+  if (!item || typeof item !== 'object') return false;
+
+  const score = [
+    getField(item, 'STATUS MDU', 'STATUS_MDU', 'status_mdu'),
+    getField(item, 'STATUS LIBERAÇÃO', 'STATUS LIBERACAO', 'STATUS_LIBERACAO', 'status_liberacao'),
+    getField(item, 'CODGED', 'codged', 'cod_ged', 'CÓD. GED', 'COD GED'),
+    getField(item, 'Qtde Blocos', 'QTDE_BLOCOS', 'QTD_BLOCOS', 'qtd_blocos'),
+    getField(item, 'PARCEIRA', 'parceira')
+  ].filter((value) => String(value || '').trim() !== '').length;
+
+  const ongoingHints = [
+    getField(item, 'STATUS_GERAL', 'STATUS', 'status', 'Status Geral'),
+    getField(item, 'MOTIVO_GERAL', 'MOTIVO', 'motivo', 'Motivo Geral'),
+    getField(item, 'SOLICITANTE', 'solicitante')
+  ].filter((value) => String(value || '').trim() !== '').length;
+
+  return score >= 2 && score >= ongoingHints;
+}
+
 function renderGponOngoingEpo(customRows = null) {
   const container = document.getElementById('epo-action-content');
   if (!container) return;
 
-  const dados = Array.isArray(customRows) ? customRows : getEpoRowsForEpo('gpon-ongoing', epoSelecionadaAtual);
+  const dadosOriginais = Array.isArray(customRows) ? customRows : getEpoRowsForEpo('gpon-ongoing', epoSelecionadaAtual);
+  const dados = (Array.isArray(dadosOriginais) ? dadosOriginais : []).filter(isLikelyEpoOngoingRow);
   if (!dados.length) {
     container.innerHTML = `
       <p class="epo-section-title">${escapeHtml(epoSelecionadaAtual)} • GPON ONGOING (0)</p>
@@ -8017,7 +8133,8 @@ function renderProjetoFEpo(customRows = null) {
   const container = document.getElementById('epo-action-content');
   if (!container) return;
 
-  const dados = Array.isArray(customRows) ? customRows : getEpoRowsForEpo('projeto-f', epoSelecionadaAtual);
+  const dadosOriginais = Array.isArray(customRows) ? customRows : getEpoRowsForEpo('projeto-f', epoSelecionadaAtual);
+  const dados = (Array.isArray(dadosOriginais) ? dadosOriginais : []).filter(isLikelyEpoProjetoFRow);
   if (!dados.length) {
     container.innerHTML = `
       <p class="epo-section-title">${escapeHtml(epoSelecionadaAtual)} • PROJETO F (0)</p>

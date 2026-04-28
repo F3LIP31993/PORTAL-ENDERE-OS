@@ -3,7 +3,8 @@ param(
   [string]$Branch = "main",
   [int]$PollSeconds = 5,
   [int]$DebounceSeconds = 20,
-  [string]$CommitPrefix = "chore: auto sync"
+  [string]$CommitPrefix = "chore: auto sync",
+  [switch]$PushToRemote
 )
 
 $ErrorActionPreference = "Stop"
@@ -39,7 +40,7 @@ function Get-TrackedChanges([string]$Path) {
   return $filtered
 }
 
-function Sync-Now([string]$Path, [string]$TargetBranch, [string]$Prefix) {
+function Sync-Now([string]$Path, [string]$TargetBranch, [string]$Prefix, [bool]$ShouldPush) {
   Set-Location $Path
 
   # Adiciona tudo (respeitando .gitignore)
@@ -53,9 +54,13 @@ function Sync-Now([string]$Path, [string]$TargetBranch, [string]$Prefix) {
 
   $message = "$Prefix $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
   git commit -m $message | Out-Null
-  git push origin $TargetBranch | Out-Null
 
-  Write-Log "Sync concluido: commit + push em '$TargetBranch'."
+  if ($ShouldPush) {
+    git push origin $TargetBranch | Out-Null
+    Write-Log "Sync concluido: commit + push em '$TargetBranch'."
+  } else {
+    Write-Log "Sync concluido: commit local criado (sem push remoto)."
+  }
 }
 
 try {
@@ -68,6 +73,11 @@ try {
 
 Write-Log "Auto Git Sync iniciado em '$RepoPath' (branch: $Branch)."
 Write-Log "Debounce: $DebounceSeconds s | Poll: $PollSeconds s"
+if ($PushToRemote.IsPresent) {
+  Write-Log "Modo remoto: push automatico habilitado."
+} else {
+  Write-Log "Modo seguro: apenas commit local automatico (push desabilitado)."
+}
 Write-Log "Pare com Ctrl+C"
 
 $lastFingerprint = ""
@@ -96,7 +106,7 @@ while ($true) {
     if ($pendingSince -ne $null) {
       $elapsed = (New-TimeSpan -Start $pendingSince -End (Get-Date)).TotalSeconds
       if ($elapsed -ge $DebounceSeconds) {
-        Sync-Now -Path $RepoPath -TargetBranch $Branch -Prefix $CommitPrefix
+        Sync-Now -Path $RepoPath -TargetBranch $Branch -Prefix $CommitPrefix -ShouldPush $PushToRemote.IsPresent
         $lastFingerprint = ""
         $pendingSince = $null
       }
