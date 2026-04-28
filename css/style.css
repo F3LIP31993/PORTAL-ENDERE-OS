@@ -1463,6 +1463,7 @@ h1 {
 }
 
 .filtros-projeto-f,
+.filtros-pendente,
 .filtros-empresarial,
 .filtro-status {
   display: flex;
@@ -1510,6 +1511,21 @@ h1 {
   width: 128px;
   font-size: 10px;
   padding: 5px 7px;
+}
+
+#filtro-cidade-pendente {
+  min-width: 180px;
+  max-width: 240px;
+}
+
+.filtro-item-acoes {
+  min-width: 220px;
+}
+
+.filtro-pendente-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 #pesquisa h1 {
