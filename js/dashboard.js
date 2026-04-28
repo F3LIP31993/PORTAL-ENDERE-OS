@@ -3290,6 +3290,7 @@ function renderTabelaProjetoF(id, lista) {
     window.__projetoFModalData = [];
     tbody.innerHTML = `<tr><td colspan="8">Nenhum registro</td></tr>`;
     popularFiltroCidadeProjetoF();
+    popularFiltroStatusProjetoF(dadosPorCategoria['projeto-f'] || []);
     return;
   }
 
@@ -3340,6 +3341,7 @@ function renderTabelaProjetoF(id, lista) {
   }
 
   popularFiltroCidadeProjetoF();
+  popularFiltroStatusProjetoF(dadosPorCategoria['projeto-f'] || []);
 }
 
 function isStatusLiberadoProjetoF(item) {
@@ -3801,13 +3803,84 @@ function filtrarProjetoFPorEndereco() {
   });
 }
 
+function popularFiltroStatusProjetoF(listaBase = null) {
+  const input = document.getElementById('filtro-status-projeto-f');
+  const sugestoes = document.getElementById('filtro-status-projeto-f-sugestoes');
+  if (!input || !sugestoes) return;
+
+  const valorAtual = input.value || '';
+  const filtro = normalizeText(valorAtual);
+  const dados = Array.isArray(listaBase) ? listaBase : (dadosPorCategoria['projeto-f'] || []);
+
+  const statusUnicos = [...new Set(dados
+    .map(item => String(getField(item, 'STATUS MDU', 'STATUS_MDU', 'status_mdu') || '').trim())
+    .filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+
+  const statusFiltrados = statusUnicos
+    .filter(status => !filtro || normalizeText(status).includes(filtro));
+  const statusVisiveis = statusFiltrados.slice(0, 12);
+
+  const headHtml = `
+    <div class="filtro-status-projeto-f-head">
+      <span class="filtro-status-projeto-f-icon" aria-hidden="true">🏷️</span>
+      <span class="filtro-status-projeto-f-title">Status MDU</span>
+      <span class="filtro-status-projeto-f-count">${statusFiltrados.length}</span>
+    </div>
+  `;
+
+  if (!statusVisiveis.length) {
+    sugestoes.innerHTML = `${headHtml}<div class="filtro-status-projeto-f-vazio">Nenhum status encontrado</div>`;
+    sugestoes.classList.remove('hidden');
+    return;
+  }
+
+  sugestoes.innerHTML = `${headHtml}<div class="filtro-status-projeto-f-list">${statusVisiveis.map(status => `
+    <button type="button" class="filtro-status-projeto-f-opcao" onclick='selecionarStatusProjetoF(${JSON.stringify(status)})'>${escapeHtml(status)}</button>
+  `).join('')}</div>`;
+
+  sugestoes.classList.remove('hidden');
+}
+
+function mostrarSugestoesStatusProjetoF() {
+  popularFiltroStatusProjetoF();
+}
+
+function ocultarSugestoesStatusProjetoF() {
+  const sugestoes = document.getElementById('filtro-status-projeto-f-sugestoes');
+  if (sugestoes) {
+    sugestoes.classList.add('hidden');
+  }
+}
+
+function selecionarStatusProjetoF(status) {
+  const input = document.getElementById('filtro-status-projeto-f');
+  if (input) {
+    input.value = status || '';
+  }
+
+  ocultarSugestoesStatusProjetoF();
+  aplicarFiltrosProjetoF();
+}
+
+function filtrarProjetoFPorStatus(listaBase = null) {
+  const statusSelecionado = String(document.getElementById('filtro-status-projeto-f')?.value || '').trim();
+  const dados = Array.isArray(listaBase) ? listaBase : (dadosPorCategoria['projeto-f'] || []);
+  if (!statusSelecionado) return dados;
+
+  const statusNormalizado = normalizeText(statusSelecionado);
+
+  return dados.filter(item => {
+    const statusMdu = String(getField(item, 'STATUS MDU', 'STATUS_MDU', 'status_mdu') || '').trim();
+    return normalizeText(statusMdu).includes(statusNormalizado);
+  });
+}
+
 function aplicarFiltrosProjetoF() {
   popularFiltroCidadeProjetoF();
 
-  let dadosFiltrados = dadosPorCategoria['projeto-f'] || [];
-
   // Aplicar filtro de cidade
-  dadosFiltrados = filtrarProjetoFPorCidade();
+  let dadosFiltrados = filtrarProjetoFPorCidade();
 
   // Aplicar filtro de endereço sobre os dados já filtrados por cidade
   const filtroEndereco = document.getElementById('filtro-endereco-projeto-f')?.value?.toLowerCase().trim() || '';
@@ -3818,15 +3891,22 @@ function aplicarFiltrosProjetoF() {
     });
   }
 
+  popularFiltroStatusProjetoF(dadosFiltrados);
+  dadosFiltrados = filtrarProjetoFPorStatus(dadosFiltrados);
+
   renderTabelaProjetoF('tabela-projeto-f', dadosFiltrados);
 }
 
 document.addEventListener('click', (event) => {
   const filtroProjetoF = document.querySelector('.filtro-item-cidade-projetof');
-  if (!filtroProjetoF) return;
+  const filtroStatusProjetoF = document.querySelector('.filtro-item-status-projetof');
 
-  if (!filtroProjetoF.contains(event.target)) {
+  if (filtroProjetoF && !filtroProjetoF.contains(event.target)) {
     ocultarSugestoesCidadeProjetoF();
+  }
+
+  if (filtroStatusProjetoF && !filtroStatusProjetoF.contains(event.target)) {
+    ocultarSugestoesStatusProjetoF();
   }
 });
 
