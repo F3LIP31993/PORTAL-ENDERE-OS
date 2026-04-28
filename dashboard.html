@@ -460,6 +460,11 @@
             <label for="filtro-endereco-projeto-f">Buscar Endereço:</label>
             <input type="text" id="filtro-endereco-projeto-f" placeholder="Digite parte do endereço..." oninput="aplicarFiltrosProjetoF()" />
           </div>
+          <div class="filtro-item filtro-item-status-projetof">
+            <label for="filtro-status-projeto-f">Status MDU:</label>
+            <input type="text" id="filtro-status-projeto-f" placeholder="Digite o status..." oninput="aplicarFiltrosProjetoF()" onfocus="mostrarSugestoesStatusProjetoF()" autocomplete="off" />
+            <div id="filtro-status-projeto-f-sugestoes" class="filtro-status-projeto-f-sugestoes hidden"></div>
+          </div>
         </div>
         <table>
           <thead>
