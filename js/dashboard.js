@@ -32,6 +32,7 @@ const STORAGE_DATASET_CACHE_KEY = "portalDatasetCache";
 const STORAGE_SHARED_SYNC_QUEUE_KEY = "portalSharedSyncRetryQueue";
 const SESSION_ONLY_DATASET_KEYS = [];
 const SHARED_REFRESH_INTERVAL_MS = 120000;
+const BUILD_VERSION_CHECK_INTERVAL_MS = 45000;
 const MAX_LOCAL_CACHE_ITEMS_BY_CATEGORY = {};
 const PRIORITY_DATASET_CACHE_KEYS = [
   'projeto-f',
@@ -50,6 +51,45 @@ const runtimeEpoStores = {
   'gpon-ongoing': null,
   'projeto-f': null,
 };
+let currentPortalBuildVersion = '';
+let portalBuildReloadScheduled = false;
+
+async function checkForNewPortalBuild(forceInit = false) {
+  if (!window.location.protocol.startsWith('http')) return;
+
+  try {
+    const configUrl = `/api/config?_build_check=${Date.now()}`;
+    const response = await fetch(configUrl, {
+      credentials: 'include',
+      cache: 'no-store'
+    });
+
+    if (!response.ok) return;
+
+    const config = await response.json().catch(() => ({}));
+    const buildVersion = String(config?.buildVersion || config?.version || '').trim();
+    if (!buildVersion) return;
+
+    if (!currentPortalBuildVersion || forceInit) {
+      currentPortalBuildVersion = buildVersion;
+      return;
+    }
+
+    if (currentPortalBuildVersion !== buildVersion && !portalBuildReloadScheduled) {
+      portalBuildReloadScheduled = true;
+      const statusEl = document.getElementById('import-status');
+      if (statusEl) {
+        statusEl.textContent = '♻️ Nova versão publicada no Render. Atualizando página...';
+      }
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 1200);
+    }
+  } catch {
+    // Sem bloqueio: se a API estiver indisponível, tenta no próximo ciclo.
+  }
+}
 
 function stripSessionOnlyDatasets(cache = {}) {
   const sanitized = { ...(cache || {}) };
@@ -1869,18 +1909,24 @@ window.addEventListener("DOMContentLoaded", async () => {
   inicializarFiltrosDDD();
   setImportMode(importMode);
   agendarRenderVisaoGerencia(true);
+  await checkForNewPortalBuild(true);
 
   window.setInterval(() => {
     updateNotificationBadge();
     carregarDadosCompartilhados();
     carregarEpoDatasetsCompartilhados();
     processarFilaSyncCompartilhada();
+    checkForNewPortalBuild();
 
     const panel = document.getElementById("notificationPanel");
     if (panel && !panel.classList.contains("hidden")) {
       renderNotificationList();
     }
   }, SHARED_REFRESH_INTERVAL_MS);
+
+  window.setInterval(() => {
+    checkForNewPortalBuild();
+  }, BUILD_VERSION_CHECK_INTERVAL_MS);
 
   // Atualizar badge quando outra aba/máquina mudar os usuários (localStorage)
   window.addEventListener("storage", (event) => {
@@ -3598,11 +3644,12 @@ function popularFiltroStatusMdu() {
 }
 
 function popularFiltroCidadeProjetoF() {
-  // Popula o datalist de autocomplete (o input de texto não precisa de rebuild de options)
-  const datalist = document.getElementById('filtro-cidade-projeto-f-list');
-  if (!datalist) return;
+  const input = document.getElementById('filtro-cidade-projeto-f');
+  const sugestoes = document.getElementById('filtro-cidade-projeto-f-sugestoes');
+  if (!input || !sugestoes) return;
 
-  const valorAtual = '';
+  const valorAtual = input.value || '';
+  const filtro = valorAtual.toLowerCase().trim();
   const dados = dadosPorCategoria['projeto-f'] || [];
   const dadosCidadesLen = (dadosPorCategoria['projeto-f-cities'] || []).length;
   const cacheToken = `projeto-f:${getDatasetVersionToken(dados)}:${dados.length}:${dadosCidadesLen}`;
@@ -3646,7 +3693,49 @@ function popularFiltroCidadeProjetoF() {
     projetoFCityFilterCacheOptions = cidadesUnicas.slice();
   }
 
-  datalist.innerHTML = cidadesUnicas.map(c => `<option value="${c}"></option>`).join('');
+  const cidadesFiltradas = cidadesUnicas.filter(cidade => !filtro || cidade.toLowerCase().includes(filtro));
+  const cidadesVisiveis = cidadesFiltradas.slice(0, 10);
+
+  const headHtml = `
+    <div class="filtro-cidade-projeto-f-head">
+      <span class="filtro-cidade-projeto-f-icon" aria-hidden="true">📍</span>
+      <span class="filtro-cidade-projeto-f-title">Cidades</span>
+      <span class="filtro-cidade-projeto-f-count">${cidadesFiltradas.length}</span>
+    </div>
+  `;
+
+  if (!cidadesVisiveis.length) {
+    sugestoes.innerHTML = `${headHtml}<div class="filtro-cidade-projeto-f-vazio">Nenhuma cidade encontrada</div>`;
+    sugestoes.classList.remove('hidden');
+    return;
+  }
+
+  sugestoes.innerHTML = `${headHtml}<div class="filtro-cidade-projeto-f-list">${cidadesVisiveis.map(cidade => `
+    <button type="button" class="filtro-cidade-projeto-f-opcao" onclick='selecionarCidadeProjetoF(${JSON.stringify(cidade)})'>${escapeHtml(cidade)}</button>
+  `).join('')}</div>`;
+
+  sugestoes.classList.remove('hidden');
+}
+
+function mostrarSugestoesCidadeProjetoF() {
+  popularFiltroCidadeProjetoF();
+}
+
+function ocultarSugestoesCidadeProjetoF() {
+  const sugestoes = document.getElementById('filtro-cidade-projeto-f-sugestoes');
+  if (sugestoes) {
+    sugestoes.classList.add('hidden');
+  }
+}
+
+function selecionarCidadeProjetoF(cidade) {
+  const input = document.getElementById('filtro-cidade-projeto-f');
+  if (input) {
+    input.value = cidade || '';
+  }
+
+  ocultarSugestoesCidadeProjetoF();
+  aplicarFiltrosProjetoF();
 }
 
 function filtrarMduOngoingPorStatus() {
@@ -3702,6 +3791,8 @@ function filtrarProjetoFPorEndereco() {
 }
 
 function aplicarFiltrosProjetoF() {
+  popularFiltroCidadeProjetoF();
+
   let dadosFiltrados = dadosPorCategoria['projeto-f'] || [];
 
   // Aplicar filtro de cidade
@@ -3718,6 +3809,15 @@ function aplicarFiltrosProjetoF() {
 
   renderTabelaProjetoF('tabela-projeto-f', dadosFiltrados);
 }
+
+document.addEventListener('click', (event) => {
+  const filtroProjetoF = document.querySelector('.filtro-item-cidade-projetof');
+  if (!filtroProjetoF) return;
+
+  if (!filtroProjetoF.contains(event.target)) {
+    ocultarSugestoesCidadeProjetoF();
+  }
+});
 
 // ===== FILTROS EMPRESARIAL =====
 function popularFiltrosEmpresarial(listaBase = null) {
