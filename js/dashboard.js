@@ -2619,8 +2619,8 @@ function importarCSV() {
       const dados = parseSarRedeCsvRows(linhas, delimiter);
 
       applyDatasetToState('sar-rede', dados);
-      cacheDatasetLocally('sar-rede', dados, { source: 'manual', locked: true });
-      persistirDadosCompartilhados('sar-rede', dados, { source: 'manual', locked: true });
+      cacheDatasetLocally('sar-rede', dados, { source: 'manual', locked: false });
+      await persistirDadosCompartilhados('sar-rede', dados, { source: 'manual', locked: false });
 
       renderTabelaSarRede('tabela-sar-rede', dados);
       popularFiltroStatusSarRede(dados);
@@ -3524,6 +3524,38 @@ function renderTabelaLiberados(id, lista) {
   tbody.innerHTML = rows;
 }
 
+function getLiberadosRowsFiltrados(listaBase = null) {
+  const dados = Array.isArray(listaBase) ? listaBase : getDadosLiberadosDaAba(getPreferredDataset('liberados') || [], liberadosAbaAtiva);
+  const filtroCidade = normalizeText(document.getElementById('filtro-cidade-liberados')?.value || '').trim();
+
+  if (!filtroCidade) {
+    return dados;
+  }
+
+  return dados.filter((item) => {
+    const cidade = normalizeText(getField(item, 'CIDADE', 'Cidade', 'cidade') || '');
+    return cidade.includes(filtroCidade);
+  });
+}
+
+function aplicarFiltrosLiberados() {
+  const baseLiberados = getPreferredDataset('liberados');
+  let dadosAba = getDadosLiberadosDaAba(baseLiberados || [], liberadosAbaAtiva);
+
+  if ((!baseLiberados || !baseLiberados.length) && !dadosAba.length && liberadosAbaAtiva === 'projeto-f') {
+    const baseProjetoF = getPreferredDataset('projeto-f');
+    dadosAba = getDadosLiberadosProjetoF(baseProjetoF || []).map(item => ({ ...item, _aba_liberados: 'projeto-f' }));
+  }
+
+  const dadosFiltrados = getLiberadosRowsFiltrados(dadosAba);
+  const infoEl = document.getElementById('liberados-aba-info');
+  if (infoEl) {
+    infoEl.textContent = `Aba ativa: ${getLiberadosAbaLabel(liberadosAbaAtiva)} • ${dadosFiltrados.length} registro(s)`;
+  }
+
+  renderTabelaLiberados('tabela-liberados', dadosFiltrados);
+}
+
 function visualizarLiberado(index) {
   const rows = Array.isArray(window.__liberadosModalData) ? window.__liberadosModalData : [];
   const item = rows[index];
@@ -3772,7 +3804,7 @@ function atualizarFiltroStatusMdu() {
 }
 
 function filtrarProjetoFPorCidade() {
-  const filtroCidade = (document.getElementById('filtro-cidade-projeto-f')?.value || '').toLowerCase().trim();
+  const filtroCidade = normalizeText(document.getElementById('filtro-cidade-projeto-f')?.value || '').trim();
   const dados = dadosPorCategoria['projeto-f'] || [];
 
   if (!filtroCidade) {
@@ -3780,11 +3812,10 @@ function filtrarProjetoFPorCidade() {
   }
 
   return dados.filter(item => {
-    const cidade = String(getField(item, 'CIDADE', 'cidade', 'Cidade') || '')
+    const cidade = normalizeText(String(getField(item, 'CIDADE', 'cidade', 'Cidade') || '')
       .replace(/\r?\n/g, ' ')
       .replace(/\s+/g, ' ')
-      .toLowerCase()
-      .trim();
+      .trim());
     return cidade.includes(filtroCidade);
   });
 }
@@ -9721,10 +9752,14 @@ function carregarDadosCategoria(categoriaId) {
 
     const infoEl = document.getElementById('liberados-aba-info');
     if (infoEl) {
-      infoEl.textContent = `Aba ativa: ${getLiberadosAbaLabel(liberadosAbaAtiva)} • ${dadosAba.length} registro(s)`;
+      const dadosFiltrados = getLiberadosRowsFiltrados(dadosAba);
+      infoEl.textContent = `Aba ativa: ${getLiberadosAbaLabel(liberadosAbaAtiva)} • ${dadosFiltrados.length} registro(s)`;
+      renderTabelaLiberados('tabela-liberados', dadosFiltrados);
+      atualizarContadores();
+      return;
     }
 
-    renderTabelaLiberados('tabela-liberados', dadosAba);
+    renderTabelaLiberados('tabela-liberados', getLiberadosRowsFiltrados(dadosAba));
     atualizarContadores();
     return;
   }
