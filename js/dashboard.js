@@ -848,6 +848,91 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
     return compact;
   };
 
+  const normalizeEpoProjetoFRowsForStorage = async (rows = []) => {
+    if (!Array.isArray(rows) || !rows.length) return [];
+
+    const compact = [];
+    const chunkSize = 1000;
+
+    const buildPayload = (row) => ({
+      '__epoBucket': getField(row, '__epoBucket', '__epobucket'),
+      'PARCEIRA': getField(row, 'PARCEIRA', 'parceira', 'EPO', 'epo', 'CLUSTER', 'cluster'),
+      'CIDADE': getField(row, 'CIDADE', 'cidade', 'Cidade'),
+      'BLOCO': getField(row, 'BLOCO', 'bloco', 'Bloco'),
+      'CODGED': getField(row, 'CODGED', 'codged', 'cod_ged', 'COD GED', 'CÓD. GED', 'GED'),
+      'ENDEREÇO': getField(row, 'ENDEREÇO', 'ENDERECO', 'endereco', 'endereco_entrada'),
+      'NUMERO': getField(row, 'NUMERO', 'NÚMERO', 'numero', 'num'),
+      'Qtde Blocos': getField(row, 'Qtde Blocos', 'QTDE_BLOCOS', 'QTD_BLOCOS', 'qtd_blocos'),
+      'STATUS MDU': getField(row, 'STATUS MDU', 'STATUS_MDU', 'status_mdu'),
+      'STATUS LIBERAÇÃO': getField(row, 'STATUS LIBERAÇÃO', 'STATUS LIBERACAO', 'STATUS_LIBERACAO', 'status_liberacao'),
+      'DT_CONSTRUÇÃO': getField(row, 'DT_CONSTRUÇÃO', 'DT_CONSTRUCAO', 'dt_construcao'),
+    });
+
+    let start = 0;
+    while (start < rows.length) {
+      const end = Math.min(start + chunkSize, rows.length);
+      for (let i = start; i < end; i += 1) {
+        const payload = buildPayload(rows[i]);
+        const hasRelevantData = [
+          payload['PARCEIRA'],
+          payload['CODGED'],
+          payload['ENDEREÇO'],
+          payload['CIDADE'],
+          payload['STATUS MDU'],
+          payload['STATUS LIBERAÇÃO'],
+        ].some((value) => String(value || '').trim() !== '');
+        if (hasRelevantData) compact.push(payload);
+      }
+
+      start = end;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    return compact;
+  };
+
+  const normalizeEpoOngoingRowsForStorage = async (rows = []) => {
+    if (!Array.isArray(rows) || !rows.length) return [];
+
+    const compact = [];
+    const chunkSize = 1000;
+
+    const buildPayload = (row) => ({
+      '__epoBucket': getField(row, '__epoBucket', '__epobucket'),
+      'COD-MDUGO': getField(row, 'COD-MDUGO', 'CODIGO', 'CÓDIGO', 'cod-mdugo', 'codmdugo'),
+      'ENDEREÇO': getField(row, 'ENDEREÇO', 'ENDERECO', 'endereco_unico', 'endereco', 'endereco_entrada'),
+      'NUMERO': getField(row, 'NUMERO', 'NÚMERO', 'numero', 'num'),
+      'BAIRRO': getField(row, 'BAIRRO', 'bairro'),
+      'CIDADE': getField(row, 'CIDADE', 'cidade', 'Cidade'),
+      'EPO': getField(row, 'EPO', 'epo', 'CLUSTER', 'cluster', 'PARCEIRA', 'parceira'),
+      'SOLICITANTE': getField(row, 'SOLICITANTE', 'solicitante', 'TIPO', 'tipo'),
+      'STATUS_GERAL': getField(row, 'STATUS_GERAL', 'status_geral', 'STATUS', 'status', 'Status Geral'),
+      'MOTIVO_GERAL': getField(row, 'MOTIVO_GERAL', 'motivo_geral', 'MOTIVO', 'motivo', 'Motivo Geral'),
+      'OBS': getField(row, 'OBS', 'obs', 'OBSERVACAO', 'observacao', 'STATUS OBS', 'status_obs')
+    });
+
+    let start = 0;
+    while (start < rows.length) {
+      const end = Math.min(start + chunkSize, rows.length);
+      for (let i = start; i < end; i += 1) {
+        const payload = buildPayload(rows[i]);
+        const hasRelevantData = [
+          payload['COD-MDUGO'],
+          payload['ENDEREÇO'],
+          payload['STATUS_GERAL'],
+          payload['MOTIVO_GERAL'],
+          payload['EPO'],
+        ].some((value) => String(value || '').trim() !== '');
+        if (hasRelevantData) compact.push(payload);
+      }
+
+      start = end;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    return compact;
+  };
+
   const finalItemsToPersist = (categoria === 'projeto-f')
     ? await (async () => {
         const compactRows = await normalizeProjetoFRowsForStorage(itemsToPersist);
@@ -861,6 +946,16 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
     : (categoria === 'liberados')
       ? await (async () => {
           const compactRows = await normalizeLiberadosRowsForStorage(itemsToPersist);
+          return compactRows.length ? compactRows : itemsToPersist;
+        })()
+    : (categoria === 'epo-projeto-f')
+      ? await (async () => {
+          const compactRows = await normalizeEpoProjetoFRowsForStorage(itemsToPersist);
+          return compactRows.length ? compactRows : itemsToPersist;
+        })()
+    : (categoria === 'epo-gpon-ongoing')
+      ? await (async () => {
+          const compactRows = await normalizeEpoOngoingRowsForStorage(itemsToPersist);
           return compactRows.length ? compactRows : itemsToPersist;
         })()
     : itemsToPersist;
