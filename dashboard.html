@@ -449,12 +449,12 @@
         <h1>📡 Projeto F</h1>
       </div>
 
-      <div class="card">
+      <div class="card card-projetof-filtros">
         <div class="filtros-projeto-f">
-          <div class="filtro-item">
+          <div class="filtro-item filtro-item-cidade-projetof">
             <label for="filtro-cidade-projeto-f">Filtrar Cidade:</label>
-            <input type="text" id="filtro-cidade-projeto-f" placeholder="Digite a cidade..." oninput="aplicarFiltrosProjetoF()" autocomplete="off" list="filtro-cidade-projeto-f-list" />
-            <datalist id="filtro-cidade-projeto-f-list"></datalist>
+            <input type="text" id="filtro-cidade-projeto-f" placeholder="Digite a cidade..." oninput="aplicarFiltrosProjetoF()" onfocus="mostrarSugestoesCidadeProjetoF()" autocomplete="off" />
+            <div id="filtro-cidade-projeto-f-sugestoes" class="filtro-cidade-projeto-f-sugestoes hidden"></div>
           </div>
           <div class="filtro-item">
             <label for="filtro-endereco-projeto-f">Buscar Endereço:</label>
