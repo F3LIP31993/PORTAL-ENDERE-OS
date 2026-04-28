@@ -8912,7 +8912,7 @@ function popularFiltroCidadePendente() {
   }
 
   sugestoes.innerHTML = cidades.map(cidade => `
-    <button type="button" class="filtro-cidade-pendente-opcao" onclick="selecionarCidadePendente(${JSON.stringify(cidade)})">${escapeHtml(cidade)}</button>
+    <button type="button" class="filtro-cidade-pendente-opcao" onclick='selecionarCidadePendente(${JSON.stringify(cidade)})'>${escapeHtml(cidade)}</button>
   `).join('');
 
   sugestoes.classList.remove('hidden');
