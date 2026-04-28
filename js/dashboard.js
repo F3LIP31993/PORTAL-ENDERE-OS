@@ -6773,10 +6773,10 @@ function garantirEpoProjetoFDerivado(options = {}) {
 
   const rows = flattenEpoNovosStore(storeDerivado);
   saveEpoStore('projeto-f', storeDerivado);
-  cacheDatasetLocally('epo-projeto-f', rows, { source: 'derived', locked: true });
+  cacheDatasetLocally('epo-projeto-f', rows, { source: 'derived', locked: false });
 
   if (persistShared && getCurrentUser()?.role === 'admin') {
-    persistirDadosCompartilhados('epo-projeto-f', rows, { source: 'derived', locked: true });
+    persistirDadosCompartilhados('epo-projeto-f', rows, { source: 'derived', locked: false });
   }
 
   return storeDerivado;
@@ -6811,7 +6811,7 @@ function updateEpoImportStatus(actionKey = 'gpon-ongoing', extraText = '') {
   const storeRows = getEpoRowsByAction(actionKey);
   const rows = snapshotItems.length ? snapshotItems : storeRows;
   const sourceText = snapshot.source || (storeRows.length ? 'local' : 'shared');
-  const lockedText = (snapshot.locked || rows.length > 0) ? 'travado' : 'não travado';
+  const lockedText = snapshot.locked ? 'travado' : 'sincronizado';
 
   if (!rows.length && !extraText) {
     statusEl.textContent = '';
@@ -6893,7 +6893,7 @@ async function carregarEpoDatasetsCompartilhados() {
 
         const user = getCurrentUser();
         if (user?.role === 'admin' && localRows.length) {
-          persistirDadosCompartilhados(cfg.sharedKey, localRows, { source: 'manual', locked: true });
+          persistirDadosCompartilhados(cfg.sharedKey, localRows, { source: 'manual', locked: false });
         }
         updateEpoImportStatus(actionKey);
         return;
@@ -6903,7 +6903,7 @@ async function carregarEpoDatasetsCompartilhados() {
         source: 'shared',
         updatedAt: epoSnapshot?.updated_at || epoSnapshot?.updatedAt || new Date().toISOString(),
         updatedBy: epoSnapshot?.updated_by || epoSnapshot?.updatedBy || '',
-        locked: true,
+        locked: false,
       });
 
       const store = buildEpoNovosStoreFromRows(rows, actionKey);
@@ -7013,9 +7013,33 @@ function getEpoCountsByName(epoName = '') {
   const key = String(epoName || '').trim().toUpperCase();
   if (!key) return { gpon: 0, projetoF: 0 };
 
+  const buildCountMapFromBase = (actionKey = 'gpon-ongoing') => {
+    const categoriaBase = actionKey === 'projeto-f' ? 'projeto-f' : 'mdu-ongoing';
+    const rows = getPreferredDataset(categoriaBase);
+    const map = {};
+
+    (Array.isArray(rows) ? rows : []).forEach((item) => {
+      const epo = _resolverEpoDaLinha(item, actionKey);
+      if (!epo) return;
+      map[epo] = (map[epo] || 0) + 1;
+    });
+
+    return {
+      map,
+      hasBaseData: Array.isArray(rows) && rows.length > 0,
+    };
+  };
+
+  const gponBase = buildCountMapFromBase('gpon-ongoing');
+  const projetoFBase = buildCountMapFromBase('projeto-f');
+
   return {
-    gpon: getEpoRowsForEpo('gpon-ongoing', key).length,
-    projetoF: getEpoRowsForEpo('projeto-f', key).length
+    gpon: gponBase.hasBaseData
+      ? (gponBase.map[key] || 0)
+      : getEpoRowsForEpo('gpon-ongoing', key).length,
+    projetoF: projetoFBase.hasBaseData
+      ? (projetoFBase.map[key] || 0)
+      : getEpoRowsForEpo('projeto-f', key).length
   };
 }
 
@@ -7328,8 +7352,8 @@ function importarPlanilhaEpoGponOngoing() {
       atualizarResumoEpoSelecionada();
       atualizarContadores();
       const linhasPersistencia = flattenEpoNovosStore(byEpo);
-      const persistResult = await persistirDadosCompartilhados('epo-gpon-ongoing', linhasPersistencia, { source: 'manual', locked: true });
-      cacheDatasetLocally('epo-gpon-ongoing', linhasPersistencia, { source: 'manual', locked: true });
+      const persistResult = await persistirDadosCompartilhados('epo-gpon-ongoing', linhasPersistencia, { source: 'manual', locked: false });
+      cacheDatasetLocally('epo-gpon-ongoing', linhasPersistencia, { source: 'manual', locked: false });
 
       const total = linhasAno.length;
       const descartadasAno = filtroAnoIgnorado ? 0 : (linhasValidas.length - linhasAno.length);
@@ -7444,8 +7468,8 @@ function importarPlanilhaEpoProjetoF() {
       atualizarCountPillsEpo();
       atualizarResumoEpoSelecionada();
       const linhasPersistencia = flattenEpoNovosStore(byEpo);
-      const persistResult = await persistirDadosCompartilhados('epo-projeto-f', linhasPersistencia, { source: 'manual', locked: true });
-      cacheDatasetLocally('epo-projeto-f', linhasPersistencia, { source: 'manual', locked: true });
+      const persistResult = await persistirDadosCompartilhados('epo-projeto-f', linhasPersistencia, { source: 'manual', locked: false });
+      cacheDatasetLocally('epo-projeto-f', linhasPersistencia, { source: 'manual', locked: false });
       atualizarContadores();
 
       const total = linhasAno.length;
