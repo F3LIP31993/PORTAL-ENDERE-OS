@@ -33,7 +33,17 @@ const STORAGE_SHARED_SYNC_QUEUE_KEY = "portalSharedSyncRetryQueue";
 const SESSION_ONLY_DATASET_KEYS = [];
 const SHARED_REFRESH_INTERVAL_MS = 120000;
 const BUILD_VERSION_CHECK_INTERVAL_MS = 45000;
-const MAX_LOCAL_CACHE_ITEMS_BY_CATEGORY = {};
+const MAX_LOCAL_CACHE_ITEMS_BY_CATEGORY = {
+  'projeto-f': 5000,
+  'liberados': 5000,
+  'sar-rede': 5000,
+  'epo-gpon-ongoing': 5000,
+  'epo-projeto-f': 5000,
+  'mdu-ongoing': 5000,
+  'empresarial': 5000,
+  'pendente-autorizacao': 5000,
+  'backlog': 5000
+};
 const PRIORITY_DATASET_CACHE_KEYS = [
   'projeto-f',
   'liberados',
@@ -679,9 +689,9 @@ async function carregarDadosCompartilhados() {
             const fullItems = Array.isArray(payload?.items) ? payload.items : [];
             if (fullItems.length) {
               applyDatasetToState(categoria, fullItems);
-              cacheDatasetLocally(categoria, fullItems.slice(0, 10), {
+              cacheDatasetLocally(categoria, fullItems, {
                 ...snapshot,
-                truncated: true,
+                truncated: fullItems.length > 5000,
                 server: true,
                 updatedAt: snapshot?.updated_at || snapshot?.updatedAt || new Date().toISOString(),
                 updatedBy: snapshot?.updated_by || snapshot?.updatedBy || '',
@@ -703,12 +713,12 @@ async function carregarDadosCompartilhados() {
       if (items.length || !existingItems.length) {
         applyDatasetToState(categoria, items);
         if (items.length) {
-          cacheDatasetLocally(categoria, items.slice(0, 10), {
+          cacheDatasetLocally(categoria, items, {
             source: snapshot?.source || 'shared',
             updatedAt: snapshot?.updated_at || snapshot?.updatedAt || new Date().toISOString(),
             updatedBy: snapshot?.updated_by || snapshot?.updatedBy || '',
             locked: true,
-            truncated: true,
+            truncated: items.length > 5000,
             server: true,
           });
         }
