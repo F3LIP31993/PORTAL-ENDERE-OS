@@ -1916,8 +1916,15 @@ window.addEventListener("DOMContentLoaded", async () => {
   await processarFilaSyncCompartilhada();
   aplicarRestricaoEpoAccess();
 
-  // Preenche os cards/tabelas principais ja na entrada para evitar tela vazia.
-  ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'sar-rede', 'projeto-f'].forEach(carregarDadosCategoria);
+  // Preenche os cards/tabelas principais já na entrada para evitar tela vazia.
+  ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'projeto-f'].forEach(carregarDadosCategoria);
+  // SAR REDE: força sempre o cache local locked, se existir
+  const localSar = getLocalDatasetCache()?.['sar-rede'];
+  if (localSar?.locked && Array.isArray(localSar.items) && localSar.items.length) {
+    applyDatasetToState('sar-rede', localSar.items);
+  } else {
+    carregarDadosCategoria('sar-rede');
+  }
   atualizarContadores();
   
   // Carregar dados específicos de usuário de acompanhamento
