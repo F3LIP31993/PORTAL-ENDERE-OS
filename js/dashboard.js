@@ -9721,6 +9721,17 @@ function carregarDaBacklog(categoriaId) {
 }
 
 function carregarDadosCategoria(categoriaId) {
+    // Sempre priorizar cache local locked: true ao abrir SAR REDE
+    if (categoriaId === 'sar-rede') {
+      const localSar = getLocalDatasetCache()?.['sar-rede'];
+      if (localSar?.locked && Array.isArray(localSar.items) && localSar.items.length) {
+        applyDatasetToState('sar-rede', localSar.items);
+        renderTabelaSarRede('tabela-sar-rede', localSar.items);
+        popularFiltroStatusSarRede(localSar.items);
+        atualizarContadores();
+        return;
+      }
+    }
   if (!categoriaId) return;
 
   // Caso especial: Ongoing usa um parser diferente e layout de tabela próprio
