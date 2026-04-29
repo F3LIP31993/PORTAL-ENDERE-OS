@@ -2002,6 +2002,30 @@ function logTamanhoPlanilhasLocalStorage() {
 }
 window.logTamanhoPlanilhasLocalStorage = logTamanhoPlanilhasLocalStorage;
 
+// AVISO AUTOMÁTICO DE LOCALSTORAGE QUASE CHEIO
+function checarEspacoLocalStorage(threshold = 0.8) {
+  // Limite estimado: 5MB (padrão navegadores)
+  const LIMITE_ESTIMADO = 5 * 1024 * 1024;
+  let total = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const value = localStorage.getItem(localStorage.key(i));
+    total += value ? new Blob([value]).size : 0;
+  }
+  if (total > LIMITE_ESTIMADO * threshold) {
+    const usadoMB = (total / (1024 * 1024)).toFixed(2);
+    const limiteMB = (LIMITE_ESTIMADO / (1024 * 1024)).toFixed(2);
+    alert(`⚠️ Atenção: O espaço local do navegador está quase cheio! (${usadoMB}MB de ${limiteMB}MB)\n\nRecomenda-se exportar ou limpar planilhas antigas para evitar perda de dados.`);
+    return true;
+  }
+  return false;
+}
+
+// Checar espaço ao carregar a página
+window.addEventListener('DOMContentLoaded', function() {
+  checarEspacoLocalStorage();
+});
+window.logTamanhoPlanilhasLocalStorage = logTamanhoPlanilhasLocalStorage;
+
 // Upload de foto de perfil
 document.getElementById("fotoPerfil").addEventListener("change", function() {
   const file = this.files[0];
