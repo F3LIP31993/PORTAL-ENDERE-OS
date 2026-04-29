@@ -641,12 +641,21 @@ async function carregarDadosCompartilhados() {
       const localUpdatedAt = Date.parse(localSnapshot?.updatedAt || '') || 0;
       const sharedUpdatedAt = Date.parse(snapshot?.updated_at || snapshot?.updatedAt || '') || 0;
       const localIsTruncated = Boolean(localSnapshot?.truncated);
-      const shouldKeepLockedLocal = ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'projeto-f', 'sar-rede', 'ongoing'].includes(categoria)
+      // NUNCA sobrescrever SAR REDE local locked: true
+      if (
+        categoria === 'sar-rede' &&
+        Boolean(localSnapshot?.locked) &&
+        localItems.length &&
+        !localIsTruncated
+      ) {
+        applyDatasetToState(categoria, localItems);
+        return;
+      }
+      const shouldKeepLockedLocal = ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'projeto-f', 'ongoing'].includes(categoria)
         && Boolean(localSnapshot?.locked)
         && localItems.length
         && !localIsTruncated
         && (!items.length || localUpdatedAt >= sharedUpdatedAt);
-
       if (shouldKeepLockedLocal) {
         applyDatasetToState(categoria, localItems);
         return;
