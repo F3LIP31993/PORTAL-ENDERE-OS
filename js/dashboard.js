@@ -686,9 +686,16 @@ async function carregarDadosCompartilhados() {
                 updatedAt: snapshot?.updated_at || snapshot?.updatedAt || new Date().toISOString(),
                 updatedBy: snapshot?.updated_by || snapshot?.updatedBy || '',
               });
+            } else {
+              // Se não conseguir buscar do backend, mostra snapshot mínimo local
+              applyDatasetToState(categoria, localItems);
             }
+          })
+          .catch(() => {
+            // Se erro na requisição, mostra snapshot mínimo local
+            applyDatasetToState(categoria, localItems);
           });
-        applyDatasetToState(categoria, localItems);
+        // Não mostra nada até a resposta do backend ou fallback
         return;
       }
 
