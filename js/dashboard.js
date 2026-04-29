@@ -1967,6 +1967,41 @@ window.addEventListener("DOMContentLoaded", async () => {
   });
 });
 
+// REGISTRO GLOBAL DA FUNÇÃO DE DIAGNÓSTICO
+function logTamanhoPlanilhasLocalStorage() {
+  if (typeof localStorage === 'undefined') {
+    console.warn('localStorage não está disponível.');
+    return;
+  }
+  const tamanhos = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+    try {
+      const value = localStorage.getItem(key);
+      const bytes = value ? new Blob([value]).size : 0;
+      tamanhos.push({ key, bytes });
+    } catch (e) {
+      tamanhos.push({ key, bytes: -1, erro: true });
+    }
+  }
+  tamanhos.sort((a, b) => b.bytes - a.bytes);
+  console.log('Tamanho das planilhas/categorias no localStorage:');
+  tamanhos.forEach(({ key, bytes, erro }) => {
+    if (erro) {
+      console.log(`- ${key}: erro ao calcular`);
+    } else {
+      const kb = (bytes / 1024).toFixed(2);
+      console.log(`- ${key}: ${bytes} bytes (${kb} KB)`);
+    }
+  });
+  if (tamanhos.length === 0) {
+    console.log('Nenhuma planilha/categoria encontrada no localStorage.');
+  }
+  return tamanhos;
+}
+window.logTamanhoPlanilhasLocalStorage = logTamanhoPlanilhasLocalStorage;
+
 // Upload de foto de perfil
 document.getElementById("fotoPerfil").addEventListener("change", function() {
   const file = this.files[0];
