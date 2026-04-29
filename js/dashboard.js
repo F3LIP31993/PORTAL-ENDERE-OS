@@ -379,6 +379,16 @@ function getPreferredDataset(categoriaId) {
 function applyDatasetToState(categoria, items) {
   const safeItems = Array.isArray(items) ? items : [];
 
+  // Proteção: nunca sobrescrever SAR REDE local locked: true
+  if (categoria === 'sar-rede') {
+    const localSnapshot = getLocalDatasetCache()?.[categoria];
+    if (localSnapshot?.locked && Array.isArray(localSnapshot.items) && localSnapshot.items.length) {
+      // Mantém sempre o local travado
+      dadosPorCategoria[categoria] = localSnapshot.items;
+      return;
+    }
+  }
+
   // Protecao: nao deixar sincronizacoes vazias apagarem dados do card Empresarial.
   if (categoria === "empresarial" && safeItems.length === 0) {
     const atual = Array.isArray(dadosPorCategoria[categoria]) ? dadosPorCategoria[categoria] : [];
