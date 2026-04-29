@@ -705,7 +705,7 @@ async function carregarDadosCompartilhados() {
     }
     const isAdmin = getCurrentUser()?.role === 'admin';
 
-    Object.entries(datasets).forEach(([categoria, snapshot]) => {
+    for (const [categoria, snapshot] of Object.entries(datasets)) {
       const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
       const existingItems = Array.isArray(dadosPorCategoria[categoria]) ? dadosPorCategoria[categoria] : [];
       const localSnapshot = localCache?.[categoria] || {};
@@ -721,7 +721,7 @@ async function carregarDadosCompartilhados() {
         !localIsTruncated
       ) {
         applyDatasetToState(categoria, localItems);
-        return;
+        continue;
       }
       const shouldKeepLockedLocal = ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'projeto-f', 'ongoing'].includes(categoria)
         && Boolean(localSnapshot?.locked)
@@ -730,45 +730,44 @@ async function carregarDadosCompartilhados() {
         && (!items.length || localUpdatedAt >= sharedUpdatedAt);
       if (shouldKeepLockedLocal) {
         applyDatasetToState(categoria, localItems);
-        return;
+        continue;
       }
 
       // Se snapshot indicar truncado ou server, buscar dados completos do backend
       if (snapshot?.truncated || snapshot?.server) {
-        fetch(`/api/shared_datasets/${encodeURIComponent(categoria)}`, { credentials: "include" })
-          .then(res => res.ok ? res.json() : null)
-          .then(async payload => {
-            const fullItems = Array.isArray(payload?.items) ? payload.items : [];
-            if (fullItems.length) {
-              applyDatasetToState(categoria, fullItems);
-              cacheDatasetLocally(categoria, fullItems, {
-                ...snapshot,
-                truncated: false,
-                server: true,
-                updatedAt: snapshot?.updated_at || snapshot?.updatedAt || new Date().toISOString(),
-                updatedBy: snapshot?.updated_by || snapshot?.updatedBy || '',
-              });
-              await salvarPlanilhaIndexedDB(categoria, fullItems);
-            } else {
-              // Se não conseguir buscar do backend, tenta IndexedDB, senão snapshot mínimo local
-              const idxItems = await lerPlanilhaIndexedDB(categoria);
-              if (idxItems && idxItems.length) {
-                applyDatasetToState(categoria, idxItems);
-              } else {
-                applyDatasetToState(categoria, localItems);
-              }
-            }
-          })
-          .catch(async () => {
-            // Se erro na requisição, tenta IndexedDB, senão snapshot mínimo local
+        try {
+          const res = await fetch(`/api/shared_datasets/${encodeURIComponent(categoria)}`, { credentials: "include" });
+          const payload = res.ok ? await res.json() : null;
+          const fullItems = Array.isArray(payload?.items) ? payload.items : [];
+          if (fullItems.length) {
+            applyDatasetToState(categoria, fullItems);
+            cacheDatasetLocally(categoria, fullItems, {
+              ...snapshot,
+              truncated: false,
+              server: true,
+              updatedAt: snapshot?.updated_at || snapshot?.updatedAt || new Date().toISOString(),
+              updatedBy: snapshot?.updated_by || snapshot?.updatedBy || '',
+            });
+            await salvarPlanilhaIndexedDB(categoria, fullItems);
+          } else {
+            // Se não conseguir buscar do backend, tenta IndexedDB, senão snapshot mínimo local
             const idxItems = await lerPlanilhaIndexedDB(categoria);
             if (idxItems && idxItems.length) {
               applyDatasetToState(categoria, idxItems);
             } else {
               applyDatasetToState(categoria, localItems);
             }
-          });
-        return;
+          }
+        } catch {
+          // Se erro na requisição, tenta IndexedDB, senão snapshot mínimo local
+          const idxItems = await lerPlanilhaIndexedDB(categoria);
+          if (idxItems && idxItems.length) {
+            applyDatasetToState(categoria, idxItems);
+          } else {
+            applyDatasetToState(categoria, localItems);
+          }
+        }
+        continue;
       }
 
       // Evita que um snapshot vazio do servidor apague dados já carregados localmente.
@@ -786,7 +785,7 @@ async function carregarDadosCompartilhados() {
           await salvarPlanilhaIndexedDB(categoria, items);
         }
       }
-    });
+    }
 
     Object.entries(localCache).forEach(([categoria, snapshot]) => {
       const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
