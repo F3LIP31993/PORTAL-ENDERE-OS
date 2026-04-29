@@ -2619,8 +2619,8 @@ function importarCSV() {
       const dados = parseSarRedeCsvRows(linhas, delimiter);
 
       applyDatasetToState('sar-rede', dados);
-      cacheDatasetLocally('sar-rede', dados, { source: 'manual', locked: false });
-      await persistirDadosCompartilhados('sar-rede', dados, { source: 'manual', locked: false });
+      cacheDatasetLocally('sar-rede', dados, { source: 'manual', locked: true });
+      await persistirDadosCompartilhados('sar-rede', dados, { source: 'manual', locked: true });
 
       renderTabelaSarRede('tabela-sar-rede', dados);
       popularFiltroStatusSarRede(dados);
