@@ -671,16 +671,38 @@ async function carregarDadosCompartilhados() {
         return;
       }
 
+      // Se snapshot indicar truncado ou server, buscar dados completos do backend
+      if (snapshot?.truncated || snapshot?.server) {
+        fetch(`/api/shared_datasets/${encodeURIComponent(categoria)}`, { credentials: "include" })
+          .then(res => res.ok ? res.json() : null)
+          .then(payload => {
+            const fullItems = Array.isArray(payload?.items) ? payload.items : [];
+            if (fullItems.length) {
+              applyDatasetToState(categoria, fullItems);
+              cacheDatasetLocally(categoria, fullItems.slice(0, 10), {
+                ...snapshot,
+                truncated: true,
+                server: true,
+                updatedAt: snapshot?.updated_at || snapshot?.updatedAt || new Date().toISOString(),
+                updatedBy: snapshot?.updated_by || snapshot?.updatedBy || '',
+              });
+            }
+          });
+        applyDatasetToState(categoria, localItems);
+        return;
+      }
+
       // Evita que um snapshot vazio do servidor apague dados já carregados localmente.
       if (items.length || !existingItems.length) {
         applyDatasetToState(categoria, items);
-        // Mantém snapshot local atualizado e bloqueado para todas as categorias com dados
         if (items.length) {
-          cacheDatasetLocally(categoria, items, {
+          cacheDatasetLocally(categoria, items.slice(0, 10), {
             source: snapshot?.source || 'shared',
             updatedAt: snapshot?.updated_at || snapshot?.updatedAt || new Date().toISOString(),
             updatedBy: snapshot?.updated_by || snapshot?.updatedBy || '',
             locked: true,
+            truncated: true,
+            server: true,
           });
         }
       }
@@ -1039,18 +1061,25 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
     }
   }
 
+  // Salva snapshot mínimo local (primeiras 10 linhas, metadados, flags)
+  const snapshotMinimo = {
+    items: Array.isArray(finalItemsToPersist) ? finalItemsToPersist.slice(0, 10) : [],
+    updatedAt: metaWithUser.updatedAt || new Date().toISOString(),
+    source: metaWithUser.source || 'shared',
+    updatedBy: metaWithUser.updatedBy || '',
+    truncated: true,
+    server: true
+  };
   try {
-    cacheDatasetLocally(categoria, finalItemsToPersist, metaWithUser);
+    cacheDatasetLocally(categoria, snapshotMinimo.items, snapshotMinimo);
   } catch (cacheError) {
-    console.warn(`Falha ao salvar cache local da categoria ${categoria}. Tentando sincronizar no servidor mesmo assim.`, cacheError);
+    console.warn(`Falha ao salvar snapshot local mínimo da categoria ${categoria}.`, cacheError);
   }
 
   const isAdmin = user?.role === "admin";
-
   if (!window.location.protocol.startsWith("http") || !isAdmin) {
     return { synced: false, localOnly: true };
   }
-
   try {
     await enviarDatasetCompartilhadoParaServidor(categoria, finalItemsToPersist);
     delete sharedSyncRetryQueue[categoria];
@@ -1066,7 +1095,6 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
       queuedAt: new Date().toISOString()
     };
     saveSharedSyncRetryQueue();
-
     console.warn(`Falha ao salvar dados compartilhados da categoria ${categoria}.`, error);
     const statusEl = document.getElementById('import-status');
     if (statusEl) {
@@ -2022,7 +2050,20 @@ function checarEspacoLocalStorage(threshold = 0.8) {
 
 // Checar espaço ao carregar a página
 window.addEventListener('DOMContentLoaded', function() {
-  checarEspacoLocalStorage();
+  try {
+    // Só exibe o alerta se o usuário for admin
+    var user = null;
+    if (typeof getCurrentUser === 'function') {
+      user = getCurrentUser();
+    } else if (window.currentUser) {
+      user = window.currentUser;
+    }
+    if (user && user.role === 'admin') {
+      checarEspacoLocalStorage();
+    }
+  } catch (e) {
+    // Se der erro, não exibe nada
+  }
 });
 window.logTamanhoPlanilhasLocalStorage = logTamanhoPlanilhasLocalStorage;
 
