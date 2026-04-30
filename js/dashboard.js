@@ -80,14 +80,12 @@ function renderDropdownCidadesLiberados(subcard) {
   const cidades = Array.from(cidadesSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   // Monta dropdown
   container.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;width:100%;">
-      <button id="btn-dropdown-cidade-${subcard}" style="padding:6px 16px;min-width:180px;max-width:320px;display:flex;align-items:center;justify-content:space-between;border:1px solid #bfc9d1;background:#fff;border-radius:4px;cursor:pointer;font-size:15px;">
-        <span style="flex:1;text-align:left;">Selecionar cidade</span>
-        <span style="font-size:18px;">&#9660;</span>
-      </button>
-      <div id="dropdown-cidade-lista-${subcard}" style="display:none;position:absolute;z-index:10;background:#fff;border:1px solid #ccc;width:320px;max-height:220px;overflow-y:auto;box-shadow:0 2px 8px #0002;">
-        ${cidades.map(cidade => `<div style='padding:8px;cursor:pointer;' onmousedown="selecionarCidadeLiberados('${subcard}','${cidade.replace(/'/g, "\'")}')">${cidade}</div>`).join('')}
-      </div>
+    <button id="btn-dropdown-cidade-${subcard}" style="padding:6px 16px;min-width:180px;max-width:320px;display:flex;align-items:center;justify-content:space-between;border:1px solid #bfc9d1;background:#fff;border-radius:4px;cursor:pointer;font-size:15px;">
+      <span style="flex:1;text-align:left;">Selecionar cidade</span>
+      <span style="font-size:18px;">&#9660;</span>
+    </button>
+    <div id="dropdown-cidade-lista-${subcard}" style="display:none;position:absolute;z-index:10;background:#fff;border:1px solid #ccc;width:320px;max-height:220px;overflow-y:auto;box-shadow:0 2px 8px #0002;">
+      ${cidades.map(cidade => `<div style='padding:8px;cursor:pointer;' onmousedown="selecionarCidadeLiberados('${subcard}','${cidade.replace(/'/g, "\'")}')">${cidade}</div>`).join('')}
     </div>
   `;
   // Eventos
