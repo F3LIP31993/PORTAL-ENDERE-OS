@@ -3587,13 +3587,20 @@ function atualizarBotoesAbaLiberados() {
   });
 }
 
-function selecionarAbaLiberados(aba = 'projeto-f') {
+
+async function selecionarAbaLiberados(aba = 'projeto-f') {
   liberadosSubcardSelecionado = true;
   liberadosAbaAtiva = normalizeLiberadosAba(aba);
   atualizarBotoesAbaLiberados();
   atualizarBadgesLiberados();
   updateImportTargetLabel();
   atualizarLayoutLiberados();
+
+  // Força leitura do IndexedDB para garantir todos os registros
+  const dadosIdx = await lerPlanilhaIndexedDB('liberados');
+  if (Array.isArray(dadosIdx) && dadosIdx.length) {
+    applyDatasetToState('liberados', dadosIdx);
+  }
   carregarDadosCategoria('liberados');
 }
 
