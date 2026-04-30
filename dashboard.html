@@ -453,8 +453,34 @@
         <div class="filtros-projeto-f">
           <div class="filtro-item filtro-item-cidade-projetof">
             <label for="filtro-cidade-projeto-f">Filtrar Cidade:</label>
-            <input type="text" id="filtro-cidade-projeto-f" placeholder="Digite a cidade..." oninput="aplicarFiltrosProjetoF()" onfocus="mostrarSugestoesCidadeProjetoF()" autocomplete="off" />
+            <div style="display:flex; gap:6px; align-items:center;">
+              <input type="text" id="filtro-cidade-projeto-f" placeholder="Digite a cidade..." oninput="aplicarFiltrosProjetoF()" onfocus="mostrarSugestoesCidadeProjetoF()" autocomplete="off" />
+              <button type="button" class="btn-secondary" style="padding:2px 8px;font-size:13px;" onclick="abrirModalCidadesProjetoF()">Ver todas as cidades</button>
+            </div>
             <div id="filtro-cidade-projeto-f-sugestoes" class="filtro-cidade-projeto-f-sugestoes hidden"></div>
+          <!-- Modal de cidades Projeto F -->
+          <div id="modal-cidades-projeto-f" class="modal hidden">
+            <div class="modal-content" style="max-width:420px;">
+              <div class="modal-header modal-header-professional">
+                <div>
+                  <p class="modal-kicker">Visualização rápida</p>
+                  <h2>Cidades do Projeto F</h2>
+                </div>
+                <button class="btn-voltar modal-close-professional" onclick="fecharModalCidadesProjetoF()">×</button>
+              </div>
+              <div class="modal-body">
+                <table style="width:100%;border-collapse:collapse;">
+                  <thead>
+                    <tr><th style="text-align:left;padding:6px 8px;">Cidade</th><th style="text-align:right;padding:6px 8px;">Qtd</th></tr>
+                  </thead>
+                  <tbody id="tabela-cidades-projeto-f"></tbody>
+                </table>
+              </div>
+              <div class="modal-footer">
+                <button class="btn-secondary" type="button" onclick="fecharModalCidadesProjetoF()">Fechar</button>
+              </div>
+            </div>
+          </div>
           </div>
           <div class="filtro-item">
             <label for="filtro-endereco-projeto-f">Buscar Endereço:</label>
@@ -539,6 +565,7 @@
           <div class="filtro-item">
             <label for="filtro-cidade-liberados">Filtrar Cidade:</label>
             <input type="text" id="filtro-cidade-liberados" placeholder="Digite a cidade..." oninput="aplicarFiltrosLiberados()" />
+            <button type="button" onclick="document.getElementById('filtro-cidade-liberados').value='';aplicarFiltrosLiberados();" style="margin-left:4px;">Limpar Filtro</button>
           </div>
         </div>
         <table>
