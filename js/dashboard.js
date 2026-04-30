@@ -10,6 +10,28 @@ function abrirCardEpoProjetoF() {
 
 // Substitua a chamada de exibição do card EPO > PROJETO F para usar abrirCardEpoProjetoF()
 // Exemplo: ao clicar no botão/aba PROJETO F dentro do card EPO, chame abrirCardEpoProjetoF() ao invés de só mostrar a tela.
+
+// ===== AJUSTE: Remover legendas dos subcards LIBERADOS =====
+function removerLegendasLiberados() {
+  // Remove legendas de status e instrução dos subcards LIBERADOS
+  const legendas = document.querySelectorAll('.liberados-legenda, .liberados-instrucao, .liberados-status');
+  legendas.forEach(el => el.remove());
+  // Também pode remover textos específicos se necessário
+  const textos = [
+    'Aba ativa:',
+    'Selecione PROJETO F, GPON E HFC ou GREENFIELD para abrir anexo e tabela.'
+  ];
+  document.querySelectorAll('*').forEach(el => {
+    textos.forEach(txt => {
+      if (el.textContent && el.textContent.includes(txt)) {
+        el.remove();
+      }
+    });
+  });
+}
+
+// Chame removerLegendasLiberados() ao renderizar os subcards LIBERADOS
+// Exemplo: após renderizar a tabela ou ao trocar de subcard
 // ========== LISTA VISUAL DE CIDADES PROJETO F ==========
 function renderTabelaCidadesProjetoFInline() {
   const container = document.getElementById('tabela-cidades-projeto-f-inline');
@@ -34,17 +56,69 @@ function selecionarCidadeProjetoF(cidade) {
   aplicarFiltrosProjetoF();
 }
 
-// Substitui o filtro para usar a cidade selecionada visualmente
-function aplicarFiltrosProjetoF() {
-  const cidade = window._cidadeProjetoFSelecionada || '';
-  // ...existing code...
-  // (Aqui deve-se manter o restante da lógica de filtro já existente, só mudando a origem do valor da cidade)
-  // Exemplo:
-  // const endereco = document.getElementById('filtro-endereco-projeto-f').value.trim();
-  // const status = document.getElementById('filtro-status-projeto-f').value.trim();
-  // ...
-  // (restante do filtro)
+
+// Novo filtro de cidade: dropdown clicável
+function renderDropdownCidadesLiberados(subcard) {
+  // subcard: 'projeto-f', 'gpon-hfc', 'greenfield'
+  const containerId = `filtro-cidade-dropdown-${subcard}`;
+  let container = document.getElementById(containerId);
+  if (!container) {
+    // Cria container se não existir
+    const filtroArea = document.getElementById(`filtro-cidade-area-${subcard}`);
+    if (!filtroArea) return;
+    container = document.createElement('div');
+    container.id = containerId;
+    filtroArea.appendChild(container);
+  }
+  // Busca cidades únicas
+  const rows = Array.isArray(dadosPorCategoria[subcard]) ? dadosPorCategoria[subcard] : [];
+  const cidadesSet = new Set();
+  rows.forEach(row => {
+    const cidade = String(row.CIDADE || row.cidade || '').trim();
+    if (cidade) cidadesSet.add(cidade);
+  });
+  const cidades = Array.from(cidadesSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  // Monta dropdown
+  container.innerHTML = `
+    <div style="position:relative;display:inline-block;width:100%;max-width:320px;">
+      <button id="btn-dropdown-cidade-${subcard}" style="width:100%;padding:6px 8px;text-align:left;">Filtrar cidade <span style='float:right;'>&#9660;</span></button>
+      <div id="dropdown-cidade-lista-${subcard}" style="display:none;position:absolute;z-index:10;background:#fff;border:1px solid #ccc;width:100%;max-height:220px;overflow-y:auto;box-shadow:0 2px 8px #0002;">
+        ${cidades.map(cidade => `<div style='padding:8px;cursor:pointer;' onmousedown="selecionarCidadeLiberados('${subcard}','${cidade.replace(/'/g, "\'")}')">${cidade}</div>`).join('')}
+      </div>
+    </div>
+  `;
+  // Eventos
+  const btn = document.getElementById(`btn-dropdown-cidade-${subcard}`);
+  const lista = document.getElementById(`dropdown-cidade-lista-${subcard}`);
+  if (btn && lista) {
+    btn.onclick = () => {
+      lista.style.display = lista.style.display === 'block' ? 'none' : 'block';
+    };
+    document.addEventListener('click', function handler(e) {
+      if (!btn.contains(e.target) && !lista.contains(e.target)) {
+        lista.style.display = 'none';
+        document.removeEventListener('click', handler);
+      }
+    });
+  }
 }
+
+function selecionarCidadeLiberados(subcard, cidade) {
+  window._cidadeLiberadosSelecionada = window._cidadeLiberadosSelecionada || {};
+  window._cidadeLiberadosSelecionada[subcard] = cidade;
+  aplicarFiltrosLiberados(subcard);
+  // Fecha dropdown
+  const lista = document.getElementById(`dropdown-cidade-lista-${subcard}`);
+  if (lista) lista.style.display = 'none';
+}
+
+function aplicarFiltrosLiberados(subcard) {
+  const cidade = (window._cidadeLiberadosSelecionada && window._cidadeLiberadosSelecionada[subcard]) || '';
+  // ...aplicar filtro na tabela do subcard usando a cidade selecionada...
+  // (Aqui deve-se manter o restante da lógica de filtro já existente, só mudando a origem do valor da cidade)
+}
+
+// Chame renderDropdownCidadesLiberados('projeto-f'), renderDropdownCidadesLiberados('gpon-hfc'), renderDropdownCidadesLiberados('greenfield') ao renderizar cada subcard LIBERADOS
 
 // Renderizar a lista de cidades ao carregar os dados do Projeto F
 const _oldApplyDatasetToStatePF = applyDatasetToState;
