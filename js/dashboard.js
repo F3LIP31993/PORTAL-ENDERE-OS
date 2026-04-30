@@ -3620,9 +3620,14 @@ function resetarFluxoLiberados() {
   liberadosSubcardSelecionado = false;
   atualizarBotoesAbaLiberados();
   atualizarBadgesLiberados();
-  updateImportTargetLabel();
-  atualizarLayoutLiberados();
-
+    // Sempre ler do IndexedDB ao trocar de aba
+    atualizarBadgesLiberados();
+    carregarDadosCategoria('liberados');
+    updateImportTargetLabel();
+    atualizarLayoutLiberados();
+    applyDatasetToState('liberados', []);
+    dadosPorCategoria['liberados'] = [];
+    // Atualiza badge e tabela com base no IndexedDB
   const infoEl = document.getElementById('liberados-aba-info');
   if (infoEl) {
     infoEl.textContent = 'Selecione PROJETO F, GPON E HFC ou GREENFIELD para abrir anexo e tabela.';
