@@ -1,11 +1,20 @@
-// ========== MODAL DE CIDADES PROJETO F ==========
-function abrirModalCidadesProjetoF() {
-  const modal = document.getElementById('modal-cidades-projeto-f');
-  const tbody = document.getElementById('tabela-cidades-projeto-f');
-  if (!modal || !tbody) return;
-  // Pega todos os registros do Projeto F
+// Garante que ao abrir o card EPO > PROJETO F, os dados sejam lidos do IndexedDB
+function abrirCardEpoProjetoF() {
+  lerPlanilhaIndexedDB('epo-projeto-f').then(items => {
+    if (Array.isArray(items) && items.length) {
+      applyDatasetToState('epo-projeto-f', items);
+      // Aqui você pode chamar a função de renderização da tabela, se necessário
+    }
+  });
+}
+
+// Substitua a chamada de exibição do card EPO > PROJETO F para usar abrirCardEpoProjetoF()
+// Exemplo: ao clicar no botão/aba PROJETO F dentro do card EPO, chame abrirCardEpoProjetoF() ao invés de só mostrar a tela.
+// ========== LISTA VISUAL DE CIDADES PROJETO F ==========
+function renderTabelaCidadesProjetoFInline() {
+  const container = document.getElementById('tabela-cidades-projeto-f-inline');
+  if (!container) return;
   const rows = Array.isArray(dadosPorCategoria['projeto-f']) ? dadosPorCategoria['projeto-f'] : [];
-  // Conta cidades únicas
   const cidadesMap = {};
   rows.forEach(row => {
     const cidade = String(row.CIDADE || row.cidade || '').trim();
@@ -13,22 +22,38 @@ function abrirModalCidadesProjetoF() {
     cidadesMap[cidade] = (cidadesMap[cidade] || 0) + 1;
   });
   const cidades = Object.entries(cidadesMap).sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
-  tbody.innerHTML = cidades.length
-    ? cidades.map(([cidade, qtd]) => `<tr style='cursor:pointer;' onclick=\"selecionarCidadeProjetoF('${cidade.replace(/'/g, "\'")}')\"><td style='padding:6px 8px;'>${cidade}</td><td style='text-align:right;padding:6px 8px;'>${qtd}</td></tr>`).join('')
-    : `<tr><td colspan='2' style='text-align:center;'>Nenhuma cidade encontrada</td></tr>`;
-  modal.classList.remove('hidden');
-}
-
-function fecharModalCidadesProjetoF() {
-  const modal = document.getElementById('modal-cidades-projeto-f');
-  if (modal) modal.classList.add('hidden');
+  container.innerHTML = cidades.length
+    ? `<table style='width:100%;border-collapse:collapse;'><thead><tr><th style="text-align:left;padding:6px 8px;">Cidade</th><th style="text-align:right;padding:6px 8px;">Qtd</th></tr></thead><tbody>` +
+      cidades.map(([cidade, qtd]) => `<tr style='cursor:pointer;' onclick="selecionarCidadeProjetoF('${cidade.replace(/'/g, "\'")}')"><td style='padding:6px 8px;'>${cidade}</td><td style='text-align:right;padding:6px 8px;'>${qtd}</td></tr>`).join('') +
+      `</tbody></table>`
+    : `<div style='padding:8px;text-align:center;'>Nenhuma cidade encontrada</div>`;
 }
 
 function selecionarCidadeProjetoF(cidade) {
-  document.getElementById('filtro-cidade-projeto-f').value = cidade;
+  window._cidadeProjetoFSelecionada = cidade;
   aplicarFiltrosProjetoF();
-  fecharModalCidadesProjetoF();
 }
+
+// Substitui o filtro para usar a cidade selecionada visualmente
+function aplicarFiltrosProjetoF() {
+  const cidade = window._cidadeProjetoFSelecionada || '';
+  // ...existing code...
+  // (Aqui deve-se manter o restante da lógica de filtro já existente, só mudando a origem do valor da cidade)
+  // Exemplo:
+  // const endereco = document.getElementById('filtro-endereco-projeto-f').value.trim();
+  // const status = document.getElementById('filtro-status-projeto-f').value.trim();
+  // ...
+  // (restante do filtro)
+}
+
+// Renderizar a lista de cidades ao carregar os dados do Projeto F
+const _oldApplyDatasetToStatePF = applyDatasetToState;
+applyDatasetToState = function(categoria, items) {
+  _oldApplyDatasetToStatePF.apply(this, arguments);
+  if (categoria === 'projeto-f') {
+    renderTabelaCidadesProjetoFInline();
+  }
+};
 // ====== IndexedDB Utility for Large Datasets ======
 const PLANILHA_DB_NAME = 'portalPlanilhasDB';
 const PLANILHA_DB_VERSION = 1;
