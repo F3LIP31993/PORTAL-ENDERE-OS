@@ -247,12 +247,11 @@ function saveLocalDatasetCache(cache) {
     // Mantém metadados e reduz listas muito grandes para caber no armazenamento local.
     Object.entries(reduced).forEach(([key, snapshot]) => {
       const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
-      if (items.length > 4000) {
-        reduced[key] = {
-          ...snapshot,
-          items: items.slice(0, 4000)
-        };
-      }
+      // Não trunca mais ao salvar cache
+      reduced[key] = {
+        ...snapshot,
+        items: items
+      };
     });
 
     try {
@@ -286,17 +285,15 @@ function cacheDatasetLocally(categoria, items, meta = {}) {
   const previous = cache[categoria] || {};
   const currentUser = getCurrentUser();
   const inferredUpdatedBy = currentUser?.username || currentUser?.name || '';
-  const maxLocalItems = Number(MAX_LOCAL_CACHE_ITEMS_BY_CATEGORY[categoria] || 0);
-  const shouldTruncate = maxLocalItems > 0 && items.length > maxLocalItems;
-  const cachedItems = shouldTruncate ? items.slice(0, maxLocalItems) : items;
+  // Não trunca mais os dados salvos localmente
   const snapshot = {
-    items: cachedItems,
+    items,
     updatedAt: meta.updatedAt || new Date().toISOString(),
     source: meta.source || previous.source || 'shared',
     locked: typeof meta.locked === 'boolean' ? meta.locked : Boolean(previous.locked),
     updatedBy: meta.updatedBy || meta.updated_by || previous.updatedBy || inferredUpdatedBy,
-    truncated: shouldTruncate,
-    fullCount: shouldTruncate ? items.length : undefined,
+    truncated: false,
+    fullCount: undefined,
   };
 
   if (SESSION_ONLY_DATASET_KEYS.includes(categoria)) {
@@ -2109,40 +2106,7 @@ function logTamanhoPlanilhasLocalStorage() {
 window.logTamanhoPlanilhasLocalStorage = logTamanhoPlanilhasLocalStorage;
 
 // AVISO AUTOMÁTICO DE LOCALSTORAGE QUASE CHEIO
-function checarEspacoLocalStorage(threshold = 0.8) {
-  // Limite estimado: 5MB (padrão navegadores)
-  const LIMITE_ESTIMADO = 5 * 1024 * 1024;
-  let total = 0;
-  for (let i = 0; i < localStorage.length; i++) {
-    const value = localStorage.getItem(localStorage.key(i));
-    total += value ? new Blob([value]).size : 0;
-  }
-  if (total > LIMITE_ESTIMADO * threshold) {
-    const usadoMB = (total / (1024 * 1024)).toFixed(2);
-    const limiteMB = (LIMITE_ESTIMADO / (1024 * 1024)).toFixed(2);
-    alert(`⚠️ Atenção: O espaço local do navegador está quase cheio! (${usadoMB}MB de ${limiteMB}MB)\n\nRecomenda-se exportar ou limpar planilhas antigas para evitar perda de dados.`);
-    return true;
-  }
-  return false;
-}
-
-// Checar espaço ao carregar a página
-window.addEventListener('DOMContentLoaded', function() {
-  try {
-    // Só exibe o alerta se o usuário for admin
-    var user = null;
-    if (typeof getCurrentUser === 'function') {
-      user = getCurrentUser();
-    } else if (window.currentUser) {
-      user = window.currentUser;
-    }
-    if (user && user.role === 'admin') {
-      checarEspacoLocalStorage();
-    }
-  } catch (e) {
-    // Se der erro, não exibe nada
-  }
-});
+// Removido alerta automático de localStorage quase cheio
 window.logTamanhoPlanilhasLocalStorage = logTamanhoPlanilhasLocalStorage;
 
 // Upload de foto de perfil
