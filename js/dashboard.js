@@ -3701,13 +3701,16 @@ function aplicarFiltrosLiberados() {
     dadosAba = getDadosLiberadosProjetoF(baseProjetoF || []).map(item => ({ ...item, _aba_liberados: 'projeto-f' }));
   }
 
-  const dadosFiltrados = getLiberadosRowsFiltrados(dadosAba);
+  // Sempre limpar filtro de cidade ao trocar de aba ou importar
+  const filtroCidadeInput = document.getElementById('filtro-cidade-liberados');
+  if (filtroCidadeInput) filtroCidadeInput.value = '';
+
   const infoEl = document.getElementById('liberados-aba-info');
   if (infoEl) {
-    infoEl.textContent = `Aba ativa: ${getLiberadosAbaLabel(liberadosAbaAtiva)} • ${dadosFiltrados.length} registro(s)`;
+    infoEl.textContent = `Aba ativa: ${getLiberadosAbaLabel(liberadosAbaAtiva)} • ${dadosAba.length} registro(s)`;
   }
 
-  renderTabelaLiberados('tabela-liberados', dadosFiltrados);
+  renderTabelaLiberados('tabela-liberados', dadosAba);
 }
 
 function visualizarLiberado(index) {
