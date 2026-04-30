@@ -86,11 +86,11 @@ const SESSION_ONLY_DATASET_KEYS = [];
 const SHARED_REFRESH_INTERVAL_MS = 120000;
 const BUILD_VERSION_CHECK_INTERVAL_MS = 45000;
 const MAX_LOCAL_CACHE_ITEMS_BY_CATEGORY = {
-  'projeto-f': 5000,
+  'projeto-f': undefined,
   'liberados': 5000,
   'sar-rede': 5000,
   'epo-gpon-ongoing': 5000,
-  'epo-projeto-f': 5000,
+  'epo-projeto-f': undefined,
   'mdu-ongoing': 5000,
   'empresarial': 5000,
   'pendente-autorizacao': 5000,
