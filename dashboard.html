@@ -555,13 +555,10 @@
       </div>
 
       <div class="card" id="liberados-detalhes-card" style="display:none;">
-        <h2 style="margin-top:0;">Registros Liberados</h2>
-        <p id="liberados-aba-info" style="margin:0 0 8px 0; font-size:12px; color:#475569; font-weight:600;"></p>
         <div class="filtros-liberados">
           <div class="filtro-item">
-            <label for="filtro-cidade-liberados">Filtrar Cidade:</label>
-            <input type="text" id="filtro-cidade-liberados" placeholder="Digite a cidade..." oninput="aplicarFiltrosLiberados()" />
-            <button type="button" onclick="document.getElementById('filtro-cidade-liberados').value='';aplicarFiltrosLiberados();" style="margin-left:4px;">Limpar Filtro</button>
+            <label for="filtro-cidade-dropdown-liberados">Filtrar Cidade:</label>
+            <div id="filtro-cidade-area-liberados"></div>
           </div>
         </div>
         <table>
