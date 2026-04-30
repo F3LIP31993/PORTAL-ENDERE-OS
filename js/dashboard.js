@@ -408,6 +408,10 @@ function hasLockedDataset(categoria) {
 }
 
 function getPreferredDataset(categoriaId) {
+  // Para LIBERADOS, nunca usar localStorage/cache, só o estado
+  if (categoriaId === 'liberados') {
+    return Array.isArray(dadosPorCategoria['liberados']) ? dadosPorCategoria['liberados'] : [];
+  }
   const localCache = getLocalDatasetCache();
   const localSnapshot = localCache?.[categoriaId] || {};
   const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
@@ -437,6 +441,12 @@ function getPreferredDataset(categoriaId) {
 
 function applyDatasetToState(categoria, items) {
   const safeItems = Array.isArray(items) ? items : [];
+
+  // Para LIBERADOS, sempre sobrescrever, nunca usar locked/localStorage
+  if (categoria === 'liberados') {
+    dadosPorCategoria['liberados'] = safeItems;
+    return;
+  }
 
   // Proteção: nunca sobrescrever SAR REDE local locked: true
   if (categoria === 'sar-rede') {
