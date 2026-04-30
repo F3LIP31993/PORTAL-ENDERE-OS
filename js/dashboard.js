@@ -1139,14 +1139,22 @@ async function persistirDadosCompartilhados(categoria, items, meta = {}) {
 
   // Salva todos os dados no IndexedDB e no cache local (sem truncar)
   try {
-    await salvarPlanilhaIndexedDB(categoria, finalItemsToPersist);
-    cacheDatasetLocally(categoria, finalItemsToPersist, {
-      updatedAt: metaWithUser.updatedAt || new Date().toISOString(),
-      source: metaWithUser.source || 'shared',
-      updatedBy: metaWithUser.updatedBy || '',
-      truncated: false,
-      server: true
-    });
+    let categoriaStore = categoria;
+    // Para LIBERADOS, salva em store separada por aba
+    if (categoria === 'liberados' && meta && meta._abaLiberados) {
+      categoriaStore = `liberados-${meta._abaLiberados}`;
+    }
+    await salvarPlanilhaIndexedDB(categoriaStore, finalItemsToPersist);
+    // Não salva mais grandes volumes no localStorage para LIBERADOS
+    if (!categoriaStore.startsWith('liberados-')) {
+      cacheDatasetLocally(categoriaStore, finalItemsToPersist, {
+        updatedAt: metaWithUser.updatedAt || new Date().toISOString(),
+        source: metaWithUser.source || 'shared',
+        updatedBy: metaWithUser.updatedBy || '',
+        truncated: false,
+        server: true
+      });
+    }
   } catch (cacheError) {
     console.warn(`Falha ao salvar dados no IndexedDB/cache local da categoria ${categoria}.`, cacheError);
   }
