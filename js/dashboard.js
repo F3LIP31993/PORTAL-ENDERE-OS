@@ -3465,6 +3465,7 @@ function renderTabelaProjetoF(id, lista) {
   const dados = Array.isArray(lista) ? lista : [];
   window.__projetoFModalData = dados;
 
+  // Exibe todas as linhas
   const buildRows = (startIndex, endIndex) => dados.slice(startIndex, endIndex).map((i, localIndex) => {
     const index = startIndex + localIndex;
     const codigo = getField(i, "COD-MDUGO", "cod-mdugo", "codmdugo");
@@ -3490,23 +3491,8 @@ function renderTabelaProjetoF(id, lista) {
       </tr>`;
   }).join('');
 
-  const initialBatchSize = 220;
-  const chunkSize = 500;
-
-  tbody.innerHTML = buildRows(0, Math.min(initialBatchSize, dados.length));
-
-  if (dados.length > initialBatchSize) {
-    let nextStart = initialBatchSize;
-    const appendChunk = () => {
-      const end = Math.min(nextStart + chunkSize, dados.length);
-      tbody.insertAdjacentHTML('beforeend', buildRows(nextStart, end));
-      nextStart = end;
-      if (nextStart < dados.length) {
-        window.requestAnimationFrame(appendChunk);
-      }
-    };
-    window.requestAnimationFrame(appendChunk);
-  }
+  // Exibe todas as linhas de uma vez
+  tbody.innerHTML = buildRows(0, dados.length);
 
   popularFiltroCidadeProjetoF();
   popularFiltroStatusProjetoF(dadosPorCategoria['projeto-f'] || []);
@@ -3907,7 +3893,7 @@ function popularFiltroCidadeProjetoF() {
   }
 
   const cidadesFiltradas = cidadesUnicas.filter(cidade => !filtro || cidade.toLowerCase().includes(filtro));
-  const cidadesVisiveis = cidadesFiltradas.slice(0, 10);
+  const cidadesVisiveis = cidadesFiltradas;
 
   const headHtml = `
     <div class="filtro-cidade-projeto-f-head">
@@ -9456,11 +9442,9 @@ function renderPendenteAutorizacao() {
   popularFiltroCidadePendente();
 
   const dados = getPendenteRowsFiltrados();
-  const MAX_DISPLAY = 2500;
-  const dadosParaRender = dados.length > MAX_DISPLAY ? dados.slice(0, MAX_DISPLAY) : dados;
-
+  // Exibe todos os dados, sem truncar
   const tabelaId = pendenteActiveTab === 'vistoria' ? 'tabela-pendente-vistoria' : 'tabela-pendente-backbone';
-  renderTabelaPendente(tabelaId, dadosParaRender);
+  renderTabelaPendente(tabelaId, dados);
 }
 
 document.addEventListener('click', (event) => {
