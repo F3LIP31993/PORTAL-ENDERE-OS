@@ -10155,20 +10155,19 @@ function carregarLiberadosDatasetRemotamente() {
       // Sem bloqueio: manter fallback local.
     }
 
+
+    // Nunca usar fallback localStorage/cache para LIBERADOS
     if (!rows.length) {
-      const localRows = getLocalDatasetCache()?.['liberados']?.items;
-      if (Array.isArray(localRows) && localRows.length) {
-        rows = localRows;
-        meta = { source: 'local-fallback', locked: true, updatedAt: new Date().toISOString() };
+      // Tenta IndexedDB, se não houver, deixa vazio
+      const idxRows = await lerPlanilhaIndexedDB('liberados');
+      if (Array.isArray(idxRows) && idxRows.length) {
+        rows = idxRows;
+      } else {
+        rows = [];
       }
     }
 
-    if (!rows.length) {
-      return [];
-    }
-
     applyDatasetToState('liberados', rows);
-    cacheDatasetLocally('liberados', rows, meta);
 
     if (document.querySelector('#liberados.secao.ativa')) {
       atualizarBadgesLiberados();
