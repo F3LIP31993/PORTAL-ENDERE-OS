@@ -81,7 +81,10 @@ function renderDropdownCidadesLiberados(subcard) {
   // Monta dropdown
   container.innerHTML = `
     <div style="position:relative;display:inline-block;width:100%;max-width:320px;">
-      <button id="btn-dropdown-cidade-${subcard}" style="width:100%;padding:6px 8px;text-align:left;">Filtrar cidade <span style='float:right;'>&#9660;</span></button>
+      <button id="btn-dropdown-cidade-${subcard}" style="width:100%;padding:6px 8px;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <span>Selecionar cidade</span>
+        <span style="font-size:18px;">&#9660;</span>
+      </button>
       <div id="dropdown-cidade-lista-${subcard}" style="display:none;position:absolute;z-index:10;background:#fff;border:1px solid #ccc;width:100%;max-height:220px;overflow-y:auto;box-shadow:0 2px 8px #0002;">
         ${cidades.map(cidade => `<div style='padding:8px;cursor:pointer;' onmousedown="selecionarCidadeLiberados('${subcard}','${cidade.replace(/'/g, "\'")}')">${cidade}</div>`).join('')}
       </div>
