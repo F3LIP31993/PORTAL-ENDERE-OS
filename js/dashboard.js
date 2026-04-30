@@ -3600,16 +3600,23 @@ async function selecionarAbaLiberados(aba = 'projeto-f') {
   liberadosSubcardSelecionado = true;
   liberadosAbaAtiva = normalizeLiberadosAba(aba);
   atualizarBotoesAbaLiberados();
-  atualizarBadgesLiberados();
   updateImportTargetLabel();
   atualizarLayoutLiberados();
 
-  // Força leitura do IndexedDB para garantir todos os registros
+  // SEMPRE ler do IndexedDB ao trocar de aba
   const dadosIdx = await lerPlanilhaIndexedDB('liberados');
-  if (Array.isArray(dadosIdx) && dadosIdx.length) {
+  if (Array.isArray(dadosIdx)) {
     applyDatasetToState('liberados', dadosIdx);
+    // Atualiza badge e tabela APÓS leitura
+    atualizarBadgesLiberados();
+    const dadosAba = getDadosLiberadosDaAba(dadosIdx, liberadosAbaAtiva);
+    renderTabelaLiberados('tabela-liberados', dadosAba);
+  } else {
+    // Se não houver dados, limpa badge/tabela
+    atualizarBadgesLiberados();
+    renderTabelaLiberados('tabela-liberados', []);
   }
-  carregarDadosCategoria('liberados');
+  // Não usar localStorage/cache para badge/tabela LIBERADOS
 }
 
 function abrirCardLiberados(aba = 'projeto-f') {
