@@ -452,12 +452,8 @@
       <div class="card card-projetof-filtros">
         <div class="filtros-projeto-f">
           <div class="filtro-item filtro-item-cidade-projetof">
-            <label for="filtro-cidade-projeto-f">Filtrar Cidade:</label>
-            <div style="display:flex; gap:6px; align-items:center;">
-              <input type="text" id="filtro-cidade-projeto-f" placeholder="Digite a cidade..." oninput="aplicarFiltrosProjetoF()" onfocus="mostrarSugestoesCidadeProjetoF()" autocomplete="off" />
-              <button type="button" class="btn-secondary" style="padding:2px 8px;font-size:13px;" onclick="abrirModalCidadesProjetoF()">Ver todas as cidades</button>
-            </div>
-            <div id="filtro-cidade-projeto-f-sugestoes" class="filtro-cidade-projeto-f-sugestoes hidden"></div>
+            <label>Cidades disponíveis:</label>
+            <div id="tabela-cidades-projeto-f-inline" style="margin:0 0 8px 0;"></div>
           <!-- Modal de cidades Projeto F -->
           <div id="modal-cidades-projeto-f" class="modal hidden">
             <div class="modal-content" style="max-width:420px;">
