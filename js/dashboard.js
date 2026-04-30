@@ -1,3 +1,34 @@
+// ========== MODAL DE CIDADES PROJETO F ==========
+function abrirModalCidadesProjetoF() {
+  const modal = document.getElementById('modal-cidades-projeto-f');
+  const tbody = document.getElementById('tabela-cidades-projeto-f');
+  if (!modal || !tbody) return;
+  // Pega todos os registros do Projeto F
+  const rows = Array.isArray(dadosPorCategoria['projeto-f']) ? dadosPorCategoria['projeto-f'] : [];
+  // Conta cidades únicas
+  const cidadesMap = {};
+  rows.forEach(row => {
+    const cidade = String(row.CIDADE || row.cidade || '').trim();
+    if (!cidade) return;
+    cidadesMap[cidade] = (cidadesMap[cidade] || 0) + 1;
+  });
+  const cidades = Object.entries(cidadesMap).sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
+  tbody.innerHTML = cidades.length
+    ? cidades.map(([cidade, qtd]) => `<tr style='cursor:pointer;' onclick=\"selecionarCidadeProjetoF('${cidade.replace(/'/g, "\'")}')\"><td style='padding:6px 8px;'>${cidade}</td><td style='text-align:right;padding:6px 8px;'>${qtd}</td></tr>`).join('')
+    : `<tr><td colspan='2' style='text-align:center;'>Nenhuma cidade encontrada</td></tr>`;
+  modal.classList.remove('hidden');
+}
+
+function fecharModalCidadesProjetoF() {
+  const modal = document.getElementById('modal-cidades-projeto-f');
+  if (modal) modal.classList.add('hidden');
+}
+
+function selecionarCidadeProjetoF(cidade) {
+  document.getElementById('filtro-cidade-projeto-f').value = cidade;
+  aplicarFiltrosProjetoF();
+  fecharModalCidadesProjetoF();
+}
 // ====== IndexedDB Utility for Large Datasets ======
 const PLANILHA_DB_NAME = 'portalPlanilhasDB';
 const PLANILHA_DB_VERSION = 1;
