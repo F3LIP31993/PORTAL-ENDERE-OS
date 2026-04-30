@@ -118,7 +118,12 @@ function aplicarFiltrosLiberados(subcard) {
   // (Aqui deve-se manter o restante da lógica de filtro já existente, só mudando a origem do valor da cidade)
 }
 
-// Chame renderDropdownCidadesLiberados('projeto-f'), renderDropdownCidadesLiberados('gpon-hfc'), renderDropdownCidadesLiberados('greenfield') ao renderizar cada subcard LIBERADOS
+
+// Chame renderDropdownCidadesLiberados('liberados') ao abrir o card LIBERADOS
+function abrirCardLiberados(subcard) {
+  // ...código existente para exibir o subcard...
+  renderDropdownCidadesLiberados('liberados');
+}
 
 // Renderizar a lista de cidades ao carregar os dados do Projeto F
 const _oldApplyDatasetToStatePF = applyDatasetToState;
