@@ -115,15 +115,62 @@ function selecionarCidadeLiberados(subcard, cidade) {
 
 function aplicarFiltrosLiberados(subcard) {
   const cidade = (window._cidadeLiberadosSelecionada && window._cidadeLiberadosSelecionada[subcard]) || '';
-  // ...aplicar filtro na tabela do subcard usando a cidade selecionada...
-  // (Aqui deve-se manter o restante da lógica de filtro já existente, só mudando a origem do valor da cidade)
+  // Filtra os dados do subcard pela cidade selecionada
+  const rows = Array.isArray(dadosPorCategoria[subcard]) ? dadosPorCategoria[subcard] : [];
+  let filtrados = rows;
+  if (cidade && cidade !== 'Todos') {
+    filtrados = rows.filter(row => {
+      const c = String(row.CIDADE || row.cidade || '').trim();
+      return c === cidade;
+    });
+  }
+  // Renderiza a tabela correta do subcard
+  const tabelaId = `tabela-liberados`;
+  const tbody = document.getElementById(tabelaId);
+  if (!tbody) return;
+  if (!filtrados.length) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center">Nenhum dado</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtrados.map(row => `
+    <tr>
+      <td>${row.TIPO_REDE || row["TIPO_REDE"] || ''}</td>
+      <td>${row.SOLICITANTE || row["SOLICITANTE"] || ''}</td>
+      <td>${row.DDD || row["DDD"] || ''}</td>
+      <td>${row.CIDADE || row["CIDADE"] || ''}</td>
+      <td>${row.ENDERECO || row["ENDERECO"] || row.ENDEREÇO || row["ENDEREÇO"] || ''}</td>
+      <td>${row.BLOCOS || row["BLOCOS"] || ''}</td>
+      <td>${row.HP || row["HP"] || ''}</td>
+      <td>${row.STATUS || row["STATUS"] || ''}</td>
+      <td>${row.DT_CONCLUIDO || row["DT_CONCLUIDO"] || ''}</td>
+      <td>${row.COD_IMOVEL || row["COD_IMOVEL"] || ''}</td>
+    </tr>
+  `).join('');
 }
 
 
 // Exibe o filtro de cidades correto para o subcard ativo em LIBERADOS
 function abrirCardLiberados(subcard) {
-  // ...código existente para exibir o subcard...
+  // Exibe o card de detalhes e renderiza o dropdown e a tabela filtrada
+  document.getElementById('liberados-detalhes-card').style.display = 'block';
+  // Garante que o filtro de cidades seja renderizado na área correta
+  // Mapeia subcard para o id correto da área de filtro
+  let filtroAreaId = 'filtro-cidade-area-liberados';
+  const filtroArea = document.getElementById(filtroAreaId);
+  if (filtroArea) {
+    // Limpa o container antes de renderizar
+    filtroArea.innerHTML = '';
+    // Cria um container específico para o subcard
+    const containerId = `filtro-cidade-dropdown-${subcard}`;
+    let container = document.getElementById(containerId);
+    if (!container) {
+      container = document.createElement('div');
+      container.id = containerId;
+      filtroArea.appendChild(container);
+    }
+  }
   renderDropdownCidadesLiberados(subcard);
+  aplicarFiltrosLiberados(subcard);
 }
 
 // Renderizar a lista de cidades ao carregar os dados do Projeto F
