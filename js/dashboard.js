@@ -60,16 +60,14 @@ function selecionarCidadeProjetoF(cidade) {
 // Novo filtro de cidade: dropdown clicável
 function renderDropdownCidadesLiberados(subcard) {
   // subcard: 'projeto-f', 'gpon-hfc', 'greenfield'
-  const containerId = `filtro-cidade-dropdown-${subcard}`;
-  let container = document.getElementById(containerId);
-  if (!container) {
-    // Cria container se não existir
-    const filtroArea = document.getElementById(`filtro-cidade-area-${subcard}`);
-    if (!filtroArea) return;
-    container = document.createElement('div');
-    container.id = containerId;
-    filtroArea.appendChild(container);
-  }
+  // Sempre renderiza o dropdown no container padrão do HTML
+  const filtroArea = document.getElementById('filtro-cidade-area-liberados');
+  if (!filtroArea) return;
+  filtroArea.innerHTML = '';
+  const container = document.createElement('div');
+  container.id = `filtro-cidade-dropdown-${subcard}`;
+  filtroArea.appendChild(container);
+
   // Busca cidades únicas
   const rows = Array.isArray(dadosPorCategoria[subcard]) ? dadosPorCategoria[subcard] : [];
   const cidadesSet = new Set();
@@ -78,14 +76,15 @@ function renderDropdownCidadesLiberados(subcard) {
     if (cidade) cidadesSet.add(cidade);
   });
   const cidades = Array.from(cidadesSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  // Monta dropdown
+
+  // Sempre mostra o dropdown, mesmo sem cidades
   container.innerHTML = `
     <button id="btn-dropdown-cidade-${subcard}" style="padding:6px 16px;min-width:180px;max-width:320px;display:flex;align-items:center;justify-content:space-between;border:1px solid #bfc9d1;background:#fff;border-radius:4px;cursor:pointer;font-size:15px;">
-      <span style="flex:1;text-align:left;">Selecionar cidade</span>
+      <span style="flex:1;text-align:left;">${cidades.length ? 'Selecionar cidade' : 'Nenhuma cidade encontrada'}</span>
       <span style="font-size:18px;">&#9660;</span>
     </button>
     <div id="dropdown-cidade-lista-${subcard}" style="display:none;position:absolute;z-index:10;background:#fff;border:1px solid #ccc;width:320px;max-height:220px;overflow-y:auto;box-shadow:0 2px 8px #0002;">
-      ${cidades.map(cidade => `<div style='padding:8px;cursor:pointer;' onmousedown="selecionarCidadeLiberados('${subcard}','${cidade.replace(/'/g, "\'")}')">${cidade}</div>`).join('')}
+      ${cidades.length ? cidades.map(cidade => `<div style='padding:8px;cursor:pointer;' onmousedown="selecionarCidadeLiberados('${subcard}','${cidade.replace(/'/g, "\'")}')">${cidade}</div>`).join('') : `<div style='padding:8px;text-align:center;color:#888;'>Nenhuma cidade</div>`}
     </div>
   `;
   // Eventos
@@ -3392,6 +3391,7 @@ function renderTabela(id, lista, atualizarRelatoriosFlag = true) {
     return;
   }
 
+  // REMOVE QUALQUER LIMITE DE LINHAS: mostra todos os registros
   const rows = lista.map(i => {
     const codigo = getField(i, "COD-MDUGO", "cod-mdugo", "codmdugo");
     const endereco = `${getField(i, "ENDEREÇO", "ENDERECO")} ${getField(i, "NUMERO", "NUM")} `.trim();
