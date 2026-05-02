@@ -120,10 +120,10 @@ function aplicarFiltrosLiberados(subcard) {
 }
 
 
-// Chame renderDropdownCidadesLiberados('liberados') ao abrir o card LIBERADOS
+// Exibe o filtro de cidades correto para o subcard ativo em LIBERADOS
 function abrirCardLiberados(subcard) {
   // ...código existente para exibir o subcard...
-  renderDropdownCidadesLiberados('liberados');
+  renderDropdownCidadesLiberados(subcard);
 }
 
 // Renderizar a lista de cidades ao carregar os dados do Projeto F
