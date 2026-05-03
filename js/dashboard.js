@@ -697,13 +697,11 @@ function applyDatasetToState(categoria, items) {
     const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
     if (Array.isArray(localItems) && localItems.length) {
       console.warn('[SAR-REDE] Tentativa de sobrescrever dados locais bloqueada. Mantendo dados locais.', localItems);
-      alert('⚠️ Proteção SAR REDE: tentativa de sobrescrever dados locais bloqueada.');
       dadosPorCategoria[categoria] = localItems;
       return;
     }
     if (Array.isArray(dadosPorCategoria[categoria]) && dadosPorCategoria[categoria].length) {
       console.warn('[SAR-REDE] Tentativa de sobrescrever dados em memória bloqueada. Mantendo dados em memória.', dadosPorCategoria[categoria]);
-      alert('⚠️ Proteção SAR REDE: tentativa de sobrescrever dados em memória bloqueada.');
       return;
     }
     // Log de qualquer tentativa de sobrescrita
@@ -711,7 +709,6 @@ function applyDatasetToState(categoria, items) {
       console.log('[SAR-REDE] Carregando dados para SAR REDE:', items);
     } else {
       console.log('[SAR-REDE] Tentativa de sobrescrever SAR REDE com array vazio. Ignorado.');
-      alert('⚠️ Proteção SAR REDE: tentativa de sobrescrever com array vazio bloqueada.');
       return;
     }
   }
