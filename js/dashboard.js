@@ -959,7 +959,24 @@ async function carregarDadosCompartilhados() {
 
       atualizarContadores();
       const secaoAtiva = document.querySelector('.secao.ativa')?.id;
-      if (secaoAtiva) {
+      if (secaoAtiva === 'sar-rede') {
+        // Força renderização do SAR REDE sempre com todos os dados locais
+        lerPlanilhaIndexedDB('sar-rede').then(items => {
+          let dadosLocais = Array.isArray(items) ? items : [];
+          if (!dadosLocais.length) {
+            const localSnapshot = getLocalDatasetCache()?.['sar-rede'];
+            if (Array.isArray(localSnapshot?.items)) {
+              dadosLocais = localSnapshot.items;
+            }
+          }
+          if (!dadosLocais.length && Array.isArray(dadosPorCategoria['sar-rede'])) {
+            dadosLocais = dadosPorCategoria['sar-rede'];
+          }
+          applyDatasetToState('sar-rede', dadosLocais);
+          renderTabelaSarRede('tabela-sar-rede', dadosLocais);
+          popularFiltroStatusSarRede(dadosLocais);
+        });
+      } else if (secaoAtiva) {
         carregarDadosCategoria(secaoAtiva);
       }
       updateImportLockInfo();
