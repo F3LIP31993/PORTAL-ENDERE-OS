@@ -8,13 +8,15 @@ function abrirCardEpoProjetoF() {
   });
 }
 
-// NOVO: Garante que ao abrir o card SAR REDE, os dados sejam lidos do IndexedDB
+// NOVO: Garante que ao abrir o card SAR REDE, os dados sejam lidos do IndexedDB e SEMPRE renderiza tudo
 function abrirCardSarRede() {
   lerPlanilhaIndexedDB('sar-rede').then(items => {
-    if (Array.isArray(items) && items.length) {
-      applyDatasetToState('sar-rede', items);
-      // Se houver função de renderização da tabela SAR REDE, chame aqui
-    }
+    // Mesmo se vier vazio, aplica ao estado para não ficar com só 10 linhas ou sumir
+    applyDatasetToState('sar-rede', Array.isArray(items) ? items : []);
+    // Renderiza a tabela completa
+    renderTabelaSarRede('tabela-sar-rede', Array.isArray(items) ? items : []);
+    // Atualiza o filtro de status
+    popularFiltroStatusSarRede(Array.isArray(items) ? items : []);
   });
 }
 
@@ -2234,13 +2236,8 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   // Preenche os cards/tabelas principais já na entrada para evitar tela vazia.
   ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'projeto-f'].forEach(carregarDadosCategoria);
-  // SAR REDE: força sempre o cache local locked, se existir
-  const localSar = getLocalDatasetCache()?.['sar-rede'];
-  if (localSar?.locked && Array.isArray(localSar.items) && localSar.items.length) {
-    applyDatasetToState('sar-rede', localSar.items);
-  } else {
-    carregarDadosCategoria('sar-rede');
-  }
+  // SAR REDE: SEMPRE força leitura do IndexedDB e renderização completa
+  abrirCardSarRede();
   atualizarContadores();
   
   // Carregar dados específicos de usuário de acompanhamento
