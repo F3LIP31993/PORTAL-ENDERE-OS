@@ -8,6 +8,19 @@ function abrirCardEpoProjetoF() {
   });
 }
 
+// NOVO: Garante que ao abrir o card SAR REDE, os dados sejam lidos do IndexedDB
+function abrirCardSarRede() {
+  lerPlanilhaIndexedDB('sar-rede').then(items => {
+    if (Array.isArray(items) && items.length) {
+      applyDatasetToState('sar-rede', items);
+      // Se houver função de renderização da tabela SAR REDE, chame aqui
+    }
+  });
+}
+
+// Ao abrir o card SAR REDE, chame abrirCardSarRede() para garantir que todos os dados sejam carregados do IndexedDB
+// Exemplo: ao clicar no botão/aba SAR REDE, chame abrirCardSarRede() ao invés de só mostrar a tela.
+
 // Substitua a chamada de exibição do card EPO > PROJETO F para usar abrirCardEpoProjetoF()
 // Exemplo: ao clicar no botão/aba PROJETO F dentro do card EPO, chame abrirCardEpoProjetoF() ao invés de só mostrar a tela.
 
