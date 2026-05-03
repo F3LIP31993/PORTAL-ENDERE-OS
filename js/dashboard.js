@@ -27,36 +27,39 @@ function abrirCardSarRede() {
 
 // ===== AJUSTE: Remover legendas dos subcards LIBERADOS =====
 function removerLegendasLiberados() {
-  function carregarDadosCategoria(categoriaId) {
-    // SAR REDE: nunca sobrescrever dados locked, sempre priorizar cache local locked
-    if (categoriaId === 'sar-rede') {
-      const localSar = getLocalDatasetCache()?.['sar-rede'];
-      if (localSar?.locked && Array.isArray(localSar.items) && localSar.items.length) {
-        applyDatasetToState('sar-rede', localSar.items);
-        renderTabelaSarRede('tabela-sar-rede', localSar.items);
-        popularFiltroStatusSarRede(localSar.items);
-        atualizarContadores();
-        return;
-      }
-      // Se não houver locked, tenta IndexedDB
-      lerPlanilhaIndexedDB('sar-rede').then(items => {
-        if (Array.isArray(items) && items.length) {
-          applyDatasetToState('sar-rede', items);
-          renderTabelaSarRede('tabela-sar-rede', items);
-          popularFiltroStatusSarRede(items);
-        } else {
-          // Se não houver nada, limpa a tabela
-          applyDatasetToState('sar-rede', []);
-          renderTabelaSarRede('tabela-sar-rede', []);
-          popularFiltroStatusSarRede([]);
-        }
-        atualizarContadores();
-      });
+  // ...código original da função...
+}
+
+// Corrigir escopo global da função carregarDadosCategoria
+function carregarDadosCategoria(categoriaId) {
+  // SAR REDE: nunca sobrescrever dados locked, sempre priorizar cache local locked
+  if (categoriaId === 'sar-rede') {
+    const localSar = getLocalDatasetCache()?.['sar-rede'];
+    if (localSar?.locked && Array.isArray(localSar.items) && localSar.items.length) {
+      applyDatasetToState('sar-rede', localSar.items);
+      renderTabelaSarRede('tabela-sar-rede', localSar.items);
+      popularFiltroStatusSarRede(localSar.items);
+      atualizarContadores();
       return;
     }
-    // ...existing code...
+    // Se não houver locked, tenta IndexedDB
+    lerPlanilhaIndexedDB('sar-rede').then(items => {
+      if (Array.isArray(items) && items.length) {
+        applyDatasetToState('sar-rede', items);
+        renderTabelaSarRede('tabela-sar-rede', items);
+        popularFiltroStatusSarRede(items);
+      } else {
+        // Se não houver nada, limpa a tabela
+        applyDatasetToState('sar-rede', []);
+        renderTabelaSarRede('tabela-sar-rede', []);
+        popularFiltroStatusSarRede([]);
+      }
+      atualizarContadores();
+    });
+    return;
   }
-  }
+  // ...restante do código original da função carregarDadosCategoria...
+}
   renderDropdownCidadesLiberados(subcard);
   aplicarFiltrosLiberados(subcard);
 }
