@@ -1,116 +1,234 @@
-// Garante que ao abrir o card EPO > PROJETO F, os dados sejam lidos do IndexedDB
-function abrirCardEpoProjetoF() {
-  lerPlanilhaIndexedDB('epo-projeto-f').then(items => {
-    if (Array.isArray(items) && items.length) {
-      applyDatasetToState('epo-projeto-f', items);
-      // Aqui você pode chamar a função de renderização da tabela, se necessário
-    }
-  });
-}
 
-// NOVO: Garante que ao abrir o card SAR REDE, os dados sejam lidos do IndexedDB e SEMPRE renderiza tudo
-function abrirCardSarRede() {
-  lerPlanilhaIndexedDB('sar-rede').then(items => {
-    // Sempre aplica ao estado e renderiza, mesmo se vier vazio
-    const dados = Array.isArray(items) ? items : [];
-    applyDatasetToState('sar-rede', dados);
-    renderTabelaSarRede('tabela-sar-rede', dados);
-    popularFiltroStatusSarRede(dados);
-  });
-}
+// Função central para abrir qualquer card/categoria e garantir renderização correta
+function abrirCategoria(categoriaId) {
+  // Remove classe ativa de todas as seções
+  document.querySelectorAll('.secao').forEach(secao => secao.classList.remove('ativa'));
+  // Ativa a seção correta
+  const secao = document.getElementById(categoriaId);
+  if (secao) secao.classList.add('ativa');
 
-// Ao abrir o card SAR REDE, chame abrirCardSarRede() para garantir que todos os dados sejam carregados do IndexedDB
-// Exemplo: ao clicar no botão/aba SAR REDE, chame abrirCardSarRede() ao invés de só mostrar a tela.
+  // Carrega e renderiza dados para cada categoria
+  if (categoriaId === 'sar-rede') {
+    lerPlanilhaIndexedDB('sar-rede').then(items => {
+      const dados = Array.isArray(items) ? items : [];
+      applyDatasetToState('sar-rede', dados);
+      renderTabelaSarRede('tabela-sar-rede', dados);
+      popularFiltroStatusSarRede(dados);
+    });
+    return;
+  }
+  if (categoriaId === 'projeto-f') {
+    lerPlanilhaIndexedDB('projeto-f').then(items => {
+      const dados = Array.isArray(items) ? items : [];
+      applyDatasetToState('projeto-f', dados);
+      renderTabelaProjetoF('tabela-projeto-f', dados);
+      renderTabelaCidadesProjetoFInline();
+      popularFiltroCidadeProjetoF();
+      popularFiltroStatusProjetoF(dados);
+    });
+    return;
+  }
+  if (categoriaId === 'mdu-ongoing') {
+    lerPlanilhaIndexedDB('mdu-ongoing').then(items => {
+      const dados = Array.isArray(items) ? items : [];
+      applyDatasetToState('mdu-ongoing', dados);
+      renderTabelaMduOngoing('tabela-mdu-ongoing', dados);
+      popularFiltroStatusMdu();
+    });
+    return;
+  }
+  if (categoriaId === 'liberados') {
+    // Sempre força fluxo de seleção de subcard
+    resetarFluxoLiberados();
+    return;
+  }
+  if (categoriaId === 'empresarial') {
+    lerPlanilhaIndexedDB('empresarial').then(items => {
+      const dados = Array.isArray(items) ? items : [];
+      applyDatasetToState('empresarial', dados);
+      renderTabelaEmpresarial('tabela-empresarial', dados);
+    });
+    return;
+  }
+  if (categoriaId === 'ongoing') {
+    lerPlanilhaIndexedDB('ongoing').then(items => {
+      const dados = Array.isArray(items) ? items : [];
+      applyDatasetToState('ongoing', dados);
+      renderTabela('tabela-ongoing', dados);
+    });
+    return;
+  }
+  if (categoriaId === 'pendente-autorizacao') {
+    lerPlanilhaIndexedDB('pendente-autorizacao').then(items => {
+      const dados = Array.isArray(items) ? items : [];
+      applyDatasetToState('pendente-autorizacao', dados);
+      // Funções de renderização específicas podem ser chamadas aqui se necessário
+    });
+    return;
+  }
+  // Para outras categorias, apenas ativa a seção
+}
 
 // Substitua a chamada de exibição do card EPO > PROJETO F para usar abrirCardEpoProjetoF()
 // Exemplo: ao clicar no botão/aba PROJETO F dentro do card EPO, chame abrirCardEpoProjetoF() ao invés de só mostrar a tela.
 
 // ===== AJUSTE: Remover legendas dos subcards LIBERADOS =====
 function removerLegendasLiberados() {
-  // ...código original da função...
+  // Remove legendas de status e instrução dos subcards LIBERADOS
+  const legendas = document.querySelectorAll('.liberados-legenda, .liberados-instrucao, .liberados-status');
+  legendas.forEach(el => el.remove());
+  // Também pode remover textos específicos se necessário
+  const textos = [
+    'Aba ativa:',
+    'Selecione PROJETO F, GPON E HFC ou GREENFIELD para abrir anexo e tabela.'
+  ];
+  document.querySelectorAll('*').forEach(el => {
+    textos.forEach(txt => {
+      if (el.textContent && el.textContent.includes(txt)) {
+        el.remove();
+      }
+    });
+  });
 }
 
-// Corrigir escopo global da função carregarDadosCategoria
-function carregarDadosCategoria(categoriaId) {
-  // SAR REDE: nunca sobrescrever dados locked, sempre priorizar cache local locked
-  if (categoriaId === 'sar-rede') {
-    const localSar = getLocalDatasetCache()?.['sar-rede'];
-    if (localSar?.locked && Array.isArray(localSar.items) && localSar.items.length) {
-      applyDatasetToState('sar-rede', localSar.items);
-      renderTabelaSarRede('tabela-sar-rede', localSar.items);
-      popularFiltroStatusSarRede(localSar.items);
-      atualizarContadores();
-      return;
-    }
-    // Se não houver locked, tenta IndexedDB
-    lerPlanilhaIndexedDB('sar-rede').then(items => {
-      if (Array.isArray(items) && items.length) {
-        applyDatasetToState('sar-rede', items);
-        renderTabelaSarRede('tabela-sar-rede', items);
-        popularFiltroStatusSarRede(items);
-      } else {
-        // Se não houver nada, limpa a tabela
-        applyDatasetToState('sar-rede', []);
-        renderTabelaSarRede('tabela-sar-rede', []);
-        popularFiltroStatusSarRede([]);
-      }
-      atualizarContadores();
-    });
-    return;
-  }
-  // PROJETO F: sempre renderizar todos os dados
-  if (categoriaId === 'projeto-f') {
-    lerPlanilhaIndexedDB('projeto-f').then(items => {
-      const dados = Array.isArray(items) ? items : [];
-      applyDatasetToState('projeto-f', dados);
-      renderTabelaProjetoF('tabela-projeto-f', dados);
-      atualizarContadores();
-    });
-    return;
-  }
-  // MDU ONGOING: sempre renderizar todos os dados
-  if (categoriaId === 'mdu-ongoing') {
-    lerPlanilhaIndexedDB('mdu-ongoing').then(items => {
-      const dados = Array.isArray(items) ? items : [];
-      applyDatasetToState('mdu-ongoing', dados);
-      renderTabelaMduOngoing('tabela-mdu-ongoing', dados);
-      atualizarContadores();
-    });
-    return;
-  }
-  // ...restante do código original da função carregarDadosCategoria...
+// Chame removerLegendasLiberados() ao renderizar os subcards LIBERADOS
+// Exemplo: após renderizar a tabela ou ao trocar de subcard
+// ========== LISTA VISUAL DE CIDADES PROJETO F ==========
+function renderTabelaCidadesProjetoFInline() {
+  const container = document.getElementById('tabela-cidades-projeto-f-inline');
+  if (!container) return;
+  const rows = Array.isArray(dadosPorCategoria['projeto-f']) ? dadosPorCategoria['projeto-f'] : [];
+  const cidadesMap = {};
+  rows.forEach(row => {
+    const cidade = String(row.CIDADE || row.cidade || '').trim();
+    if (!cidade) return;
+    cidadesMap[cidade] = (cidadesMap[cidade] || 0) + 1;
+  });
+  const cidades = Object.entries(cidadesMap).sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
+  container.innerHTML = cidades.length
+    ? `<table style='width:100%;border-collapse:collapse;'><thead><tr><th style="text-align:left;padding:6px 8px;">Cidade</th><th style="text-align:right;padding:6px 8px;">Qtd</th></tr></thead><tbody>` +
+      cidades.map(([cidade, qtd]) => `<tr style='cursor:pointer;' onclick="selecionarCidadeProjetoF('${cidade.replace(/'/g, "\'")}')"><td style='padding:6px 8px;'>${cidade}</td><td style='text-align:right;padding:6px 8px;'>${qtd}</td></tr>`).join('') +
+      `</tbody></table>`
+    : `<div style='padding:8px;text-align:center;'>Nenhuma cidade encontrada</div>`;
 }
 
-// Corrigir escopo global da função carregarDadosCategoria
-function carregarDadosCategoria(categoriaId) {
-  // SAR REDE: nunca sobrescrever dados locked, sempre priorizar cache local locked
-  if (categoriaId === 'sar-rede') {
-    const localSar = getLocalDatasetCache()?.['sar-rede'];
-    if (localSar?.locked && Array.isArray(localSar.items) && localSar.items.length) {
-      applyDatasetToState('sar-rede', localSar.items);
-      renderTabelaSarRede('tabela-sar-rede', localSar.items);
-      popularFiltroStatusSarRede(localSar.items);
-      atualizarContadores();
-      return;
-    }
-    // Se não houver locked, tenta IndexedDB
-    lerPlanilhaIndexedDB('sar-rede').then(items => {
-      if (Array.isArray(items) && items.length) {
-        applyDatasetToState('sar-rede', items);
-        renderTabelaSarRede('tabela-sar-rede', items);
-        popularFiltroStatusSarRede(items);
-      } else {
-        // Se não houver nada, limpa a tabela
-        applyDatasetToState('sar-rede', []);
-        renderTabelaSarRede('tabela-sar-rede', []);
-        popularFiltroStatusSarRede([]);
+function selecionarCidadeProjetoF(cidade) {
+  window._cidadeProjetoFSelecionada = cidade;
+  aplicarFiltrosProjetoF();
+}
+
+
+// Novo filtro de cidade: dropdown clicável
+function renderDropdownCidadesLiberados(subcard) {
+  // subcard: 'projeto-f', 'gpon-hfc', 'greenfield'
+  // Sempre renderiza o dropdown no container padrão do HTML
+  const filtroArea = document.getElementById('filtro-cidade-area-liberados');
+  if (!filtroArea) return;
+  filtroArea.innerHTML = '';
+  const container = document.createElement('div');
+  container.id = `filtro-cidade-dropdown-${subcard}`;
+  filtroArea.appendChild(container);
+
+  // Busca cidades únicas
+  const rows = Array.isArray(dadosPorCategoria[subcard]) ? dadosPorCategoria[subcard] : [];
+  const cidadesSet = new Set();
+  rows.forEach(row => {
+    const cidade = String(row.CIDADE || row.cidade || '').trim();
+    if (cidade) cidadesSet.add(cidade);
+  });
+  const cidades = Array.from(cidadesSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+  // Sempre mostra o dropdown, mesmo sem cidades
+  container.innerHTML = `
+    <button id="btn-dropdown-cidade-${subcard}" style="padding:6px 16px;min-width:180px;max-width:320px;display:flex;align-items:center;justify-content:space-between;border:1px solid #bfc9d1;background:#fff;border-radius:4px;cursor:pointer;font-size:15px;">
+      <span style="flex:1;text-align:left;">${cidades.length ? 'Selecionar cidade' : 'Nenhuma cidade encontrada'}</span>
+      <span style="font-size:18px;">&#9660;</span>
+    </button>
+    <div id="dropdown-cidade-lista-${subcard}" style="display:none;position:absolute;z-index:10;background:#fff;border:1px solid #ccc;width:320px;max-height:220px;overflow-y:auto;box-shadow:0 2px 8px #0002;">
+      ${cidades.length ? cidades.map(cidade => `<div style='padding:8px;cursor:pointer;' onmousedown="selecionarCidadeLiberados('${subcard}','${cidade.replace(/'/g, "\'")}')">${cidade}</div>`).join('') : `<div style='padding:8px;text-align:center;color:#888;'>Nenhuma cidade</div>`}
+    </div>
+  `;
+  // Eventos
+  const btn = document.getElementById(`btn-dropdown-cidade-${subcard}`);
+  const lista = document.getElementById(`dropdown-cidade-lista-${subcard}`);
+  if (btn && lista) {
+    btn.onclick = () => {
+      lista.style.display = lista.style.display === 'block' ? 'none' : 'block';
+    };
+    document.addEventListener('click', function handler(e) {
+      if (!btn.contains(e.target) && !lista.contains(e.target)) {
+        lista.style.display = 'none';
+        document.removeEventListener('click', handler);
       }
-      atualizarContadores();
     });
+  }
+}
+
+function selecionarCidadeLiberados(subcard, cidade) {
+  window._cidadeLiberadosSelecionada = window._cidadeLiberadosSelecionada || {};
+  window._cidadeLiberadosSelecionada[subcard] = cidade;
+  aplicarFiltrosLiberados(subcard);
+  // Fecha dropdown
+  const lista = document.getElementById(`dropdown-cidade-lista-${subcard}`);
+  if (lista) lista.style.display = 'none';
+}
+
+function aplicarFiltrosLiberados(subcard) {
+  const cidade = (window._cidadeLiberadosSelecionada && window._cidadeLiberadosSelecionada[subcard]) || '';
+  // Filtra os dados do subcard pela cidade selecionada
+  const rows = Array.isArray(dadosPorCategoria[subcard]) ? dadosPorCategoria[subcard] : [];
+  let filtrados = rows;
+  if (cidade && cidade !== 'Todos') {
+    filtrados = rows.filter(row => {
+      const c = String(row.CIDADE || row.cidade || '').trim();
+      return c === cidade;
+    });
+  }
+  // Renderiza a tabela correta do subcard
+  const tabelaId = `tabela-liberados`;
+  const tbody = document.getElementById(tabelaId);
+  if (!tbody) return;
+  if (!filtrados.length) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center">Nenhum dado</td></tr>`;
     return;
   }
-  // ...restante do código original da função carregarDadosCategoria...
+  tbody.innerHTML = filtrados.map(row => `
+    <tr>
+      <td>${row.TIPO_REDE || row["TIPO_REDE"] || ''}</td>
+      <td>${row.SOLICITANTE || row["SOLICITANTE"] || ''}</td>
+      <td>${row.DDD || row["DDD"] || ''}</td>
+      <td>${row.CIDADE || row["CIDADE"] || ''}</td>
+      <td>${row.ENDERECO || row["ENDERECO"] || row.ENDEREÇO || row["ENDEREÇO"] || ''}</td>
+      <td>${row.BLOCOS || row["BLOCOS"] || ''}</td>
+      <td>${row.HP || row["HP"] || ''}</td>
+      <td>${row.STATUS || row["STATUS"] || ''}</td>
+      <td>${row.DT_CONCLUIDO || row["DT_CONCLUIDO"] || ''}</td>
+      <td>${row.COD_IMOVEL || row["COD_IMOVEL"] || ''}</td>
+    </tr>
+  `).join('');
 }
+
+
+// Exibe o filtro de cidades correto para o subcard ativo em LIBERADOS
+function abrirCardLiberados(subcard) {
+  // Exibe o card de detalhes e renderiza o dropdown e a tabela filtrada
+  document.getElementById('liberados-detalhes-card').style.display = 'block';
+  // Garante que o filtro de cidades seja renderizado na área correta
+  // Mapeia subcard para o id correto da área de filtro
+  let filtroAreaId = 'filtro-cidade-area-liberados';
+  const filtroArea = document.getElementById(filtroAreaId);
+  if (filtroArea) {
+    // Limpa o container antes de renderizar
+    filtroArea.innerHTML = '';
+    // Cria um container específico para o subcard
+    const containerId = `filtro-cidade-dropdown-${subcard}`;
+    let container = document.getElementById(containerId);
+    if (!container) {
+      container = document.createElement('div');
+      container.id = containerId;
+      filtroArea.appendChild(container);
+    }
+  }
   renderDropdownCidadesLiberados(subcard);
   aplicarFiltrosLiberados(subcard);
 }
@@ -2164,8 +2282,13 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   // Preenche os cards/tabelas principais já na entrada para evitar tela vazia.
   ['pendente-autorizacao', 'empresarial', 'mdu-ongoing', 'projeto-f'].forEach(carregarDadosCategoria);
-  // SAR REDE: SEMPRE força leitura do IndexedDB e renderização completa
-  abrirCardSarRede();
+  // SAR REDE: força sempre o cache local locked, se existir
+  const localSar = getLocalDatasetCache()?.['sar-rede'];
+  if (localSar?.locked && Array.isArray(localSar.items) && localSar.items.length) {
+    applyDatasetToState('sar-rede', localSar.items);
+  } else {
+    carregarDadosCategoria('sar-rede');
+  }
   atualizarContadores();
   
   // Carregar dados específicos de usuário de acompanhamento
@@ -3180,8 +3303,8 @@ function importarCSV() {
             }
           }
 
-          // Após importação, força leitura do IndexedDB e renderização completa (corrige bug de só 10 linhas)
-          abrirCardSarRede();
+          renderTabelaSarRede('tabela-sar-rede', parsed);
+          popularFiltroStatusSarRede(parsed);
           atualizarSeccaoAtivaComDados();
           return;
         }
