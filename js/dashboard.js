@@ -2342,18 +2342,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   agendarRenderVisaoGerencia(true);
   await checkForNewPortalBuild(true);
 
-  window.setInterval(() => {
-    updateNotificationBadge();
-    carregarDadosCompartilhados();
-    carregarEpoDatasetsCompartilhados();
-    processarFilaSyncCompartilhada();
-    checkForNewPortalBuild();
-
-    const panel = document.getElementById("notificationPanel");
-    if (panel && !panel.classList.contains("hidden")) {
-      renderNotificationList();
-    }
-  }, SHARED_REFRESH_INTERVAL_MS);
+  // REMOVIDO O REFRESH AUTOMÁTICO PARA NÃO PERDER DADOS DO SAR REDE
+  // Se desejar atualizar manualmente, chame carregarDadosCompartilhados() apenas quando quiser.
 
   window.setInterval(() => {
     checkForNewPortalBuild();
