@@ -691,11 +691,10 @@ function applyDatasetToState(categoria, items) {
     return;
   }
 
-  // Proteção: nunca sobrescrever SAR REDE local locked: true
+  // Proteção: nunca sobrescrever SAR REDE se houver qualquer dado local
   if (categoria === 'sar-rede') {
     const localSnapshot = getLocalDatasetCache()?.[categoria];
-    if (localSnapshot?.locked && Array.isArray(localSnapshot.items) && localSnapshot.items.length) {
-      // Mantém sempre o local travado
+    if (Array.isArray(localSnapshot?.items) && localSnapshot.items.length) {
       dadosPorCategoria[categoria] = localSnapshot.items;
       return;
     }
