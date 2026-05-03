@@ -11,12 +11,11 @@ function abrirCardEpoProjetoF() {
 // NOVO: Garante que ao abrir o card SAR REDE, os dados sejam lidos do IndexedDB e SEMPRE renderiza tudo
 function abrirCardSarRede() {
   lerPlanilhaIndexedDB('sar-rede').then(items => {
-    // Mesmo se vier vazio, aplica ao estado para não ficar com só 10 linhas ou sumir
-    applyDatasetToState('sar-rede', Array.isArray(items) ? items : []);
-    // Renderiza a tabela completa
-    renderTabelaSarRede('tabela-sar-rede', Array.isArray(items) ? items : []);
-    // Atualiza o filtro de status
-    popularFiltroStatusSarRede(Array.isArray(items) ? items : []);
+    // Sempre aplica ao estado e renderiza, mesmo se vier vazio
+    const dados = Array.isArray(items) ? items : [];
+    applyDatasetToState('sar-rede', dados);
+    renderTabelaSarRede('tabela-sar-rede', dados);
+    popularFiltroStatusSarRede(dados);
   });
 }
 
@@ -3252,8 +3251,8 @@ function importarCSV() {
             }
           }
 
-          renderTabelaSarRede('tabela-sar-rede', parsed);
-          popularFiltroStatusSarRede(parsed);
+          // Após importação, força leitura do IndexedDB e renderização completa (corrige bug de só 10 linhas)
+          abrirCardSarRede();
           atualizarSeccaoAtivaComDados();
           return;
         }
