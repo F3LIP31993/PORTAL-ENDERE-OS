@@ -9,24 +9,32 @@ function abrirCategoria(categoriaId) {
 
   // Carrega e renderiza dados para cada categoria
   if (categoriaId === 'sar-rede') {
-    // Sempre prioriza os dados locais completos (IndexedDB/localStorage), nunca o snapshot truncado do backend
+    // Sempre prioriza os dados completos do IndexedDB/localStorage, nunca o snapshot truncado do backend
     lerPlanilhaIndexedDB('sar-rede').then(items => {
-      let dadosLocais = Array.isArray(items) ? items : [];
+      let dadosCompletos = Array.isArray(items) ? items : [];
       // Se não encontrar no IndexedDB, tenta localStorage
-      if (!dadosLocais.length) {
+      if (!dadosCompletos.length) {
         const localSnapshot = getLocalDatasetCache()?.['sar-rede'];
-        if (Array.isArray(localSnapshot?.items)) {
-          dadosLocais = localSnapshot.items;
+        if (Array.isArray(localSnapshot?.items) && localSnapshot.items.length > 10) {
+          dadosCompletos = localSnapshot.items;
         }
       }
-      // Se ainda assim não encontrar, usa o que veio do backend (parâmetro)
-      if (!dadosLocais.length && Array.isArray(dadosPorCategoria['sar-rede'])) {
-        dadosLocais = dadosPorCategoria['sar-rede'];
+      // Se ainda assim não encontrar, usa o que veio do backend (parâmetro), mas só se for mais de 10 linhas
+      if (!dadosCompletos.length && Array.isArray(dadosPorCategoria['sar-rede']) && dadosPorCategoria['sar-rede'].length > 10) {
+        dadosCompletos = dadosPorCategoria['sar-rede'];
+      }
+      // Se só houver 10 linhas, não renderiza (evita snapshot truncado)
+      if (dadosCompletos.length <= 10) {
+        console.warn('[SAR-REDE] Snapshot truncado detectado ao reabrir card. Dados completos não encontrados.');
+        // Opcional: mostrar mensagem na tela
+        renderTabelaSarRede('tabela-sar-rede', []);
+        popularFiltroStatusSarRede([]);
+        return;
       }
       // Sempre renderiza com todos os dados locais disponíveis
-      applyDatasetToState('sar-rede', dadosLocais);
-      renderTabelaSarRede('tabela-sar-rede', dadosLocais);
-      popularFiltroStatusSarRede(dadosLocais);
+      applyDatasetToState('sar-rede', dadosCompletos);
+      renderTabelaSarRede('tabela-sar-rede', dadosCompletos);
+      popularFiltroStatusSarRede(dadosCompletos);
     });
     return;
   }
