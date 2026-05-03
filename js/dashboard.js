@@ -963,10 +963,9 @@ async function carregarDadosCompartilhados() {
       const localUpdatedAt = Date.parse(localSnapshot?.updatedAt || '') || 0;
       const sharedUpdatedAt = Date.parse(snapshot?.updated_at || snapshot?.updatedAt || '') || 0;
       const localIsTruncated = Boolean(localSnapshot?.truncated);
-      // NUNCA sobrescrever SAR REDE local locked: true
+      // NUNCA sobrescrever SAR REDE local: se houver qualquer dado local, sempre priorizar
       if (
         categoria === 'sar-rede' &&
-        Boolean(localSnapshot?.locked) &&
         localItems.length &&
         !localIsTruncated
       ) {
