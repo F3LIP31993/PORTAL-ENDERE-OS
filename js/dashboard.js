@@ -9,11 +9,24 @@ function abrirCategoria(categoriaId) {
 
   // Carrega e renderiza dados para cada categoria
   if (categoriaId === 'sar-rede') {
+    // Sempre prioriza os dados locais completos (IndexedDB/localStorage), nunca o snapshot truncado do backend
     lerPlanilhaIndexedDB('sar-rede').then(items => {
-      const dados = Array.isArray(items) ? items : [];
-      applyDatasetToState('sar-rede', dados);
-      renderTabelaSarRede('tabela-sar-rede', dados);
-      popularFiltroStatusSarRede(dados);
+      let dadosLocais = Array.isArray(items) ? items : [];
+      // Se não encontrar no IndexedDB, tenta localStorage
+      if (!dadosLocais.length) {
+        const localSnapshot = getLocalDatasetCache()?.['sar-rede'];
+        if (Array.isArray(localSnapshot?.items)) {
+          dadosLocais = localSnapshot.items;
+        }
+      }
+      // Se ainda assim não encontrar, usa o que veio do backend (parâmetro)
+      if (!dadosLocais.length && Array.isArray(dadosPorCategoria['sar-rede'])) {
+        dadosLocais = dadosPorCategoria['sar-rede'];
+      }
+      // Sempre renderiza com todos os dados locais disponíveis
+      applyDatasetToState('sar-rede', dadosLocais);
+      renderTabelaSarRede('tabela-sar-rede', dadosLocais);
+      popularFiltroStatusSarRede(dadosLocais);
     });
     return;
   }
