@@ -3763,7 +3763,7 @@ function popularFiltroStatusSarRede(listaBase = null) {
 function atualizarFiltroStatusSarRede() {
   const select = document.getElementById("status-filter-sar");
   const statusSelecionado = select.value;
-  const dados = dadosPorCategoria.sarRede;
+  const dados = dadosPorCategoria['sar-rede'];
   if (!Array.isArray(dados)) return;
   if (!statusSelecionado || statusSelecionado === "Todos") {
     renderTabelaSarRede("tabela-sar-rede", dados);
