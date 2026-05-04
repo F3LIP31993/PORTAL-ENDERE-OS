@@ -96,7 +96,7 @@ function filtrarPorStatusSeguro(categoria, statusSelecionado) {
 // Função para renderizar SAR REDE (usada pelo filtro seguro)
 function renderTabelaCategoria(categoria, lista) {
   if (categoria === 'sar-rede') {
-    renderTabelaSarRede('tabela-sar-rede', lista);
+    renderTabelaSarRedeComDados('tabela-sar-rede', lista);
   }
   // Adicione outros casos se quiser expandir para outros cards
 }
@@ -117,7 +117,7 @@ function abrirCategoria(categoriaId) {
       .then(dados => {
         if (Array.isArray(dados) && dados.length) {
           salvarPlanilhaIndexedDB('sar-rede', dados);
-          renderTabelaSarRede('tabela-sar-rede', dados);
+          renderTabelaSarRedeComDados('tabela-sar-rede', dados);
           dadosPorCategoria.sarRede = dados;
           popularFiltroStatusSarRede(dados);
           renderTabelaSarRedeComDados('tabela-sar-rede', dados);
@@ -133,7 +133,7 @@ function abrirCategoria(categoriaId) {
               popularFiltroStatusSarRede([]);
               return;
             }
-            renderTabelaSarRede('tabela-sar-rede', dadosCompletos);
+            renderTabelaSarRedeComDados('tabela-sar-rede', dadosCompletos);
             dadosPorCategoria.sarRede = dadosCompletos;
             popularFiltroStatusSarRede(dadosCompletos);
             renderTabelaSarRedeComDados('tabela-sar-rede', dadosCompletos);
@@ -1113,7 +1113,7 @@ async function carregarDadosCompartilhados() {
             dadosLocais = dadosPorCategoria['sar-rede'];
           }
           applyDatasetToState('sar-rede', dadosLocais);
-          renderTabelaSarRede('tabela-sar-rede', dadosLocais);
+          renderTabelaSarRedeComDados('tabela-sar-rede', dadosLocais);
           dadosPorCategoria.sarRede = dadosLocais;
           popularFiltroStatusSarRede(dadosLocais);
           renderTabelaSarRedeComDados('tabela-sar-rede', dadosLocais);
@@ -3224,7 +3224,7 @@ function importarCSV() {
       cacheDatasetLocally('sar-rede', dados, { source: 'manual', locked: true });
       await persistirDadosCompartilhados('sar-rede', dados, { source: 'manual', locked: true });
 
-      renderTabelaSarRede('tabela-sar-rede', dados);
+      renderTabelaSarRedeComDados('tabela-sar-rede', dados);
       popularFiltroStatusSarRede(dados);
       atualizarContadores();
       invalidateVisaoGerenciaCache();
@@ -3476,7 +3476,7 @@ function importarCSV() {
             }
           }
 
-          renderTabelaSarRede('tabela-sar-rede', parsed);
+          renderTabelaSarRedeComDados('tabela-sar-rede', parsed);
           dadosPorCategoria.sarRede = parsed;
           popularFiltroStatusSarRede(parsed);
           renderTabelaSarRedeComDados('tabela-sar-rede', parsed);
@@ -3741,56 +3741,6 @@ function getSarRedeStatusProjetoReal(item) {
     || _getFieldByKeyHint(item, 'status projeto');
 }
 
-function renderTabelaSarRede(id, lista) {
-  const tbody = document.getElementById(id);
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  const dados = (Array.isArray(lista) ? lista : []).filter((item) => {
-    const idProjeto = String(getSarRedeIdProjeto(item) || '').trim();
-    const cidade = String(getField(item, 'Cidade', 'CIDADE', 'cidade') || _getFieldByKeyHint(item, 'cidade') || '').trim();
-    const cliente = String(getSarRedeCliente(item) || '').trim();
-    const status = String(getSarRedeStatusProjetoReal(item) || '').trim();
-    return Boolean(idProjeto || cidade || cliente || status);
-  });
-  if (!dados.length) {
-    window.__sarRedeRowsSnapshot = [];
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center">Nenhum registro</td></tr>';
-    popularFiltroStatusSarRede([]);
-    return;
-  }
-
-  window.__sarRedeRowsSnapshot = dados;
-
-  const rows = dados.map((item, index) => {
-    const idProjeto = getSarRedeIdProjeto(item) || '-';
-    const ddd = getField(item, 'DDD', 'ddd') || _getFieldByKeyHint(item, 'ddd') || '-';
-    const cidade = getField(item, 'Cidade', 'CIDADE', 'cidade') || _getFieldByKeyHint(item, 'cidade') || '-';
-    const cliente = getSarRedeCliente(item) || '-';
-    const projetado = getField(item, 'PROJETADO', 'projetado') || _getFieldByKeyHint(item, 'projetado') || '-';
-    const ageGeral = getField(item, 'AGE GERAL', 'age geral', 'AGE_GERAL', 'age_geral', 'AGE', 'age') || _getFieldByKeyHint(item, 'age geral') || '-';
-    const enviado = getField(item, 'ENVIADO', 'enviado') || _getFieldByKeyHint(item, 'enviado') || '-';
-    const previsao = getField(item, 'PREVISÃO', 'PREVISAO', 'previsao', 'previsão') || _getFieldByKeyHint(item, 'previs') || '-';
-    const statusProjetoReal = getSarRedeStatusProjetoReal(item) || '-';
-
-    return `
-      <tr>
-        <td>${escapeHtml(idProjeto)}</td>
-        <td>${escapeHtml(ddd)}</td>
-        <td>${escapeHtml(cidade)}</td>
-        <td><span class="table-address-cell" title="${escapeHtml(cliente)}">${escapeHtml(cliente)}</span></td>
-        <td>${escapeHtml(projetado)}</td>
-        <td><strong>${escapeHtml(ageGeral)}</strong></td>
-        <td>${escapeHtml(enviado)}</td>
-        <td>${escapeHtml(previsao)}</td>
-        <td>${escapeHtml(statusProjetoReal)}</td>
-        <td><button type="button" class="btn-visualizar" onclick="visualizarSarRedePorIndice(${index})">Visualizar</button></td>
-      </tr>`;
-  });
-
-  tbody.innerHTML = rows.join('');
-  popularFiltroStatusSarRede(dados);
-}
 
 function popularFiltroStatusSarRede(listaBase = null) {
   const select = document.getElementById('status-filter-sar');
@@ -3835,7 +3785,7 @@ function atualizarFiltroStatusSarRede() {
     const statusItem = normalizarTextoSeguro(getSarRedeStatusProjetoReal(item));
     return statusItem === statusNorm;
   });
-  renderTabelaSarRede("tabela-sar-rede", filtrados);
+  renderTabelaSarRedeComDados("tabela-sar-rede", filtrados);
 }
 
 function renderTabelaMduOngoing(id, lista) {
@@ -10257,7 +10207,7 @@ function carregarDaBacklog(categoriaId) {
       renderTabelaEmpresarial(`tabela-${categoriaId}`, localItems);
       popularFiltrosEmpresarial(localItems);
     } else if (categoriaId === 'sar-rede') {
-      renderTabelaSarRede(`tabela-${categoriaId}`, localItems);
+      renderTabelaSarRedeComDados(`tabela-${categoriaId}`, localItems);
       popularFiltroStatusSarRede(localItems);
     } else if (categoriaId === 'mdu-ongoing') {
       renderTabelaMduOngoing(`tabela-${categoriaId}`, localItems);
@@ -10292,7 +10242,7 @@ function carregarDaBacklog(categoriaId) {
         renderTabelaEmpresarial(`tabela-${categoriaId}`, dados);
         popularFiltrosEmpresarial();
       } else if (categoriaId === 'sar-rede') {
-        renderTabelaSarRede(`tabela-${categoriaId}`, dados);
+        renderTabelaSarRedeComDados(`tabela-${categoriaId}`, dados);
         popularFiltroStatusSarRede();
       } else if (categoriaId === 'mdu-ongoing') {
         renderTabelaMduOngoing(`tabela-${categoriaId}`, dados);
@@ -10320,7 +10270,7 @@ function carregarDadosCategoria(categoriaId) {
       const localSar = getLocalDatasetCache()?.['sar-rede'];
       if (localSar?.locked && Array.isArray(localSar.items) && localSar.items.length) {
         applyDatasetToState('sar-rede', localSar.items);
-        renderTabelaSarRede('tabela-sar-rede', localSar.items);
+        renderTabelaSarRedeComDados('tabela-sar-rede', localSar.items);
         popularFiltroStatusSarRede(localSar.items);
         atualizarContadores();
         return;
@@ -10438,7 +10388,7 @@ function carregarDadosCategoria(categoriaId) {
     if (categoriaId === 'empresarial') {
       renderTabelaEmpresarial(tabelaId, dados || []);
     } else if (categoriaId === 'sar-rede') {
-      renderTabelaSarRede(tabelaId, dados || []);
+      renderTabelaSarRedeComDados(tabelaId, dados || []);
       popularFiltroStatusSarRede(dados || []);
     } else if (categoriaId === 'mdu-ongoing') {
       if (!dados) {
@@ -10874,9 +10824,9 @@ function buscarEmCategoria(categoriaId) {
   if (categoriaId === 'sar-rede') {
     if (resultado.length === 0) {
       alert('❌ Nenhum resultado encontrado para: ' + termoBusca);
-      renderTabelaSarRede('tabela-sar-rede', todosDados);
+      renderTabelaSarRedeComDados('tabela-sar-rede', todosDados);
     } else {
-      renderTabelaSarRede('tabela-sar-rede', resultado);
+      renderTabelaSarRedeComDados('tabela-sar-rede', resultado);
       alert(`✅ ${resultado.length} resultado(s) encontrado(s)`);
     }
     return;
