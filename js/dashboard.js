@@ -9,40 +9,75 @@ function abrirCategoria(categoriaId) {
 
   // Carrega e renderiza dados para cada categoria
   if (categoriaId === 'sar-rede') {
-    // SAR REDE: usar apenas IndexedDB, nunca localStorage ou backend
-    lerPlanilhaIndexedDB('sar-rede').then(items => {
-      const dadosCompletos = Array.isArray(items) ? items : [];
-      if (!dadosCompletos.length) {
-        const tabela = document.getElementById('tabela-sar-rede');
-        if (tabela) {
-          tabela.innerHTML = `<tr><td colspan='20' style='text-align:center;color:red;font-weight:bold;'>Nenhum dado encontrado no SAR REDE. Por favor, importe a planilha.</td></tr>`;
+    // SAR REDE: buscar do backend e sincronizar IndexedDB
+    fetch('/api/sar-rede')
+      .then(res => res.ok ? res.json() : [])
+      .then(dados => {
+        if (Array.isArray(dados) && dados.length) {
+          salvarPlanilhaIndexedDB('sar-rede', dados);
+          renderTabelaSarRede('tabela-sar-rede', dados);
+          popularFiltroStatusSarRede(dados);
+        } else {
+          // fallback: tenta IndexedDB se backend vazio
+          lerPlanilhaIndexedDB('sar-rede').then(items => {
+            const dadosCompletos = Array.isArray(items) ? items : [];
+            if (!dadosCompletos.length) {
+              const tabela = document.getElementById('tabela-sar-rede');
+              if (tabela) {
+                tabela.innerHTML = `<tr><td colspan='20' style='text-align:center;color:red;font-weight:bold;'>Nenhum dado encontrado no SAR REDE. Por favor, importe a planilha.</td></tr>`;
+              }
+              popularFiltroStatusSarRede([]);
+              return;
+            }
+            renderTabelaSarRede('tabela-sar-rede', dadosCompletos);
+            popularFiltroStatusSarRede(dadosCompletos);
+          });
         }
-        popularFiltroStatusSarRede([]);
-        return;
-      }
-      renderTabelaSarRede('tabela-sar-rede', dadosCompletos);
-      popularFiltroStatusSarRede(dadosCompletos);
-    });
+      });
     return;
   }
   if (categoriaId === 'projeto-f') {
-    lerPlanilhaIndexedDB('projeto-f').then(items => {
-      const dados = Array.isArray(items) ? items : [];
-      applyDatasetToState('projeto-f', dados);
-      renderTabelaProjetoF('tabela-projeto-f', dados);
-      renderTabelaCidadesProjetoFInline();
-      popularFiltroCidadeProjetoF();
-      popularFiltroStatusProjetoF(dados);
-    });
+    fetch('/api/projeto-f')
+      .then(res => res.ok ? res.json() : [])
+      .then(dados => {
+        if (Array.isArray(dados) && dados.length) {
+          salvarPlanilhaIndexedDB('projeto-f', dados);
+          applyDatasetToState('projeto-f', dados);
+          renderTabelaProjetoF('tabela-projeto-f', dados);
+          renderTabelaCidadesProjetoFInline();
+          popularFiltroCidadeProjetoF();
+          popularFiltroStatusProjetoF(dados);
+        } else {
+          lerPlanilhaIndexedDB('projeto-f').then(items => {
+            const dados = Array.isArray(items) ? items : [];
+            applyDatasetToState('projeto-f', dados);
+            renderTabelaProjetoF('tabela-projeto-f', dados);
+            renderTabelaCidadesProjetoFInline();
+            popularFiltroCidadeProjetoF();
+            popularFiltroStatusProjetoF(dados);
+          });
+        }
+      });
     return;
   }
   if (categoriaId === 'mdu-ongoing') {
-    lerPlanilhaIndexedDB('mdu-ongoing').then(items => {
-      const dados = Array.isArray(items) ? items : [];
-      applyDatasetToState('mdu-ongoing', dados);
-      renderTabelaMduOngoing('tabela-mdu-ongoing', dados);
-      popularFiltroStatusMdu();
-    });
+    fetch('/api/mdu-ongoing')
+      .then(res => res.ok ? res.json() : [])
+      .then(dados => {
+        if (Array.isArray(dados) && dados.length) {
+          salvarPlanilhaIndexedDB('mdu-ongoing', dados);
+          applyDatasetToState('mdu-ongoing', dados);
+          renderTabelaMduOngoing('tabela-mdu-ongoing', dados);
+          popularFiltroStatusMdu();
+        } else {
+          lerPlanilhaIndexedDB('mdu-ongoing').then(items => {
+            const dados = Array.isArray(items) ? items : [];
+            applyDatasetToState('mdu-ongoing', dados);
+            renderTabelaMduOngoing('tabela-mdu-ongoing', dados);
+            popularFiltroStatusMdu();
+          });
+        }
+      });
     return;
   }
   if (categoriaId === 'liberados') {
@@ -51,19 +86,39 @@ function abrirCategoria(categoriaId) {
     return;
   }
   if (categoriaId === 'empresarial') {
-    lerPlanilhaIndexedDB('empresarial').then(items => {
-      const dados = Array.isArray(items) ? items : [];
-      applyDatasetToState('empresarial', dados);
-      renderTabelaEmpresarial('tabela-empresarial', dados);
-    });
+    fetch('/api/empresarial')
+      .then(res => res.ok ? res.json() : [])
+      .then(dados => {
+        if (Array.isArray(dados) && dados.length) {
+          salvarPlanilhaIndexedDB('empresarial', dados);
+          applyDatasetToState('empresarial', dados);
+          renderTabelaEmpresarial('tabela-empresarial', dados);
+        } else {
+          lerPlanilhaIndexedDB('empresarial').then(items => {
+            const dados = Array.isArray(items) ? items : [];
+            applyDatasetToState('empresarial', dados);
+            renderTabelaEmpresarial('tabela-empresarial', dados);
+          });
+        }
+      });
     return;
   }
   if (categoriaId === 'ongoing') {
-    lerPlanilhaIndexedDB('ongoing').then(items => {
-      const dados = Array.isArray(items) ? items : [];
-      applyDatasetToState('ongoing', dados);
-      renderTabela('tabela-ongoing', dados);
-    });
+    fetch('/api/ongoing')
+      .then(res => res.ok ? res.json() : [])
+      .then(dados => {
+        if (Array.isArray(dados) && dados.length) {
+          salvarPlanilhaIndexedDB('ongoing', dados);
+          applyDatasetToState('ongoing', dados);
+          renderTabela('tabela-ongoing', dados);
+        } else {
+          lerPlanilhaIndexedDB('ongoing').then(items => {
+            const dados = Array.isArray(items) ? items : [];
+            applyDatasetToState('ongoing', dados);
+            renderTabela('tabela-ongoing', dados);
+          });
+        }
+      });
     return;
   }
   if (categoriaId === 'pendente-autorizacao') {
