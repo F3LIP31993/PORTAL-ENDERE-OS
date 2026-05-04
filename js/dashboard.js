@@ -3752,8 +3752,18 @@ function popularFiltroStatusSarRede(listaBase = null) {
 
   const valorAtual = select.value || '';
   const dados = Array.isArray(listaBase) ? listaBase : (dadosPorCategoria['sar-rede'] || []);
+  function flexField(obj, ...keys) {
+    for (const k of keys) {
+      for (const key in obj) {
+        if (key.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === k.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()) {
+          return obj[key];
+        }
+      }
+    }
+    return '';
+  }
   const statusUnicos = [...new Set(dados
-    .map(item => (getSarRedeStatusProjetoReal(item) || '').trim())
+    .map(item => (flexField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'statusprojetoreal', 'Status', 'STATUS') || '').trim())
     .filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
 
