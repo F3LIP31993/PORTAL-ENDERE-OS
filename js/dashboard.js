@@ -1,3 +1,80 @@
+// === HISTÓRICO GLOBAL DE OBSERVAÇÕES ===
+async function carregarHistoricoEventos() {
+  const tbody = document.getElementById('tabela-historico');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:.7">Carregando histórico...</td></tr>';
+  let eventos = [];
+  try {
+    const res = await fetch('/api/history?limit=100', { credentials: 'include' });
+    if (res.ok) {
+      eventos = await res.json();
+    }
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#b00">Erro ao carregar histórico</td></tr>';
+    return;
+  }
+  if (!eventos.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:.7">Nenhum evento registrado.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = '';
+  eventos.forEach((ev, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${ev.created_at ? new Date(ev.created_at).toLocaleString() : '-'}</td>
+      <td>${ev.created_by || '-'}</td>
+      <td>${ev.source || ev.entity || '-'}</td>
+      <td>${ev.reference || '-'}</td>
+      <td>${ev.message || ev.obs || ev.note || '-'}</td>
+      <td>
+        <button class="btn-primary" onclick="abrirModalHistorico(${idx})">Visualizar</button>
+        <button class="btn-secondary" onclick="aceitarHistorico(${idx})">Aceito</button>
+      </td>
+    `;
+    tr.dataset.idx = idx;
+    tbody.appendChild(tr);
+  });
+  window.__historicoEventos = eventos;
+}
+
+function abrirModalHistorico(idx) {
+  const eventos = window.__historicoEventos || [];
+  const ev = eventos[idx];
+  if (!ev) return;
+  document.getElementById('modal-hist-data').textContent = ev.created_at ? new Date(ev.created_at).toLocaleString() : '-';
+  document.getElementById('modal-hist-user').textContent = ev.created_by || '-';
+  document.getElementById('modal-hist-origem').textContent = ev.source || ev.entity || '-';
+  document.getElementById('modal-hist-codigo').textContent = ev.reference || '-';
+  document.getElementById('modal-hist-obs').textContent = ev.message || ev.obs || ev.note || '-';
+  document.getElementById('modal-historico').classList.remove('hidden');
+  document.getElementById('btn-aceitar-historico').onclick = function() { aceitarHistorico(idx); };
+}
+
+function fecharModalHistorico() {
+  document.getElementById('modal-historico').classList.add('hidden');
+}
+
+function aceitarHistorico(idx) {
+  const eventos = window.__historicoEventos || [];
+  const ev = eventos[idx];
+  if (!ev) return;
+  // Marca como aceito localmente (pode ser expandido para API futuramente)
+  if (!ev.type || ev.type !== 'observacao') return fecharModalHistorico();
+  const key = 'historico_aceito_' + btoa(ev.type + '|' + (ev.reference || '') + '|' + (ev.created_at || ''));
+  localStorage.setItem(key, '1');
+  fecharModalHistorico();
+  // Feedback visual
+  const tr = document.querySelector(`#tabela-historico tr[data-idx="${idx}"]`);
+  if (tr) tr.style.opacity = '.5';
+}
+
+// Exibe histórico ao abrir a aba
+document.addEventListener('DOMContentLoaded', () => {
+  const btnHistorico = document.querySelector('button.menu-btn[onclick*="historico"]');
+  if (btnHistorico) {
+    btnHistorico.addEventListener('click', carregarHistoricoEventos);
+  }
+});
 // === REGRA DE OURO: Filtro nunca altera o dataset base, só a lista renderizada ===
 function normalizarTextoSeguro(valor) {
   return String(valor || '')
