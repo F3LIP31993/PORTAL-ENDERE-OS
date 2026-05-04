@@ -728,32 +728,13 @@ function getLocalDatasetCache() {
 
 function saveLocalDatasetCache(cache) {
   const sanitized = stripSessionOnlyDatasets(cache || {});
-
   try {
     localStorage.setItem(STORAGE_DATASET_CACHE_KEY, JSON.stringify(sanitized));
-    return;
   } catch (error) {
-    // Em quota excedida, preserva os datasets mais críticos para o portal.
-    const reduced = {};
-    PRIORITY_DATASET_CACHE_KEYS.forEach((key) => {
-      if (sanitized[key]) {
-        reduced[key] = sanitized[key];
-      }
-    });
-
-    // Mantém metadados e reduz listas muito grandes para caber no armazenamento local.
-    Object.entries(reduced).forEach(([key, snapshot]) => {
-      const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
-      // Não trunca mais ao salvar cache
-      reduced[key] = {
-        ...snapshot,
-        items: items
-      };
-    });
-
-    try {
-      localStorage.setItem(STORAGE_DATASET_CACHE_KEY, JSON.stringify(reduced));
-    } catch {
+    if (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      // Apenas avisa, não trava o portal
+      console.warn('Cache local excedeu o limite. Dados não serão salvos localmente. O portal continuará funcionando normalmente, mas sem cache local.');
+    } else {
       console.warn('Não foi possível salvar cache local completo dos datasets. O portal continuará com sincronização via servidor.', error);
     }
   }
@@ -1713,6 +1694,11 @@ async function enviarDatasetCompartilhadoParaServidor(categoria, items) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ items })
   });
+
+  if (response.status === 413) {
+    alert('O arquivo/dataset é muito grande para ser salvo no servidor. O sistema continuará funcionando apenas localmente.');
+    return { synced: false, queued: false, error: 'Payload Too Large' };
+  }
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
