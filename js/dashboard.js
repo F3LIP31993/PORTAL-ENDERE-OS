@@ -3743,33 +3743,7 @@ function renderTabelaSarRede(id, lista) {
 
   tbody.innerHTML = rows.join('');
   popularFiltroStatusSarRede(dados);
-    const idProjeto = getSarRedeIdProjeto(item) || '-';
-    const ddd = getField(item, 'DDD', 'ddd') || _getFieldByKeyHint(item, 'ddd') || '-';
-    const cidade = getField(item, 'Cidade', 'CIDADE', 'cidade') || _getFieldByKeyHint(item, 'cidade') || '-';
-    const cliente = getSarRedeCliente(item) || '-';
-    const projetado = getField(item, 'PROJETADO', 'projetado') || _getFieldByKeyHint(item, 'projetado') || '-';
-    const ageGeral = getField(item, 'AGE GERAL', 'age geral', 'AGE_GERAL', 'age_geral', 'AGE', 'age') || _getFieldByKeyHint(item, 'age geral') || '-';
-    const enviado = getField(item, 'ENVIADO', 'enviado') || _getFieldByKeyHint(item, 'enviado') || '-';
-    const previsao = getField(item, 'PREVISÃO', 'PREVISAO', 'previsao', 'previsão') || _getFieldByKeyHint(item, 'previs') || '-';
-    const statusProjetoReal = getSarRedeStatusProjetoReal(item) || '-';
-
-    return `
-      <tr>
-        <td>${escapeHtml(idProjeto)}</td>
-        <td>${escapeHtml(ddd)}</td>
-        <td>${escapeHtml(cidade)}</td>
-        <td><span class="table-address-cell" title="${escapeHtml(cliente)}">${escapeHtml(cliente)}</span></td>
-        <td>${escapeHtml(projetado)}</td>
-        <td><strong>${escapeHtml(ageGeral)}</strong></td>
-        <td>${escapeHtml(enviado)}</td>
-        <td>${escapeHtml(previsao)}</td>
-        <td>${escapeHtml(statusProjetoReal)}</td>
-        <td><button type="button" class="btn-visualizar" onclick="visualizarSarRedePorIndice(${index})">Visualizar</button></td>
-      </tr>`;
-  });
-
-  tbody.innerHTML = rows.join('');
-  popularFiltroStatusSarRede(dados);
+// ...fim da função, sem duplicação...
 }
 
 function popularFiltroStatusSarRede(listaBase = null) {
