@@ -9,30 +9,17 @@ function abrirCategoria(categoriaId) {
 
   // Carrega e renderiza dados para cada categoria
   if (categoriaId === 'sar-rede') {
-    // Sempre renderiza SAR REDE direto do IndexedDB/localStorage, nunca do estado global/backend
+    // SAR REDE: usar apenas IndexedDB, nunca localStorage ou backend
     lerPlanilhaIndexedDB('sar-rede').then(items => {
-      let dadosCompletos = Array.isArray(items) ? items : [];
-      // Se não encontrar no IndexedDB, tenta localStorage
+      const dadosCompletos = Array.isArray(items) ? items : [];
       if (!dadosCompletos.length) {
-        const localSnapshot = getLocalDatasetCache()?.['sar-rede'];
-        if (Array.isArray(localSnapshot?.items) && localSnapshot.items.length > 0) {
-          dadosCompletos = localSnapshot.items;
-        }
-      }
-      // Se ainda assim não encontrar, usa o que veio do estado global, mas só se for mais de 50 linhas
-      if (!dadosCompletos.length && Array.isArray(dadosPorCategoria['sar-rede']) && dadosPorCategoria['sar-rede'].length > 50) {
-        dadosCompletos = dadosPorCategoria['sar-rede'];
-      }
-      // Se só houver 10 linhas, mostra mensagem clara na tela
-      if (dadosCompletos.length <= 10) {
         const tabela = document.getElementById('tabela-sar-rede');
         if (tabela) {
-          tabela.innerHTML = `<tr><td colspan='20' style='text-align:center;color:red;font-weight:bold;'>Dados incompletos detectados! Por favor, reimporte a planilha SAR REDE para visualizar todos os registros.</td></tr>`;
+          tabela.innerHTML = `<tr><td colspan='20' style='text-align:center;color:red;font-weight:bold;'>Nenhum dado encontrado no SAR REDE. Por favor, importe a planilha.</td></tr>`;
         }
         popularFiltroStatusSarRede([]);
         return;
       }
-      // Sempre renderiza com todos os dados locais disponíveis
       renderTabelaSarRede('tabela-sar-rede', dadosCompletos);
       popularFiltroStatusSarRede(dadosCompletos);
     });
@@ -712,28 +699,10 @@ function applyDatasetToState(categoria, items) {
     return;
   }
 
-  // Proteção: nunca sobrescrever SAR REDE se houver qualquer dado local (mesmo vazio)
+  // SAR REDE: nunca sobrescrever, nunca usar localStorage, nunca usar backend
   if (categoria === 'sar-rede') {
-    const localSnapshot = getLocalDatasetCache()?.[categoria];
-    const localItems = Array.isArray(localSnapshot?.items) ? localSnapshot.items : [];
-    // Nunca sobrescreve se já houver mais de 10 linhas locais
-    if (Array.isArray(localItems) && localItems.length > 10) {
-      console.warn('[SAR-REDE] Tentativa de sobrescrever dados locais bloqueada. Mantendo dados locais.', localItems);
-      dadosPorCategoria[categoria] = localItems;
-      return;
-    }
-    // Nunca sobrescreve se já houver mais de 10 linhas em memória
-    if (Array.isArray(dadosPorCategoria[categoria]) && dadosPorCategoria[categoria].length > 10) {
-      console.warn('[SAR-REDE] Tentativa de sobrescrever dados em memória bloqueada. Mantendo dados em memória.', dadosPorCategoria[categoria]);
-      return;
-    }
-    // Só permite sobrescrever se vier mais de 50 linhas
-    if (items && items.length > 50) {
-      console.log('[SAR-REDE] Carregando dados completos para SAR REDE:', items);
-    } else {
-      console.log('[SAR-REDE] Tentativa de sobrescrever SAR REDE com dados incompletos (<=50 linhas). Ignorado.');
-      return;
-    }
+    // Não faz nada! O SAR REDE só é renderizado a partir do IndexedDB, nunca do estado global/localStorage/backend
+    return;
   }
 
   // Protecao: nao deixar sincronizacoes vazias apagarem dados do card Empresarial.
