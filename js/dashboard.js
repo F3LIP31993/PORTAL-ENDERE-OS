@@ -118,7 +118,9 @@ function abrirCategoria(categoriaId) {
         if (Array.isArray(dados) && dados.length) {
           salvarPlanilhaIndexedDB('sar-rede', dados);
           renderTabelaSarRede('tabela-sar-rede', dados);
+          dadosPorCategoria.sarRede = dados;
           popularFiltroStatusSarRede(dados);
+          renderTabelaSarRedeComDados('tabela-sar-rede', dados);
         } else {
           // fallback: tenta IndexedDB se backend vazio
           lerPlanilhaIndexedDB('sar-rede').then(items => {
@@ -132,7 +134,9 @@ function abrirCategoria(categoriaId) {
               return;
             }
             renderTabelaSarRede('tabela-sar-rede', dadosCompletos);
+            dadosPorCategoria.sarRede = dadosCompletos;
             popularFiltroStatusSarRede(dadosCompletos);
+            renderTabelaSarRedeComDados('tabela-sar-rede', dadosCompletos);
           });
         }
       });
@@ -1110,7 +1114,9 @@ async function carregarDadosCompartilhados() {
           }
           applyDatasetToState('sar-rede', dadosLocais);
           renderTabelaSarRede('tabela-sar-rede', dadosLocais);
+          dadosPorCategoria.sarRede = dadosLocais;
           popularFiltroStatusSarRede(dadosLocais);
+          renderTabelaSarRedeComDados('tabela-sar-rede', dadosLocais);
         });
       } else if (secaoAtiva) {
         carregarDadosCategoria(secaoAtiva);
@@ -3471,7 +3477,9 @@ function importarCSV() {
           }
 
           renderTabelaSarRede('tabela-sar-rede', parsed);
+          dadosPorCategoria.sarRede = parsed;
           popularFiltroStatusSarRede(parsed);
+          renderTabelaSarRedeComDados('tabela-sar-rede', parsed);
           atualizarSeccaoAtivaComDados();
           return;
         }
@@ -3814,10 +3822,12 @@ function popularFiltroStatusSarRede(listaBase = null) {
 function atualizarFiltroStatusSarRede() {
   const select = document.getElementById("status-filter-sar");
   const statusSelecionado = select.value;
-  const dados = dadosPorCategoria['sar-rede'];
+  const dados = dadosPorCategoria.sarRede;
   if (!Array.isArray(dados)) return;
   if (!statusSelecionado || statusSelecionado === "Todos") {
-    renderTabelaSarRede("tabela-sar-rede", dados);
+    renderTabelaSarRedeComDados("tabela-sar-rede", dados);
+      renderTabelaSarRedeComDados("tabela-sar-rede", todosDados);
+      renderTabelaSarRedeComDados("tabela-sar-rede", resultado);
     return;
   }
   const statusNorm = normalizarTextoSeguro(statusSelecionado);
