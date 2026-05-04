@@ -3759,10 +3759,20 @@ function popularFiltroStatusSarRede(listaBase = null) {
   }
 }
 
+// 4️⃣ FILTRO QUE FUNCIONA (SEM “NENHUM REGISTRO”)
 function atualizarFiltroStatusSarRede() {
-  const select = document.getElementById('status-filter-sar');
-  const status = select ? select.value : '';
-  filtrarPorStatusSeguro('sar-rede', status);
+  const select = document.getElementById("status-filter-sar");
+  const statusSelecionado = select.value;
+  const dados = dadosPorCategoria.sarRede;
+  if (!Array.isArray(dados)) return;
+  if (statusSelecionado === "Todos") {
+    renderTabelaSarRede("tabela-sar-rede", dados);
+    return;
+  }
+  const filtrados = dados.filter(
+    item => getStatusSarRede(item) === statusSelecionado
+  );
+  renderTabelaSarRede("tabela-sar-rede", filtrados);
 }
 
 function renderTabelaMduOngoing(id, lista) {
