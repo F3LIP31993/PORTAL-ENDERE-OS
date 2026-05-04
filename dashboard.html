@@ -192,29 +192,45 @@
     <!-- HISTÓRICO DE SOLICITAÇÕES -->
     <section id="historico" class="secao">
       <div class="categoria-header">
-        <h1>Histórico de solicitações</h1>
+        <h1>Histórico</h1>
       </div>
-
       <div class="card">
-        <table>
+        <table style="width:100%">
           <thead>
             <tr>
+              <th>Data</th>
               <th>Usuário</th>
-              <th>Nome</th>
-              <th>Email</th>
-              <th>Status</th>
-              <th>Solicitado em</th>
-              <th>Decisão em</th>
+              <th>Origem</th>
+              <th>Endereço/Código</th>
+              <th>Resumo</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody id="tabela-historico">
             <tr>
-              <td colspan="6" style="text-align:center">
-                Nenhuma solicitação registrada.
-              </td>
+              <td colspan="6" style="text-align:center;opacity:.7">Nenhum evento registrado.</td>
             </tr>
           </tbody>
         </table>
+      </div>
+      <div id="modal-historico" class="modal hidden">
+        <div class="modal-content" style="max-width:480px;">
+          <div class="modal-header">
+            <h2>Detalhe da Observação</h2>
+            <button class="btn-voltar modal-close-professional" onclick="fecharModalHistorico()">×</button>
+          </div>
+          <div class="modal-body">
+            <div><strong>Data:</strong> <span id="modal-hist-data">-</span></div>
+            <div><strong>Usuário:</strong> <span id="modal-hist-user">-</span></div>
+            <div><strong>Origem:</strong> <span id="modal-hist-origem">-</span></div>
+            <div><strong>Endereço/Código:</strong> <span id="modal-hist-codigo">-</span></div>
+            <div style="margin-top:12px;"><strong>Observação:</strong><br><span id="modal-hist-obs">-</span></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-secondary" type="button" onclick="fecharModalHistorico()">Fechar</button>
+            <button class="btn-primary" type="button" id="btn-aceitar-historico">Aceito</button>
+          </div>
+        </div>
       </div>
     </section>
 
