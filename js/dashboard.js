@@ -9,11 +9,43 @@ function renderMiniCardsStatusMduOngoing() {
     const status = (item['STATUS_GERAL'] || item['status_geral'] || item['Status Geral'] || '').trim() || 'Sem Status';
     statusMap[status] = (statusMap[status] || 0) + 1;
   });
+  // Ordem premium dos status
+  const ordem = [
+    '1.VISTORIA',
+    '2.PROJETO_INTERNO',
+    '3.PROJETO_REDE',
+    '4.CONSTRUCAO_REDE',
+    '5.CONSTRUCAO',
+    '7.EM_LIBERACAO',
+    'EXPANSÃO_MDU'
+  ];
   // Sempre incluir o card "Todos"
   const total = dados.length;
-  const statusList = [{ label: 'Todos', value: '', count: total }].concat(
-    Object.entries(statusMap).map(([label, count]) => ({ label, value: label, count }))
-  );
+  // Monta lista ordenada
+  const statusList = [
+    { label: 'Todos', value: '', count: total, cor: '#222', bg: 'linear-gradient(90deg,#fff,#f8f9fa)' }
+  ];
+  ordem.forEach((key, idx) => {
+    if (statusMap[key]) {
+      let cor = '#fff', bg = '#c82333';
+      switch (key) {
+        case '1.VISTORIA': bg = 'linear-gradient(90deg,#e52d27,#b31217)'; cor = '#fff'; break;
+        case '2.PROJETO_INTERNO': bg = 'linear-gradient(90deg,#485563,#29323c)'; cor = '#fff'; break;
+        case '3.PROJETO_REDE': bg = 'linear-gradient(90deg,#1e3c72,#2a5298)'; cor = '#fff'; break;
+        case '4.CONSTRUCAO_REDE': bg = 'linear-gradient(90deg,#f7971e,#ffd200)'; cor = '#222'; break;
+        case '5.CONSTRUCAO': bg = 'linear-gradient(90deg,#11998e,#38ef7d)'; cor = '#fff'; break;
+        case '7.EM_LIBERACAO': bg = 'linear-gradient(90deg,#fc4a1a,#f7b733)'; cor = '#fff'; break;
+        case 'EXPANSÃO_MDU': bg = 'linear-gradient(90deg,#8360c3,#2ebf91)'; cor = '#fff'; break;
+      }
+      statusList.push({ label: key.replace(/^[0-9]+\./,''), value: key, count: statusMap[key], cor, bg });
+    }
+  });
+  // Adiciona outros status não previstos na ordem
+  Object.entries(statusMap).forEach(([label, count]) => {
+    if (!ordem.includes(label)) {
+      statusList.push({ label, value: label, count, cor: '#fff', bg: '#6c757d' });
+    }
+  });
   // Estado do filtro ativo
   const filtroAtivo = window.__mduOngoingStatusAtivo || '';
   container.innerHTML = '';
@@ -21,16 +53,20 @@ function renderMiniCardsStatusMduOngoing() {
     const btn = document.createElement('button');
     btn.className = 'mini-card-status-btn';
     btn.textContent = `${stat.label} (${stat.count})`;
-    btn.style.padding = '8px 18px';
-    btn.style.borderRadius = '18px';
+    btn.style.padding = '10px 22px';
+    btn.style.borderRadius = '22px';
     btn.style.border = 'none';
     btn.style.fontWeight = 'bold';
-    btn.style.background = (stat.value === filtroAtivo) ? '#c82333' : '#fff';
-    btn.style.color = (stat.value === filtroAtivo) ? '#fff' : '#c82333';
-    btn.style.boxShadow = '0 1px 4px #0001';
+    btn.style.fontSize = '1.08em';
+    btn.style.background = (stat.value === filtroAtivo) ? stat.bg : '#fff';
+    btn.style.color = (stat.value === filtroAtivo) ? stat.cor : '#222';
+    btn.style.boxShadow = (stat.value === filtroAtivo) ? '0 2px 12px #0002' : '0 1px 4px #0001';
     btn.style.cursor = 'pointer';
     btn.style.transition = '0.2s';
-    btn.style.marginBottom = '4px';
+    btn.style.marginBottom = '6px';
+    btn.style.marginRight = '8px';
+    btn.style.letterSpacing = '.01em';
+    btn.style.outline = (stat.value === filtroAtivo) ? '2px solid #222' : 'none';
     btn.onclick = () => {
       window.__mduOngoingStatusAtivo = stat.value;
       aplicarMiniCardFiltroMduOngoing();
