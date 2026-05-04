@@ -878,31 +878,24 @@
 
       <!-- TABELA DE DADOS -->
       <div class="card table-card">
-        <div class="table-header">
-          <h3>Detalhes dos Endereços</h3>
+        <div class="categoria-header">
+          <button onclick="voltarDoCategoria()" class="btn-voltar">← Voltar</button>
+          <h1>MDU ONGOING</h1>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Endereço</th>
-              <th>Cidade</th>
-              <th>Status</th>
-              <th>AGE</th>
-              <th>Motivo</th>
-            </tr>
-          </thead>
-          <tbody id="tabela-relatorios">
-            <tr>
-              <td colspan="6" style="text-align:center">
-                Nenhum dado carregado
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
 
+        <div class="card import-section">
+          <span class="import-target-label">Importar para: <b>MDU ONGOING</b></span>
+          <div class="import-toolbar">
+            <button class="btn-primary" onclick="escolherArquivo('mdu-ongoing')">Escolher arquivo</button>
+            <button class="btn-primary" onclick="importarCSV('mdu-ongoing')">Importar CSV</button>
+            <button class="btn-primary" onclick="exportarPlanilha('mdu-ongoing')">Exportar Planilha</button>
+          </div>
+          <div class="import-status-line" id="import-status-mdu-ongoing"></div>
+        </div>
+
+        <div class="card card-mduongoing-filtros">
+          <div id="mini-cards-status-mduongoing" class="mini-cards-status" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;"></div>
+        </div>
     <section id="reuniao" class="secao">
       <div class="categoria-header">
         <h1>🗓️ Reunião</h1>
