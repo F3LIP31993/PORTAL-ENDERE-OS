@@ -21,9 +21,23 @@ function filtrarPorStatusSeguro(categoria, statusSelecionado) {
   });
   // Se filtro não encontrou nada → NÃO APAGA A TABELA
   if (!filtrados.length) {
-    alert('Nenhum registro encontrado para este status.');
+    mostrarAvisoFiltro(
+      'Nenhum registro encontrado para este status.',
+      categoria
+    );
     renderTabelaCategoria(categoria, base);
     return;
+  }
+  // Aviso visual para filtro (UX profissional)
+  function mostrarAvisoFiltro(mensagem, categoria) {
+    const container = document.getElementById(`aviso-filtro-${categoria}`);
+    if (!container) return;
+    container.textContent = mensagem;
+    container.style.display = 'block';
+    clearTimeout(container._timeout);
+    container._timeout = setTimeout(() => {
+      container.style.display = 'none';
+    }, 3000);
   }
   renderTabelaCategoria(categoria, filtrados);
 }
