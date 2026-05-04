@@ -1,3 +1,54 @@
+// === FUNÇÕES CORRETAS SAR REDE (NOVO PADRÃO) ===
+function renderTabelaSarRedeComDados(tabelaId, dados) {
+  const tbody = document.querySelector(`#${tabelaId} tbody`);
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  if (!Array.isArray(dados) || dados.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="10" style="text-align:center;">Nenhum registro</td>
+      </tr>
+    `;
+    return;
+  }
+  dados.forEach(item => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${item["ID Projeto"] ?? ""}</td>
+      <td>${item["DDD"] ?? ""}</td>
+      <td>${item["Cidade"] ?? ""}</td>
+      <td>${item["Cliente"] ?? ""}</td>
+      <td>${item["PROJETADO"] ?? ""}</td>
+      <td>${item["AGE GERAL"] ?? ""}</td>
+      <td>${item["ENVIADO"] ?? ""}</td>
+      <td>${item["PREVISÃO"] ?? ""}</td>
+      <td>${item["Status Projeto Real"] ?? ""}</td>
+      <td>
+        <button class="btn-visualizar">Visualizar</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function getStatusSarRede(item) {
+  return (item["Status Projeto Real"] || "").trim();
+}
+
+function atualizarFiltroStatusSarRede() {
+  const select = document.getElementById("status-filter-sar");
+  const statusSelecionado = select.value;
+  const dados = dadosPorCategoria.sarRede;
+  if (!Array.isArray(dados)) return;
+  if (statusSelecionado === "Todos") {
+    renderTabelaSarRedeComDados("tabela-sar-rede", dados);
+    return;
+  }
+  const filtrados = dados.filter(
+    item => getStatusSarRede(item) === statusSelecionado
+  );
+  renderTabelaSarRedeComDados("tabela-sar-rede", filtrados);
+}
 // === REGRA DE OURO: Filtro nunca altera o dataset base, só a lista renderizada ===
 function normalizarTextoSeguro(valor) {
   return String(valor || '')
