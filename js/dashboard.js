@@ -3709,12 +3709,15 @@ function popularFiltroStatusSarRede(listaBase = null) {
 }
 
 function atualizarFiltroStatusSarRede() {
-  const statusSelecionado = document.getElementById('status-filter-sar')?.value?.toLowerCase().trim() || '';
+  const statusSelecionado = (document.getElementById('status-filter-sar')?.value || '').trim();
   const dados = dadosPorCategoria['sar-rede'] || [];
+
+  // Normaliza ambos os lados para comparação exata, mas sem perder acentuação/capitalização do valor real
+  const normalizar = v => (v || '').trim().toLowerCase();
 
   const filtrados = !statusSelecionado
     ? dados
-    : dados.filter(item => (getSarRedeStatusProjetoReal(item) || '').toLowerCase().trim().includes(statusSelecionado));
+    : dados.filter(item => normalizar(getSarRedeStatusProjetoReal(item)) === normalizar(statusSelecionado));
 
   renderTabelaSarRede('tabela-sar-rede', filtrados);
 }
