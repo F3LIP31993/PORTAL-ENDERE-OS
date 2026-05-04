@@ -3765,13 +3765,15 @@ function atualizarFiltroStatusSarRede() {
   const statusSelecionado = select.value;
   const dados = dadosPorCategoria.sarRede;
   if (!Array.isArray(dados)) return;
-  if (statusSelecionado === "Todos") {
+  if (!statusSelecionado || statusSelecionado === "Todos") {
     renderTabelaSarRede("tabela-sar-rede", dados);
     return;
   }
-  const filtrados = dados.filter(
-    item => getStatusSarRede(item) === statusSelecionado
-  );
+  const statusNorm = normalizarTextoSeguro(statusSelecionado);
+  const filtrados = dados.filter(item => {
+    const statusItem = normalizarTextoSeguro(getSarRedeStatusProjetoReal(item));
+    return statusItem === statusNorm;
+  });
   renderTabelaSarRede("tabela-sar-rede", filtrados);
 }
 
