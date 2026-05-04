@@ -3803,9 +3803,17 @@ function atualizarFiltroStatusSarRede() {
     }
     return '';
   }
+  function normalizarTextoSeguro(valor) {
+    return String(valor || '')
+      .normalize('NFD')
+      .replace(/[ -6f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+  const statusNorm = normalizarTextoSeguro(statusSelecionado);
   const filtrados = dados.filter(item => {
     const status = String(flexField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'statusprojetoreal', 'Status', 'STATUS') || '').trim();
-    return status === statusSelecionado;
+    return normalizarTextoSeguro(status) === statusNorm;
   });
   renderTabelaSarRede("tabela-sar-rede", filtrados);
 }
