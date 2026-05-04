@@ -3778,13 +3778,25 @@ function atualizarFiltroStatusSarRede() {
   const statusSelecionado = select.value;
   const dados = dadosPorCategoria.sarRede;
   if (!Array.isArray(dados)) return;
-  if (statusSelecionado === "Todos") {
+  if (!statusSelecionado || statusSelecionado === "Todos") {
     renderTabelaSarRede("tabela-sar-rede", dados);
     return;
   }
-  const filtrados = dados.filter(
-    item => getStatusSarRede(item) === statusSelecionado
-  );
+  // Usar o mesmo flexField do renderizador para garantir compatibilidade
+  function flexField(obj, ...keys) {
+    for (const k of keys) {
+      for (const key in obj) {
+        if (key.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === k.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()) {
+          return obj[key];
+        }
+      }
+    }
+    return '';
+  }
+  const filtrados = dados.filter(item => {
+    const status = String(flexField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'statusprojetoreal', 'Status', 'STATUS') || '').trim();
+    return status === statusSelecionado;
+  });
   renderTabelaSarRede("tabela-sar-rede", filtrados);
 }
 
