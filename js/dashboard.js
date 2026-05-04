@@ -16,12 +16,7 @@ function filtrarPorStatusSeguro(categoria, statusSelecionado) {
   }
   const statusNorm = normalizarTextoSeguro(statusSelecionado);
   const filtrados = base.filter(item => {
-    const statusItem = normalizarTextoSeguro(
-      item.STATUS ||
-      item['STATUS PROJETO REAL'] ||
-      item['Status Projeto Real'] ||
-      item.status
-    );
+    const statusItem = normalizarTextoSeguro(getSarRedeStatusProjetoReal(item));
     return statusItem.includes(statusNorm);
   });
   // Se filtro não encontrou nada → NÃO APAGA A TABELA
