@@ -1,3 +1,66 @@
+// === MINI CARDS DE STATUS PARA MDU ONGOING ===
+function renderMiniCardsStatusMduOngoing() {
+  const container = document.getElementById('mini-cards-status-mduongoing');
+  if (!container) return;
+  const dados = dadosPorCategoria['mdu-ongoing'] || [];
+  // Coletar todos os status únicos
+  const statusMap = {};
+  dados.forEach(item => {
+    const status = (item['STATUS_GERAL'] || item['status_geral'] || item['Status Geral'] || '').trim() || 'Sem Status';
+    statusMap[status] = (statusMap[status] || 0) + 1;
+  });
+  // Sempre incluir o card "Todos"
+  const total = dados.length;
+  const statusList = [{ label: 'Todos', value: '', count: total }].concat(
+    Object.entries(statusMap).map(([label, count]) => ({ label, value: label, count }))
+  );
+  // Estado do filtro ativo
+  const filtroAtivo = window.__mduOngoingStatusAtivo || '';
+  container.innerHTML = '';
+  statusList.forEach(stat => {
+    const btn = document.createElement('button');
+    btn.className = 'mini-card-status-btn';
+    btn.textContent = `${stat.label} (${stat.count})`;
+    btn.style.padding = '8px 18px';
+    btn.style.borderRadius = '18px';
+    btn.style.border = 'none';
+    btn.style.fontWeight = 'bold';
+    btn.style.background = (stat.value === filtroAtivo) ? '#c82333' : '#fff';
+    btn.style.color = (stat.value === filtroAtivo) ? '#fff' : '#c82333';
+    btn.style.boxShadow = '0 1px 4px #0001';
+    btn.style.cursor = 'pointer';
+    btn.style.transition = '0.2s';
+    btn.style.marginBottom = '4px';
+    btn.onclick = () => {
+      window.__mduOngoingStatusAtivo = stat.value;
+      aplicarMiniCardFiltroMduOngoing();
+      renderMiniCardsStatusMduOngoing();
+    };
+    container.appendChild(btn);
+  });
+}
+
+function aplicarMiniCardFiltroMduOngoing() {
+  const status = window.__mduOngoingStatusAtivo || '';
+  const dados = dadosPorCategoria['mdu-ongoing'] || [];
+  let filtrados = dados;
+  if (status) {
+    filtrados = dados.filter(item => {
+      const s = (item['STATUS_GERAL'] || item['status_geral'] || item['Status Geral'] || '').trim();
+      return s === status;
+    });
+  }
+  renderTabelaMduOngoing('tabela-mdu-ongoing', filtrados);
+}
+
+// Chamar ao importar planilha ou abrir card
+if (window.renderTabelaMduOngoing) {
+  const originalRenderTabelaMduOngoing = window.renderTabelaMduOngoing;
+  window.renderTabelaMduOngoing = function(id, lista) {
+    originalRenderTabelaMduOngoing(id, lista);
+    renderMiniCardsStatusMduOngoing();
+  };
+}
 // === HISTÓRICO GLOBAL DE OBSERVAÇÕES ===
 async function carregarHistoricoEventos() {
   const tbody = document.getElementById('tabela-historico');
