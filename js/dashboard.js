@@ -6,9 +6,15 @@ function renderMiniCardsStatusSarRede() {
   // Coletar todos os status únicos
   const statusMap = {};
   // Busca flexível do campo de status
+  function normalizarCampoStatus(nome) {
+    return String(nome || '')
+      .normalize('NFD')
+      .replace(/[^a-zA-Z]/g, '')
+      .toLowerCase();
+  }
   function getStatus(item) {
     const keys = Object.keys(item);
-    const key = keys.find(k => k.toLowerCase().replace(/[^a-z]/g,'').includes('statusprojetoreal'));
+    const key = keys.find(k => normalizarCampoStatus(k).includes('statusprojetoreal'));
     return (key ? (item[key] || '').trim() : '').toUpperCase() || 'Sem Status';
   }
   dados.forEach(item => {
