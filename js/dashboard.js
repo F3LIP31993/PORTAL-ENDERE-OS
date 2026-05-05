@@ -1,3 +1,78 @@
+// === NORMALIZAÇÃO UNIVERSAL DE STATUS ===
+function normalizarStatus(valor) {
+  return String(valor || "")
+    .normalize("NFD")
+    .replace(/[^\w\s]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+// === OBTÉM STATUS REAL DO ITEM (CSV) ===
+function getStatusSarRede(item) {
+  // Busca flexível: tenta encontrar a coluna certa
+  const keys = Object.keys(item);
+  const key = keys.find(k => normalizarStatus(k).includes("STATUS PROJETO REAL"));
+  return normalizarStatus(key ? item[key] : "");
+}
+
+// === CONTAGEM POR STATUS PARA MINI CARDS ===
+function contarPorStatusSarRede() {
+  const dados = dadosPorCategoria.sarRede;
+  if (!Array.isArray(dados)) return {};
+  const contagem = {};
+  dados.forEach(item => {
+    const status = getStatusSarRede(item);
+    if (!status) return;
+    contagem[status] = (contagem[status] || 0) + 1;
+  });
+  return contagem;
+}
+
+// === MINI CARDS DINÂMICOS SAR REDE ===
+function renderMiniCardsStatusSarRede() {
+  const container = document.getElementById('mini-cards-status-sarrede');
+  if (!container) return;
+  const contagem = contarPorStatusSarRede();
+  const statusList = Object.keys(contagem).sort();
+  container.innerHTML = '';
+
+  // Card "Todos"
+  const btnTodos = document.createElement('button');
+  btnTodos.textContent = `Todos (${Object.values(contagem).reduce((a, b) => a + b, 0)})`;
+  btnTodos.className = 'mini-card-status-btn';
+  btnTodos.onclick = () => {
+    window.__sarRedeStatusAtivo = 'TODOS';
+    renderTabelaSarRedeComDados('tabela-sar-rede', dadosPorCategoria.sarRede);
+    renderMiniCardsStatusSarRede();
+  };
+  if (window.__sarRedeStatusAtivo === 'TODOS' || !window.__sarRedeStatusAtivo) btnTodos.style.background = '#c82333', btnTodos.style.color = '#fff';
+  container.appendChild(btnTodos);
+
+  // Cards por status
+  statusList.forEach(status => {
+    const btn = document.createElement('button');
+    btn.textContent = `${status} (${contagem[status]})`;
+    btn.className = 'mini-card-status-btn';
+    btn.onclick = () => {
+      window.__sarRedeStatusAtivo = status;
+      const filtrados = dadosPorCategoria.sarRede.filter(item => getStatusSarRede(item) === status);
+      renderTabelaSarRedeComDados('tabela-sar-rede', filtrados);
+      renderMiniCardsStatusSarRede();
+    };
+    if (window.__sarRedeStatusAtivo === status) btn.style.background = '#c82333', btn.style.color = '#fff';
+    container.appendChild(btn);
+  });
+}
+
+// === APÓS IMPORTAR O CSV SAR REDE ===
+function aposImportarCsvSarRede(dados) {
+  dadosPorCategoria.sarRede = dados;
+  window.__sarRedeStatusAtivo = 'TODOS';
+  renderMiniCardsStatusSarRede();
+  renderTabelaSarRedeComDados('tabela-sar-rede', dados);
+}
 // === MINI CARDS DE STATUS PARA SAR REDE ===
 function renderMiniCardsStatusSarRede() {
   const container = document.getElementById('mini-cards-status-sarrede');
