@@ -11050,12 +11050,21 @@ function buscarEmCategoria(categoriaId) {
       return codigo.includes(termoBusca) || endereco.includes(termoBusca);
     });
   } else if (categoriaId === 'sar-rede') {
+    // Busca robusta: ignora acentos, case e busca parcial em todos os campos relevantes
+    function normalizarBusca(str) {
+      return String(str || '')
+        .normalize('NFD')
+        .replace(/[^\w\s]/g, '')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+    }
+    const termoBuscaNorm = normalizarBusca(termoBusca);
     resultado = todosDados.filter(item => {
-      const idProjeto = String(getSarRedeIdProjeto(item) || '').toLowerCase();
-      const cliente = String(getSarRedeCliente(item) || '').toLowerCase();
-      const endereco = String(getField(item, "ENDEREÇO", "ENDERECO", "endereco") || '').toLowerCase();
-
-      return idProjeto.includes(termoBusca) || cliente.includes(termoBusca) || endereco.includes(termoBusca);
+      const idProjeto = normalizarBusca(getSarRedeIdProjeto(item));
+      const cliente = normalizarBusca(getSarRedeCliente(item));
+      const endereco = normalizarBusca(getField(item, "ENDEREÇO", "ENDERECO", "endereco"));
+      return idProjeto.includes(termoBuscaNorm) || cliente.includes(termoBuscaNorm) || endereco.includes(termoBuscaNorm);
     });
   } else if (categoriaId === 'liberados') {
     const dadosAba = getDadosLiberadosDaAba(getPreferredDataset('liberados') || [], liberadosAbaAtiva);
