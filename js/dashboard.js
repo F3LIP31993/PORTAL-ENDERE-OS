@@ -1,3 +1,97 @@
+// === MINI CARDS DE STATUS PARA PROJETO F ===
+function renderMiniCardsStatusProjetoF() {
+  const container = document.getElementById('mini-cards-status-projetof');
+  if (!container) return;
+  const dados = dadosPorCategoria['projeto-f'] || [];
+  // Coletar todos os status únicos
+  const statusMap = {};
+  dados.forEach(item => {
+    const status = (item['STATUS MDU'] || item['status_mdu'] || item['Status MDU'] || '').trim() || 'Sem Status';
+    statusMap[status] = (statusMap[status] || 0) + 1;
+  });
+  // Ordem premium dos status
+  const ordem = [
+    '1.VISTORIA',
+    '2.PROJETO_INTERNO',
+    '3.PROJETO_REDE',
+    '4.CONSTRUCAO_REDE',
+    '5.CONSTRUCAO',
+    '7.EM_LIBERACAO',
+    'EXPANSÃO_MDU'
+  ];
+  // Sempre incluir o card "Todos"
+  const total = dados.length;
+  // Monta lista ordenada
+  const statusList = [
+    { label: 'Todos', value: '', count: total, cor: '#222', bg: 'linear-gradient(90deg,#fff,#f8f9fa)' }
+  ];
+  ordem.forEach((key, idx) => {
+    if (statusMap[key]) {
+      let cor = '#fff', bg = '#c82333';
+      switch (key) {
+        case '1.VISTORIA': bg = 'linear-gradient(90deg,#e52d27,#b31217)'; cor = '#fff'; break;
+        case '2.PROJETO_INTERNO': bg = 'linear-gradient(90deg,#485563,#29323c)'; cor = '#fff'; break;
+        case '3.PROJETO_REDE': bg = 'linear-gradient(90deg,#1e3c72,#2a5298)'; cor = '#fff'; break;
+        case '4.CONSTRUCAO_REDE': bg = 'linear-gradient(90deg,#f7971e,#ffd200)'; cor = '#222'; break;
+        case '5.CONSTRUCAO': bg = 'linear-gradient(90deg,#11998e,#38ef7d)'; cor = '#fff'; break;
+        case '7.EM_LIBERACAO': bg = 'linear-gradient(90deg,#fc4a1a,#f7b733)'; cor = '#fff'; break;
+        case 'EXPANSÃO_MDU': bg = 'linear-gradient(90deg,#8360c3,#2ebf91)'; cor = '#fff'; break;
+      }
+      statusList.push({ label: key.replace(/^[0-9]+\./,''), value: key, count: statusMap[key], cor, bg });
+    }
+  });
+  // Adiciona outros status não previstos na ordem
+  Object.entries(statusMap).forEach(([label, count]) => {
+    if (!ordem.includes(label)) {
+      statusList.push({ label, value: label, count, cor: '#fff', bg: '#6c757d' });
+    }
+  });
+  // Estado do filtro ativo
+  const filtroAtivo = window.__projetoFStatusAtivo || '';
+  container.innerHTML = '';
+  statusList.forEach(stat => {
+    const btn = document.createElement('button');
+    btn.className = 'mini-card-status-btn';
+    btn.textContent = `${stat.label} (${stat.count})`;
+    btn.style.padding = '6px 14px';
+    btn.style.borderRadius = '16px';
+    btn.style.border = (stat.value === filtroAtivo) ? '1.5px solid #222' : '1px solid #e0e0e0';
+    btn.style.fontWeight = '600';
+    btn.style.fontFamily = 'Segoe UI, Arial, sans-serif';
+    btn.style.fontSize = '0.98em';
+    btn.style.background = (stat.value === filtroAtivo) ? stat.bg : '#f8f9fa';
+    btn.style.color = (stat.value === filtroAtivo) ? stat.cor : '#222';
+    btn.style.boxShadow = (stat.value === filtroAtivo) ? '0 2px 8px #0001' : '0 1px 2px #0001';
+    btn.style.cursor = 'pointer';
+    btn.style.transition = '0.18s';
+    btn.style.marginBottom = '4px';
+    btn.style.marginRight = '6px';
+    btn.style.letterSpacing = '.01em';
+    btn.style.outline = 'none';
+    btn.style.opacity = (stat.value === filtroAtivo) ? '1' : '0.92';
+    btn.onmouseenter = () => { btn.style.opacity = '1'; btn.style.boxShadow = '0 2px 12px #0002'; };
+    btn.onmouseleave = () => { btn.style.opacity = (stat.value === filtroAtivo) ? '1' : '0.92'; btn.style.boxShadow = (stat.value === filtroAtivo) ? '0 2px 8px #0001' : '0 1px 2px #0001'; };
+    btn.onclick = () => {
+      window.__projetoFStatusAtivo = stat.value;
+      aplicarMiniCardFiltroProjetoF();
+      renderMiniCardsStatusProjetoF();
+    };
+    container.appendChild(btn);
+  });
+}
+
+function aplicarMiniCardFiltroProjetoF() {
+  const status = window.__projetoFStatusAtivo || '';
+  const dados = dadosPorCategoria['projeto-f'] || [];
+  let filtrados = dados;
+  if (status) {
+    filtrados = dados.filter(item => {
+      const s = (item['STATUS MDU'] || item['status_mdu'] || item['Status MDU'] || '').trim();
+      return s === status;
+    });
+  }
+  renderTabelaProjetoF('tabela-projeto-f', filtrados);
+}
 // === NORMALIZAÇÃO UNIVERSAL DE STATUS ===
 function normalizarStatus(valor) {
   return String(valor || "")
@@ -431,6 +525,7 @@ function abrirCategoria(categoriaId) {
     return;
   }
   if (categoriaId === 'projeto-f') {
+    window.__projetoFStatusAtivo = '';
     fetch('/api/projeto-f')
       .then(res => res.ok ? res.json() : [])
       .then(dados => {
@@ -438,17 +533,13 @@ function abrirCategoria(categoriaId) {
           salvarPlanilhaIndexedDB('projeto-f', dados);
           applyDatasetToState('projeto-f', dados);
           renderTabelaProjetoF('tabela-projeto-f', dados);
-          renderTabelaCidadesProjetoFInline();
-          popularFiltroCidadeProjetoF();
-          popularFiltroStatusProjetoF(dados);
+          renderMiniCardsStatusProjetoF();
         } else {
           lerPlanilhaIndexedDB('projeto-f').then(items => {
             const dados = Array.isArray(items) ? items : [];
             applyDatasetToState('projeto-f', dados);
             renderTabelaProjetoF('tabela-projeto-f', dados);
-            renderTabelaCidadesProjetoFInline();
-            popularFiltroCidadeProjetoF();
-            popularFiltroStatusProjetoF(dados);
+            renderMiniCardsStatusProjetoF();
           });
         }
       });
