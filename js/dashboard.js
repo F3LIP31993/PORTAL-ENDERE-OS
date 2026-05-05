@@ -95,12 +95,21 @@ function renderMiniCardsStatusSarRede() {
 function aplicarMiniCardFiltroSarRede() {
   const status = window.__sarRedeStatusAtivo || '';
   const dados = dadosPorCategoria['sar-rede'] || [];
+  // Busca flexível do campo de status (igual ao renderMiniCardsStatusSarRede)
+  function normalizarCampoStatus(nome) {
+    return String(nome || '')
+      .normalize('NFD')
+      .replace(/[^a-zA-Z]/g, '')
+      .toLowerCase();
+  }
+  function getStatus(item) {
+    const keys = Object.keys(item);
+    const key = keys.find(k => normalizarCampoStatus(k).includes('statusprojetoreal'));
+    return (key ? (item[key] || '').trim() : '').toUpperCase() || 'Sem Status';
+  }
   let filtrados = dados;
   if (status) {
-    filtrados = dados.filter(item => {
-      const s = (item['STATUS_PROJETO_REAL'] || item['status_projeto_real'] || item['Status Projeto Real'] || '').trim();
-      return s === status;
-    });
+    filtrados = dados.filter(item => getStatus(item) === status);
   }
   renderTabelaSarRede('tabela-sar-rede', filtrados);
 }
