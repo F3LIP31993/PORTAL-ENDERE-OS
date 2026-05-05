@@ -4028,13 +4028,8 @@ function renderTabelaSarRede(id, lista) {
     return '';
   }
 
-  const dados = (Array.isArray(lista) ? lista : []).filter((item) => {
-    const idProjeto = String(flexField(item, 'ID Projeto', 'ID_PROJETO', 'idprojeto') || '').trim();
-    const cidade = String(flexField(item, 'Cidade', 'CIDADE', 'cidade') || '').trim();
-    const cliente = String(flexField(item, 'Cliente', 'CLIENTE', 'cliente') || '').trim();
-    const status = String(flexField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'statusprojetoreal', 'Status', 'STATUS') || '').trim();
-    return Boolean(idProjeto || cidade || cliente || status);
-  });
+  // NÃO FILTRA MAIS: exibe todos os registros recebidos
+  const dados = Array.isArray(lista) ? lista : [];
   if (!dados.length) {
     window.__sarRedeRowsSnapshot = [];
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center">Nenhum registro</td></tr>';
@@ -4072,7 +4067,6 @@ function renderTabelaSarRede(id, lista) {
 
   tbody.innerHTML = rows.join('');
   popularFiltroStatusSarRede(dados);
-// ...fim da função, sem duplicação...
 }
 
 function popularFiltroStatusSarRede(listaBase = null) {
