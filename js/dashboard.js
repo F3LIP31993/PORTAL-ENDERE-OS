@@ -526,7 +526,7 @@ function abrirCategoria(categoriaId) {
   }
   if (categoriaId === 'projeto-f') {
     window.__projetoFStatusAtivo = '';
-    // Sempre tenta carregar do cache local primeiro para evitar travamentos e perda de dados
+    // 1. Sempre tenta carregar do cache local (localStorage) primeiro
     const cache = getLocalDatasetCache();
     const snapshot = cache['projeto-f'] || {};
     const localItems = Array.isArray(snapshot.items) ? snapshot.items : [];
@@ -536,25 +536,34 @@ function abrirCategoria(categoriaId) {
       renderMiniCardsStatusProjetoF();
       return;
     }
-    // Se não houver cache local, busca do backend normalmente
-    fetch('/api/projeto-f')
-      .then(res => res.ok ? res.json() : [])
-      .then(dados => {
-        if (Array.isArray(dados) && dados.length) {
-          salvarPlanilhaIndexedDB('projeto-f', dados);
-          cacheDatasetLocally('projeto-f', dados);
-          applyDatasetToState('projeto-f', dados);
-          renderTabelaProjetoF('tabela-projeto-f', dados);
-          renderMiniCardsStatusProjetoF();
-        } else {
-          lerPlanilhaIndexedDB('projeto-f').then(items => {
-            const dados = Array.isArray(items) ? items : [];
-            applyDatasetToState('projeto-f', dados);
-            renderTabelaProjetoF('tabela-projeto-f', dados);
+    // 2. Se não houver cache local, tenta IndexedDB
+    lerPlanilhaIndexedDB('projeto-f').then(items => {
+      const dados = Array.isArray(items) ? items : [];
+      if (dados.length > 0) {
+        cacheDatasetLocally('projeto-f', dados);
+        applyDatasetToState('projeto-f', dados);
+        renderTabelaProjetoF('tabela-projeto-f', dados);
+        renderMiniCardsStatusProjetoF();
+        return;
+      }
+      // 3. Se não houver nada local, busca do backend normalmente
+      fetch('/api/projeto-f')
+        .then(res => res.ok ? res.json() : [])
+        .then(dadosApi => {
+          if (Array.isArray(dadosApi) && dadosApi.length) {
+            salvarPlanilhaIndexedDB('projeto-f', dadosApi);
+            cacheDatasetLocally('projeto-f', dadosApi);
+            applyDatasetToState('projeto-f', dadosApi);
+            renderTabelaProjetoF('tabela-projeto-f', dadosApi);
             renderMiniCardsStatusProjetoF();
-          });
-        }
-      });
+          } else {
+            // Se não houver nada, limpa a tabela mas mantém mini cards e busca
+            applyDatasetToState('projeto-f', []);
+            renderTabelaProjetoF('tabela-projeto-f', []);
+            renderMiniCardsStatusProjetoF();
+          }
+        });
+    });
     return;
   }
   if (categoriaId === 'mdu-ongoing') {
