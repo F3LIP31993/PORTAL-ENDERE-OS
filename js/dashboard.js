@@ -106,9 +106,19 @@ function aplicarMiniCardFiltroEpo(epoTipo) {
     });
   }
   if (epoTipo === 'gpon-ongoing') {
+    // Sempre renderiza a tabela, mesmo se não houver dados
     renderTabelaEpoGponOngoing('tabela-epo-gpon-ongoing', filtrados);
+    // Se não houver dados, mostrar mensagem clara
+    if (filtrados.length === 0) {
+      const tabela = document.getElementById('tabela-epo-gpon-ongoing');
+      if (tabela) tabela.innerHTML = '<tr><td colspan="20" style="text-align:center;color:#888;padding:18px 0;">Nenhum registro encontrado para este status nesta EPO.</td></tr>';
+    }
   } else {
     renderTabelaEpoProjetoF('tabela-epo-projetof', filtrados);
+    if (filtrados.length === 0) {
+      const tabela = document.getElementById('tabela-epo-projetof');
+      if (tabela) tabela.innerHTML = '<tr><td colspan="20" style="text-align:center;color:#888;padding:18px 0;">Nenhum registro encontrado para este status nesta EPO.</td></tr>';
+    }
   }
 }
 // === MINI CARDS DE STATUS PARA PROJETO F ===
