@@ -1,3 +1,106 @@
+// === MINI CARDS DE STATUS PARA EPO (GPON ONGOING e PROJETO F) ===
+function renderMiniCardsStatusEpo(epoTipo) {
+  // epoTipo: 'gpon-ongoing' ou 'projeto-f'
+  const container = document.getElementById('mini-cards-status-epo');
+  if (!container) return;
+  const categoria = epoTipo === 'gpon-ongoing' ? 'epo-gpon-ongoing' : 'epo-projeto-f';
+  const dados = dadosPorCategoria[categoria] || [];
+  // Coletar todos os status únicos
+  const statusMap = {};
+  dados.forEach(item => {
+    // GPON ONGOING: STATUS_GERAL, PROJETO F: STATUS MDU
+    const status = (item['STATUS_GERAL'] || item['status_geral'] || item['Status Geral'] || item['STATUS MDU'] || item['status_mdu'] || item['Status MDU'] || '').trim() || 'Sem Status';
+    statusMap[status] = (statusMap[status] || 0) + 1;
+  });
+  // Ordem premium dos status
+  const ordem = [
+    '1.VISTORIA',
+    '2.PROJETO_INTERNO',
+    '3.PROJETO_REDE',
+    '4.CONSTRUCAO_REDE',
+    '5.CONSTRUCAO',
+    '7.EM_LIBERACAO',
+    'EXPANSÃO_MDU'
+  ];
+  // Sempre incluir o card "Todos"
+  const total = dados.length;
+  const statusList = [
+    { label: 'Todos', value: '', count: total, cor: '#222', bg: 'linear-gradient(90deg,#fff,#f8f9fa)' }
+  ];
+  ordem.forEach((key) => {
+    if (statusMap[key]) {
+      let cor = '#fff', bg = '#c82333';
+      switch (key) {
+        case '1.VISTORIA': bg = 'linear-gradient(90deg,#e52d27,#b31217)'; cor = '#fff'; break;
+        case '2.PROJETO_INTERNO': bg = 'linear-gradient(90deg,#485563,#29323c)'; cor = '#fff'; break;
+        case '3.PROJETO_REDE': bg = 'linear-gradient(90deg,#1e3c72,#2a5298)'; cor = '#fff'; break;
+        case '4.CONSTRUCAO_REDE': bg = 'linear-gradient(90deg,#f7971e,#ffd200)'; cor = '#222'; break;
+        case '5.CONSTRUCAO': bg = 'linear-gradient(90deg,#11998e,#38ef7d)'; cor = '#fff'; break;
+        case '7.EM_LIBERACAO': bg = 'linear-gradient(90deg,#fc4a1a,#f7b733)'; cor = '#fff'; break;
+        case 'EXPANSÃO_MDU': bg = 'linear-gradient(90deg,#8360c3,#2ebf91)'; cor = '#fff'; break;
+      }
+      statusList.push({ label: key.replace(/^[0-9]+\./,''), value: key, count: statusMap[key], cor, bg });
+    }
+  });
+  // Adiciona outros status não previstos na ordem
+  Object.entries(statusMap).forEach(([label, count]) => {
+    if (!ordem.includes(label)) {
+      statusList.push({ label, value: label, count, cor: '#fff', bg: '#6c757d' });
+    }
+  });
+  // Estado do filtro ativo
+  const filtroKey = epoTipo === 'gpon-ongoing' ? '__epoGponOngoingStatusAtivo' : '__epoProjetoFStatusAtivo';
+  const filtroAtivo = window[filtroKey] || '';
+  container.innerHTML = '';
+  statusList.forEach(stat => {
+    const btn = document.createElement('button');
+    btn.className = 'mini-card-status-btn';
+    btn.textContent = `${stat.label} (${stat.count})`;
+    btn.style.padding = '6px 14px';
+    btn.style.borderRadius = '16px';
+    btn.style.border = (stat.value === filtroAtivo) ? '1.5px solid #222' : '1px solid #e0e0e0';
+    btn.style.fontWeight = '600';
+    btn.style.fontFamily = 'Segoe UI, Arial, sans-serif';
+    btn.style.fontSize = '0.98em';
+    btn.style.background = (stat.value === filtroAtivo) ? stat.bg : '#f8f9fa';
+    btn.style.color = (stat.value === filtroAtivo) ? stat.cor : '#222';
+    btn.style.boxShadow = (stat.value === filtroAtivo) ? '0 2px 8px #0001' : '0 1px 2px #0001';
+    btn.style.cursor = 'pointer';
+    btn.style.transition = '0.18s';
+    btn.style.marginBottom = '4px';
+    btn.style.marginRight = '6px';
+    btn.style.letterSpacing = '.01em';
+    btn.style.outline = 'none';
+    btn.style.opacity = (stat.value === filtroAtivo) ? '1' : '0.92';
+    btn.onmouseenter = () => { btn.style.opacity = '1'; btn.style.boxShadow = '0 2px 12px #0002'; };
+    btn.onmouseleave = () => { btn.style.opacity = (stat.value === filtroAtivo) ? '1' : '0.92'; btn.style.boxShadow = (stat.value === filtroAtivo) ? '0 2px 8px #0001' : '0 1px 2px #0001'; };
+    btn.onclick = () => {
+      window[filtroKey] = stat.value;
+      aplicarMiniCardFiltroEpo(epoTipo);
+      renderMiniCardsStatusEpo(epoTipo);
+    };
+    container.appendChild(btn);
+  });
+}
+
+function aplicarMiniCardFiltroEpo(epoTipo) {
+  const filtroKey = epoTipo === 'gpon-ongoing' ? '__epoGponOngoingStatusAtivo' : '__epoProjetoFStatusAtivo';
+  const status = window[filtroKey] || '';
+  const categoria = epoTipo === 'gpon-ongoing' ? 'epo-gpon-ongoing' : 'epo-projeto-f';
+  const dados = dadosPorCategoria[categoria] || [];
+  let filtrados = dados;
+  if (status) {
+    filtrados = dados.filter(item => {
+      const s = (item['STATUS_GERAL'] || item['status_geral'] || item['Status Geral'] || item['STATUS MDU'] || item['status_mdu'] || item['Status MDU'] || '').trim();
+      return s === status;
+    });
+  }
+  if (epoTipo === 'gpon-ongoing') {
+    renderTabelaEpoGponOngoing('tabela-epo-gpon-ongoing', filtrados);
+  } else {
+    renderTabelaEpoProjetoF('tabela-epo-projetof', filtrados);
+  }
+}
 // === MINI CARDS DE STATUS PARA PROJETO F ===
 function renderMiniCardsStatusProjetoF() {
   const container = document.getElementById('mini-cards-status-projetof');
@@ -8459,6 +8562,10 @@ function importarPlanilhaEpoGponOngoing() {
 
       if (epoAcaoAtual === 'gpon-ongoing' && epoSelecionadaAtual) renderGponOngoingEpo();
       if (input) input.value = '';
+
+      // Atualiza mini cards de status EPO
+      renderMiniCardsStatusEpo('gpon-ongoing');
+      aplicarMiniCardFiltroEpo('gpon-ongoing');
     } catch (err) {
       console.error('[EPO][GPON ONGOING] Erro ao processar importação:', err);
       if (statusEl) statusEl.textContent = `⚠️ Erro ao processar importação: ${err?.message || 'desconhecido'}`;
@@ -8576,6 +8683,10 @@ function importarPlanilhaEpoProjetoF() {
 
       if (epoAcaoAtual === 'projeto-f' && epoSelecionadaAtual) renderProjetoFEpo();
       if (input) input.value = '';
+
+      // Atualiza mini cards de status EPO
+      renderMiniCardsStatusEpo('projeto-f');
+      aplicarMiniCardFiltroEpo('projeto-f');
     } catch (err) {
       console.error('[EPO][PROJETO F] Erro ao processar importação:', err);
       if (statusEl) statusEl.textContent = `⚠️ Erro ao processar importação: ${err?.message || 'desconhecido'}`;
@@ -9953,6 +10064,10 @@ function selecionarEpo(nomeEpo) {
 }
 
 function resetarSelecaoEpo() {
+
+    // Esconde mini cards de status EPO
+    const miniCardsContainer = document.getElementById('mini-cards-status-epo');
+    if (miniCardsContainer) miniCardsContainer.style.display = 'none';
   epoSelecionadaAtual = '';
 
   const epoSection = document.getElementById('epo');
@@ -9996,10 +10111,31 @@ function executarAcaoEpo(tipoAcao) {
     return;
   }
 
+
+  // Mini cards de status EPO: mostrar apenas para abas GPON ONGOING e PROJETO F
+  const miniCardsContainer = document.getElementById('mini-cards-status-epo');
+  if (miniCardsContainer) {
+    if (tipoAcao === 'gpon-ongoing') {
+      miniCardsContainer.style.display = 'flex';
+      renderMiniCardsStatusEpo('gpon-ongoing');
+      aplicarMiniCardFiltroEpo('gpon-ongoing');
+    } else if (tipoAcao === 'projeto-f') {
+      miniCardsContainer.style.display = 'flex';
+      renderMiniCardsStatusEpo('projeto-f');
+      aplicarMiniCardFiltroEpo('projeto-f');
+    } else {
+      miniCardsContainer.style.display = 'none';
+    }
+  }
+
   if (tipoAcao === 'equipes') {
     renderListaEquipesEpo();
   } else if (tipoAcao === 'projeto-f') {
-    renderProjetoFEpo();
+    // A tabela será renderizada pelo filtro dos mini cards
+    // renderProjetoFEpo();
+  } else if (tipoAcao === 'gpon-ongoing') {
+    // A tabela será renderizada pelo filtro dos mini cards
+    // renderGponOngoingEpo();
   } else {
     renderGponOngoingEpo();
   }
