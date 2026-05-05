@@ -268,8 +268,6 @@
 
         <p class="epo-subheading epo-selecao-intro" id="epo-selecao-intro">Selecione uma EPO para abrir importações e a área de equipes.</p>
 
-  <!-- MINI CARDS DE STATUS EPO -->
-  <div id="mini-cards-status-epo" style="margin: 12px 0 8px 0; display: flex; flex-wrap: wrap; gap: 0;"></div>
 
         <div class="epo-pill-grid" role="list" aria-label="Lista de EPOs">
           <button type="button" class="epo-pill" data-epo="ACESSO" role="listitem" onclick="selecionarEpo('ACESSO')">ACESSO<span class="epo-pill-count"></span></button>
@@ -295,6 +293,8 @@
             <button type="button" class="btn-secondary epo-action-trigger" data-action="gpon-ongoing" onclick="executarAcaoEpo('gpon-ongoing')">GPON ONGOING</button>
             <button type="button" class="btn-secondary epo-action-trigger" data-action="projeto-f" onclick="executarAcaoEpo('projeto-f')">PROJETO F</button>
           </div>
+          <!-- MINI CARDS DE STATUS EPO -->
+          <div id="mini-cards-status-epo" style="margin: 8px 0 0 0; display: none; flex-wrap: wrap; gap: 0;"></div>
           <div id="epo-action-content" class="epo-action-content"></div>
           <div id="epo-action-result" class="epo-action-result">Selecione uma EPO para habilitar as opções.</div>
         </div>
