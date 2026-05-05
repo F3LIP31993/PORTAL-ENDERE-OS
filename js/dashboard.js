@@ -92,9 +92,15 @@ function aplicarMiniCardFiltroEpo(epoTipo) {
   const status = window[filtroKey] || '';
   const categoria = epoTipo === 'gpon-ongoing' ? 'epo-gpon-ongoing' : 'epo-projeto-f';
   const dados = dadosPorCategoria[categoria] || [];
-  let filtrados = dados;
+  // Filtrar apenas para a EPO selecionada
+  const epoSelecionada = (window.epoSelecionadaAtual || '').toUpperCase();
+  let filtrados = dados.filter(item => {
+    // Campo EPO pode variar: EPO, NOME_EPO, etc
+    const nomeEpo = (item['EPO'] || item['NOME_EPO'] || item['EPO_NOME'] || '').toUpperCase();
+    return nomeEpo === epoSelecionada;
+  });
   if (status) {
-    filtrados = dados.filter(item => {
+    filtrados = filtrados.filter(item => {
       const s = (item['STATUS_GERAL'] || item['status_geral'] || item['Status Geral'] || item['STATUS MDU'] || item['status_mdu'] || item['Status MDU'] || '').trim();
       return s === status;
     });
