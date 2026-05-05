@@ -5,8 +5,14 @@ function renderMiniCardsStatusSarRede() {
   const dados = dadosPorCategoria['sar-rede'] || [];
   // Coletar todos os status únicos
   const statusMap = {};
+  // Busca flexível do campo de status
+  function getStatus(item) {
+    const keys = Object.keys(item);
+    const key = keys.find(k => k.toLowerCase().replace(/[^a-z]/g,'').includes('statusprojetoreal'));
+    return (key ? (item[key] || '').trim() : '').toUpperCase() || 'Sem Status';
+  }
   dados.forEach(item => {
-    const status = (item['STATUS_PROJETO_REAL'] || item['status_projeto_real'] || item['Status Projeto Real'] || '').trim() || 'Sem Status';
+    const status = getStatus(item);
     statusMap[status] = (statusMap[status] || 0) + 1;
   });
   // Ordem premium dos status (ajuste conforme necessário)
@@ -99,6 +105,17 @@ if (window.renderTabelaSarRede) {
   window.renderTabelaSarRede = function(id, lista) {
     originalRenderTabelaSarRede(id, lista);
     renderMiniCardsStatusSarRede();
+  };
+}
+// Garante renderização dos mini cards após importar CSV
+if (window.importarCSV) {
+  const originalImportarCSV = window.importarCSV;
+  window.importarCSV = function(categoria) {
+    const r = originalImportarCSV.apply(this, arguments);
+    if (categoria === 'sar-rede') {
+      setTimeout(renderMiniCardsStatusSarRede, 200);
+    }
+    return r;
   };
 }
 // === MINI CARDS DE STATUS PARA MDU ONGOING ===
