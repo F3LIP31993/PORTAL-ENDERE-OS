@@ -30,184 +30,19 @@ function contarPorStatusSarRede() {
   return contagem;
 }
 
-// === MINI CARDS DINÂMICOS SAR REDE ===
-function renderMiniCardsStatusSarRede() {
-  const container = document.getElementById('mini-cards-status-sarrede');
-  if (!container) return;
-  const contagem = contarPorStatusSarRede();
-  const statusList = Object.keys(contagem).sort();
-  container.innerHTML = '';
-
-  // Card "Todos"
-  const btnTodos = document.createElement('button');
-  btnTodos.textContent = `Todos (${Object.values(contagem).reduce((a, b) => a + b, 0)})`;
-  btnTodos.className = 'mini-card-status-btn';
-  btnTodos.onclick = () => {
-    window.__sarRedeStatusAtivo = 'TODOS';
-    renderTabelaSarRedeComDados('tabela-sar-rede', dadosPorCategoria.sarRede);
-    renderMiniCardsStatusSarRede();
-  };
-  if (window.__sarRedeStatusAtivo === 'TODOS' || !window.__sarRedeStatusAtivo) btnTodos.style.background = '#c82333', btnTodos.style.color = '#fff';
-  container.appendChild(btnTodos);
-
-  // Cards por status
-  statusList.forEach(status => {
-    const btn = document.createElement('button');
-    btn.textContent = `${status} (${contagem[status]})`;
-    btn.className = 'mini-card-status-btn';
-    btn.onclick = () => {
-      window.__sarRedeStatusAtivo = status;
-      const filtrados = dadosPorCategoria.sarRede.filter(item => getStatusSarRede(item) === status);
-      renderTabelaSarRedeComDados('tabela-sar-rede', filtrados);
-      renderMiniCardsStatusSarRede();
-    };
-    if (window.__sarRedeStatusAtivo === status) btn.style.background = '#c82333', btn.style.color = '#fff';
-    container.appendChild(btn);
-  });
-}
-
 // === APÓS IMPORTAR O CSV SAR REDE ===
+// Mantém a função robusta já existente
 function aposImportarCsvSarRede(dados) {
-  dadosPorCategoria.sarRede = dados;
-  window.__sarRedeStatusAtivo = 'TODOS';
+  dadosPorCategoria['sar-rede'] = dados;
+  window.__sarRedeStatusAtivo = '';
   renderMiniCardsStatusSarRede();
-  renderTabelaSarRedeComDados('tabela-sar-rede', dados);
+  renderTabelaSarRede('tabela-sar-rede', dados);
 }
-// === MINI CARDS DE STATUS PARA SAR REDE ===
-function renderMiniCardsStatusSarRede() {
-  const container = document.getElementById('mini-cards-status-sarrede');
-  if (!container) return;
-  const dados = dadosPorCategoria['sar-rede'] || [];
-  // Coletar todos os status únicos
-  const statusMap = {};
-  // Busca flexível do campo de status
-  function normalizarCampoStatus(nome) {
-    return String(nome || '')
-      .normalize('NFD')
-      .replace(/[^a-zA-Z]/g, '')
-      .toLowerCase();
-  }
-  function getStatus(item) {
-    const keys = Object.keys(item);
-    const key = keys.find(k => normalizarCampoStatus(k).includes('statusprojetoreal'));
-    return (key ? (item[key] || '').trim() : '').toUpperCase() || 'Sem Status';
-  }
-  dados.forEach(item => {
-    const status = getStatus(item);
-    statusMap[status] = (statusMap[status] || 0) + 1;
-  });
-  // Ordem premium dos status (ajuste conforme necessário)
-  const ordem = [
-    '1.VISTORIA',
-    '2.PROJETO_INTERNO',
-    '3.PROJETO_REDE',
-    '4.CONSTRUCAO_REDE',
-    '5.CONSTRUCAO',
-    '7.EM_LIBERACAO',
-    'EXPANSÃO_MDU'
-  ];
-  // Sempre incluir o card "Todos"
-  const total = dados.length;
-  // Monta lista ordenada
-  const statusList = [
-    { label: 'Todos', value: '', count: total, cor: '#222', bg: 'linear-gradient(90deg,#fff,#f8f9fa)' }
-  ];
-  ordem.forEach((key, idx) => {
-    if (statusMap[key]) {
-      let cor = '#fff', bg = '#c82333';
-      switch (key) {
-        case '1.VISTORIA': bg = 'linear-gradient(90deg,#e52d27,#b31217)'; cor = '#fff'; break;
-        case '2.PROJETO_INTERNO': bg = 'linear-gradient(90deg,#485563,#29323c)'; cor = '#fff'; break;
-        case '3.PROJETO_REDE': bg = 'linear-gradient(90deg,#1e3c72,#2a5298)'; cor = '#fff'; break;
-        case '4.CONSTRUCAO_REDE': bg = 'linear-gradient(90deg,#f7971e,#ffd200)'; cor = '#222'; break;
-        case '5.CONSTRUCAO': bg = 'linear-gradient(90deg,#11998e,#38ef7d)'; cor = '#fff'; break;
-        case '7.EM_LIBERACAO': bg = 'linear-gradient(90deg,#fc4a1a,#f7b733)'; cor = '#fff'; break;
-        case 'EXPANSÃO_MDU': bg = 'linear-gradient(90deg,#8360c3,#2ebf91)'; cor = '#fff'; break;
-      }
-      statusList.push({ label: key.replace(/^[0-9]+\./,''), value: key, count: statusMap[key], cor, bg });
-    }
-  });
-  // Adiciona outros status não previstos na ordem
-  Object.entries(statusMap).forEach(([label, count]) => {
-    if (!ordem.includes(label)) {
-      statusList.push({ label, value: label, count, cor: '#fff', bg: '#6c757d' });
-    }
-  });
-  // Estado do filtro ativo
-  const filtroAtivo = window.__sarRedeStatusAtivo || '';
-  container.innerHTML = '';
-  statusList.forEach(stat => {
-    const btn = document.createElement('button');
-    btn.className = 'mini-card-status-btn';
-    btn.textContent = `${stat.label} (${stat.count})`;
-    btn.style.padding = '6px 14px';
-    btn.style.borderRadius = '16px';
-    btn.style.border = (stat.value === filtroAtivo) ? '1.5px solid #222' : '1px solid #e0e0e0';
-    btn.style.fontWeight = '600';
-    btn.style.fontFamily = 'Segoe UI, Arial, sans-serif';
-    btn.style.fontSize = '0.98em';
-    btn.style.background = (stat.value === filtroAtivo) ? stat.bg : '#f8f9fa';
-    btn.style.color = (stat.value === filtroAtivo) ? stat.cor : '#222';
-    btn.style.boxShadow = (stat.value === filtroAtivo) ? '0 2px 8px #0001' : '0 1px 2px #0001';
-    btn.style.cursor = 'pointer';
-    btn.style.transition = '0.18s';
-    btn.style.marginBottom = '4px';
-    btn.style.marginRight = '6px';
-    btn.style.letterSpacing = '.01em';
-    btn.style.outline = 'none';
-    btn.style.opacity = (stat.value === filtroAtivo) ? '1' : '0.92';
-    btn.onmouseenter = () => { btn.style.opacity = '1'; btn.style.boxShadow = '0 2px 12px #0002'; };
-    btn.onmouseleave = () => { btn.style.opacity = (stat.value === filtroAtivo) ? '1' : '0.92'; btn.style.boxShadow = (stat.value === filtroAtivo) ? '0 2px 8px #0001' : '0 1px 2px #0001'; };
-    btn.onclick = () => {
-      window.__sarRedeStatusAtivo = stat.value;
-      aplicarMiniCardFiltroSarRede();
-      renderMiniCardsStatusSarRede();
-    };
-    container.appendChild(btn);
-  });
-}
-
-function aplicarMiniCardFiltroSarRede() {
-  const status = window.__sarRedeStatusAtivo || '';
-  const dados = dadosPorCategoria['sar-rede'] || [];
-  // Busca flexível do campo de status (igual ao renderMiniCardsStatusSarRede)
-  function normalizarCampoStatus(nome) {
-    return String(nome || '')
-      .normalize('NFD')
-      .replace(/[^a-zA-Z]/g, '')
-      .toLowerCase();
-  }
-  function getStatus(item) {
-    const keys = Object.keys(item);
-    const key = keys.find(k => normalizarCampoStatus(k).includes('statusprojetoreal'));
-    return (key ? (item[key] || '').trim() : '').toUpperCase() || 'Sem Status';
-  }
-  let filtrados = dados;
-  if (status) {
-    filtrados = dados.filter(item => getStatus(item) === status);
-  }
-  renderTabelaSarRede('tabela-sar-rede', filtrados);
-}
+// Mantém apenas a versão robusta já existente de renderMiniCardsStatusSarRede
+// (Se já existe uma versão robusta mais abaixo, mantenha apenas ela e remova duplicidade)
 
 // Chamar ao importar planilha ou abrir card
-if (window.renderTabelaSarRede) {
-  const originalRenderTabelaSarRede = window.renderTabelaSarRede;
-  window.renderTabelaSarRede = function(id, lista) {
-    originalRenderTabelaSarRede(id, lista);
-    renderMiniCardsStatusSarRede();
-  };
-}
-// Garante renderização dos mini cards após importar CSV
-if (window.importarCSV) {
-  const originalImportarCSV = window.importarCSV;
-  window.importarCSV = function(categoria) {
-    const r = originalImportarCSV.apply(this, arguments);
-    if (categoria === 'sar-rede') {
-      setTimeout(renderMiniCardsStatusSarRede, 200);
-    }
-    return r;
-  };
-}
+// Removido o patch automático para renderMiniCardsStatusSarRede e importarCSV para evitar conflito de versões
 // === MINI CARDS DE STATUS PARA MDU ONGOING ===
 function renderMiniCardsStatusMduOngoing() {
   const container = document.getElementById('mini-cards-status-mduongoing');
@@ -435,7 +270,7 @@ function filtrarPorStatusSeguro(categoria, statusSelecionado) {
 // Função para renderizar SAR REDE (usada pelo filtro seguro)
 function renderTabelaCategoria(categoria, lista) {
   if (categoria === 'sar-rede') {
-    renderTabelaSarRede('tabela-sar-rede', lista);
+    aposImportarCsvSarRede(lista);
   }
   // Adicione outros casos se quiser expandir para outros cards
 }
@@ -456,8 +291,7 @@ function abrirCategoria(categoriaId) {
       .then(dados => {
         if (Array.isArray(dados) && dados.length) {
           salvarPlanilhaIndexedDB('sar-rede', dados);
-          renderTabelaSarRede('tabela-sar-rede', dados);
-          popularFiltroStatusSarRede(dados);
+          aposImportarCsvSarRede(dados);
         } else {
           // fallback: tenta IndexedDB se backend vazio
           lerPlanilhaIndexedDB('sar-rede').then(items => {
@@ -467,11 +301,11 @@ function abrirCategoria(categoriaId) {
               if (tabela) {
                 tabela.innerHTML = `<tr><td colspan='20' style='text-align:center;color:red;font-weight:bold;'>Nenhum dado encontrado no SAR REDE. Por favor, importe a planilha.</td></tr>`;
               }
-              popularFiltroStatusSarRede([]);
+              // Limpa mini cards
+              renderMiniCardsStatusSarRede([]);
               return;
             }
-            renderTabelaSarRede('tabela-sar-rede', dadosCompletos);
-            popularFiltroStatusSarRede(dadosCompletos);
+            aposImportarCsvSarRede(dadosCompletos);
           });
         }
       });
