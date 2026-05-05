@@ -81,7 +81,7 @@ function renderMiniCardsStatusEpo(epoTipo) {
     btn.onclick = () => {
       window[filtroKey] = stat.value;
       aplicarMiniCardFiltroEpo(epoTipo);
-      renderMiniCardsStatusEpo(epoTipo);
+      // NÃO re-renderiza os mini cards, só a tabela
     };
     container.appendChild(btn);
   });
