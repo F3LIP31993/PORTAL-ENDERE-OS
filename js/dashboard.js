@@ -10132,30 +10132,34 @@ function executarAcaoEpo(tipoAcao) {
   }
 
 
-  // Mini cards de status EPO: mostrar apenas para abas GPON ONGOING e PROJETO F
-  const miniCardsContainer = document.getElementById('mini-cards-status-epo');
-  if (miniCardsContainer) {
-    if (tipoAcao === 'gpon-ongoing') {
-      miniCardsContainer.style.display = 'flex';
-      renderMiniCardsStatusEpo('gpon-ongoing');
-      aplicarMiniCardFiltroEpo('gpon-ongoing');
-    } else if (tipoAcao === 'projeto-f') {
-      miniCardsContainer.style.display = 'flex';
-      renderMiniCardsStatusEpo('projeto-f');
-      aplicarMiniCardFiltroEpo('projeto-f');
-    } else {
-      miniCardsContainer.style.display = 'none';
-    }
-  }
-
   if (tipoAcao === 'equipes') {
     renderListaEquipesEpo();
   } else if (tipoAcao === 'projeto-f') {
-    // A tabela será renderizada pelo filtro dos mini cards
-    // renderProjetoFEpo();
+    // Exibe tabela do Projeto F da EPO selecionada
+    const categoria = 'epo-projeto-f';
+    const epoSelecionada = (window.epoSelecionadaAtual || '').toUpperCase();
+    const dados = (dadosPorCategoria[categoria] || []).filter(item => {
+      const nomeEpo = (item['EPO'] || item['NOME_EPO'] || item['EPO_NOME'] || '').toUpperCase();
+      return nomeEpo === epoSelecionada;
+    });
+    renderTabelaEpoProjetoF('tabela-epo-projetof', dados);
+    if (dados.length === 0) {
+      const tabela = document.getElementById('tabela-epo-projetof');
+      if (tabela) tabela.innerHTML = '<tr><td colspan="20" style="text-align:center;color:#888;padding:18px 0;">Nenhum registro encontrado para esta EPO no Projeto F.</td></tr>';
+    }
   } else if (tipoAcao === 'gpon-ongoing') {
-    // A tabela será renderizada pelo filtro dos mini cards
-    // renderGponOngoingEpo();
+    // Exibe tabela do GPON ONGOING da EPO selecionada
+    const categoria = 'epo-gpon-ongoing';
+    const epoSelecionada = (window.epoSelecionadaAtual || '').toUpperCase();
+    const dados = (dadosPorCategoria[categoria] || []).filter(item => {
+      const nomeEpo = (item['EPO'] || item['NOME_EPO'] || item['EPO_NOME'] || '').toUpperCase();
+      return nomeEpo === epoSelecionada;
+    });
+    renderTabelaEpoGponOngoing('tabela-epo-gpon-ongoing', dados);
+    if (dados.length === 0) {
+      const tabela = document.getElementById('tabela-epo-gpon-ongoing');
+      if (tabela) tabela.innerHTML = '<tr><td colspan="20" style="text-align:center;color:#888;padding:18px 0;">Nenhum registro encontrado para esta EPO no GPON ONGOING.</td></tr>';
+    }
   } else {
     renderGponOngoingEpo();
   }
