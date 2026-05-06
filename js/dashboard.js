@@ -4602,7 +4602,7 @@ function visualizarLiberado(index) {
 
   tbody.innerHTML = buildRows();
 
-  // Controles de paginação
+  // Controles de paginação - sempre logo após a tabela
   let paginacaoEl = document.getElementById('paginacao-projeto-f');
   if (!paginacaoEl) {
     paginacaoEl = document.createElement('div');
@@ -4612,7 +4612,11 @@ function visualizarLiberado(index) {
     paginacaoEl.style.alignItems = 'center';
     paginacaoEl.style.gap = '8px';
     paginacaoEl.style.margin = '12px 0';
-    tbody.parentElement.parentElement.insertBefore(paginacaoEl, tbody.parentElement.nextSibling);
+    // Garante que o container de paginação fique logo após a tabela
+    const table = tbody.closest('table');
+    if (table && table.parentElement) {
+      table.parentElement.appendChild(paginacaoEl);
+    }
   }
   paginacaoEl.innerHTML = `
     <button type="button" class="btn-secondary" ${currentPage === 1 ? 'disabled' : ''} onclick="mudarPaginaProjetoF(1)">Primeira</button>
