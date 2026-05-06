@@ -8507,9 +8507,9 @@ function atualizarCountPillsEpo() {
     const counts = getEpoCountsByName(epoName);
     const span = btn.querySelector('.epo-pill-count');
     if (span) {
-      const hasAny = counts.gpon > 0 || counts.projetoF > 0;
-      span.textContent = hasAny ? ` (${counts.gpon}/${counts.projetoF})` : '';
-      span.title = hasAny ? `GPON ONGOING: ${counts.gpon} | PROJETO F: ${counts.projetoF}` : '';
+      // Exibe sempre o número real de registros, sem texto de bloqueio ou número fixo
+      span.textContent = `(${counts.gpon || 0}/${counts.projetoF || 0})`;
+      span.title = `GPON ONGOING: ${counts.gpon || 0} | PROJETO F: ${counts.projetoF || 0}`;
     }
   });
 
@@ -10391,7 +10391,37 @@ async function carregarObservacoesPendente(codigo) {
     }
   }
 
-  renderObservacoesLista(codigo, notes);
+  renderObservacoesListaProfissional(codigo, notes);
+}
+
+// Exibe histórico profissional: ordenado, com ação, usuário, data/hora
+function renderObservacoesListaProfissional(codigo, notas) {
+  const container = document.getElementById('modal-notes');
+  if (!container) return;
+
+  if (!notas || notas.length === 0) {
+    container.innerHTML = '<li style="opacity:.7">Nenhuma observação registrada.</li>';
+    return;
+  }
+
+  // Ordena por data crescente
+  notas.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  container.innerHTML = notas.map(n => {
+    const who = n.created_by ? `<strong>${escapeHtml(n.created_by)}</strong>` : '';
+    const when = n.created_at ? `<span style="color:#888;font-size:11px;">${escapeHtml(formatarDataHoraProfissional(n.created_at))}</span>` : '';
+    const acao = n.acao ? `<span style="color:#0a7cff;font-size:11px;">[${escapeHtml(n.acao)}]</span>` : '';
+    return `<li class="note-item" style="margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">${who} ${when} ${acao}</div>
+      <div style="margin-top:2px;white-space:pre-line;">${escapeHtml(n.note)}</div>
+    </li>`;
+  }).join('');
+}
+
+function formatarDataHoraProfissional(dt) {
+  if (!dt) return '-';
+  const d = new Date(dt);
+  if (isNaN(d)) return dt;
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
 function renderObservacoesLista(codigo, notas) {
