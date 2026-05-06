@@ -4558,26 +4558,19 @@ function visualizarLiberado(index) {
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  // Paginação
-  const PAGE_SIZE = 50;
-  window.__projetoFPagination = window.__projetoFPagination || { page: 1 };
-  const page = window.__projetoFPagination.page || 1;
   const dados = Array.isArray(lista) ? lista : [];
-  const totalPages = Math.max(1, Math.ceil(dados.length / PAGE_SIZE));
-  const currentPage = Math.min(Math.max(1, page), totalPages);
-  window.__projetoFPagination.page = currentPage;
-
   if (!dados.length) {
     window.__projetoFModalData = [];
     tbody.innerHTML = `<tr><td colspan="8">Nenhum registro</td></tr>`;
+    popularFiltroCidadeProjetoF();
+    popularFiltroStatusProjetoF(dadosPorCategoria['projeto-f'] || []);
     return;
   }
 
   window.__projetoFModalData = dados;
-  const startIndex = (currentPage - 1) * PAGE_SIZE;
-  const endIndex = Math.min(startIndex + PAGE_SIZE, dados.length);
-  const buildRows = () => dados.slice(startIndex, endIndex).map((i, index) => {
-    const realIndex = startIndex + index;
+  // Exibe todas as linhas de uma vez
+  const buildRows = (startIndex, endIndex) => dados.slice(startIndex, endIndex).map((i, localIndex) => {
+    const index = startIndex + localIndex;
     const codigo = getField(i, "COD-MDUGO", "cod-mdugo", "codmdugo");
     const codged = getField(i, "CODGED", "codged", "cod_ged");
     const cidade = getField(i, "CIDADE", "cidade");
@@ -4586,7 +4579,7 @@ function visualizarLiberado(index) {
     const qtdeBlocos = getField(i, "Qtde Blocos", "QTDE_BLOCOS", "qtd_blocos");
     const statusMdu = getField(i, "STATUS MDU", "STATUS_MDU", "status_mdu");
     const statusLiberacao = getField(i, "STATUS LIBERAÇÃO", "STATUS_LIBERACAO", "status_liberacao");
-    const recordKey = String(codigo || codged || `projeto-f-${realIndex}`).replace(/"/g, '&quot;');
+    const recordKey = String(codigo || codged || `projeto-f-${index}`).replace(/"/g, '&quot;');
     return `
       <tr>
         <td>${cidade || '-'}</td>
@@ -4596,28 +4589,14 @@ function visualizarLiberado(index) {
         <td>${qtdeBlocos || '-'}</td>
         <td>${statusMdu || '-'}</td>
         <td>${statusLiberacao || '-'}</td>
-        <td><button type="button" class="btn-visualizar" data-row-index="${realIndex}" data-record-key="${recordKey}" onclick="visualizarProjetoF(this)">VISUALIZAR</button></td>
+        <td><button type="button" class="btn-visualizar" data-row-index="${index}" data-record-key="${recordKey}" onclick="visualizarProjetoF(this)">VISUALIZAR</button></td>
       </tr>`;
   }).join('');
 
-  tbody.innerHTML = buildRows();
+  tbody.innerHTML = buildRows(0, dados.length);
 
-  // Controles de paginação - container já está fixo no HTML
-  const paginacaoEl = document.getElementById('paginacao-projeto-f');
-  if (paginacaoEl) {
-    paginacaoEl.style.display = 'flex';
-    paginacaoEl.style.justifyContent = 'center';
-    paginacaoEl.style.alignItems = 'center';
-    paginacaoEl.style.gap = '8px';
-    paginacaoEl.style.margin = '12px 0';
-    paginacaoEl.innerHTML = `
-      <button type="button" class="btn-secondary" ${currentPage === 1 ? 'disabled' : ''} onclick="mudarPaginaProjetoF(1)">Primeira</button>
-      <button type="button" class="btn-secondary" ${currentPage === 1 ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${currentPage - 1})">Anterior</button>
-      <span style="font-weight:600;">Página ${currentPage} de ${totalPages}</span>
-      <button type="button" class="btn-secondary" ${currentPage === totalPages ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${currentPage + 1})">Próxima</button>
-      <button type="button" class="btn-secondary" ${currentPage === totalPages ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${totalPages})">Última</button>
-    `;
-  }
+  popularFiltroCidadeProjetoF();
+  popularFiltroStatusProjetoF(dadosPorCategoria['projeto-f'] || []);
 }
 
 window.mudarPaginaProjetoF = function(pagina) {
