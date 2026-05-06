@@ -29,6 +29,7 @@ function contarPorStatusSarRede() {
   });
   return contagem;
 }
+}
 
 // === APÓS IMPORTAR O CSV SAR REDE ===
 // Garante que o dataset base nunca é perdido/truncado e sempre atualizado corretamente
@@ -66,6 +67,7 @@ function renderMiniCardsStatusSarRede() {
   });
   // Ordem premium dos status (ajuste conforme necessário)
   const ordem = [
+}
     '1.VISTORIA',
     '2.PROJETO_INTERNO',
     '3.PROJETO_REDE',
@@ -330,7 +332,7 @@ window.abrirCategoria = function abrirCategoria(categoriaId) {
       categoria
     );
     renderTabelaCategoria(categoria, base);
-    return;
+  
   }
   // Aviso visual para filtro (UX profissional)
   function mostrarAvisoFiltro(mensagem, categoria) {
