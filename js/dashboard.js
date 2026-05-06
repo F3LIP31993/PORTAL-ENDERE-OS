@@ -432,7 +432,7 @@ function abrirCategoria(categoriaId) {
   }
   if (categoriaId === 'projeto-f') {
     fetch('/api/projeto-f')
-      .then(res => res.ok ? res.json() : [])
+      .then(res => res.ok ? res.json() : null)
       .then(dados => {
         if (Array.isArray(dados) && dados.length) {
           salvarPlanilhaIndexedDB('projeto-f', dados);
@@ -440,13 +440,23 @@ function abrirCategoria(categoriaId) {
           renderTabelaProjetoF('tabela-projeto-f', dados);
           popularFiltroStatusProjetoF(dados);
         } else {
+          // Fallback garantido: sempre tenta IndexedDB
           lerPlanilhaIndexedDB('projeto-f').then(items => {
-            const dados = Array.isArray(items) ? items : [];
-            applyDatasetToState('projeto-f', dados);
-            renderTabelaProjetoF('tabela-projeto-f', dados);
-            popularFiltroStatusProjetoF(dados);
+            const dadosIndexed = Array.isArray(items) ? items : [];
+            applyDatasetToState('projeto-f', dadosIndexed);
+            renderTabelaProjetoF('tabela-projeto-f', dadosIndexed);
+            popularFiltroStatusProjetoF(dadosIndexed);
           });
         }
+      })
+      .catch(() => {
+        // Fallback garantido: sempre tenta IndexedDB em caso de erro/falha de rede
+        lerPlanilhaIndexedDB('projeto-f').then(items => {
+          const dadosIndexed = Array.isArray(items) ? items : [];
+          applyDatasetToState('projeto-f', dadosIndexed);
+          renderTabelaProjetoF('tabela-projeto-f', dadosIndexed);
+          popularFiltroStatusProjetoF(dadosIndexed);
+        });
       });
     return;
   }
@@ -4544,48 +4554,81 @@ function visualizarLiberado(index) {
   carregarObservacoesPendente(currentPendenteCodigo);
   carregarAnexosPendente(currentPendenteCodigo);
 
-  const modal = document.getElementById('modal-obs');
-  if (modal) modal.classList.remove('hidden');
+  const tbody = document.getElementById(id);
+  if (!tbody) return;
+  tbody.innerHTML = "";
 
-  const anexoInput = document.getElementById('modal-anexo');
-  if (anexoInput) {
-    anexoInput.value = '';
-    anexoInput.onchange = (evt) => {
-      const file = evt.target.files[0];
-      if (file) {
-        uploadAnexoPendente(currentPendenteCodigo, file);
-      }
-    };
+  // Paginação
+  const PAGE_SIZE = 50;
+  window.__projetoFPagination = window.__projetoFPagination || { page: 1 };
+  const page = window.__projetoFPagination.page || 1;
+  const dados = Array.isArray(lista) ? lista : [];
+  const totalPages = Math.max(1, Math.ceil(dados.length / PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  window.__projetoFPagination.page = currentPage;
+
+  if (!dados.length) {
+    window.__projetoFModalData = [];
+    tbody.innerHTML = `<tr><td colspan="8">Nenhum registro</td></tr>`;
+    return;
   }
+
+  window.__projetoFModalData = dados;
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const endIndex = Math.min(startIndex + PAGE_SIZE, dados.length);
+  const buildRows = () => dados.slice(startIndex, endIndex).map((i, index) => {
+    const realIndex = startIndex + index;
+    const codigo = getField(i, "COD-MDUGO", "cod-mdugo", "codmdugo");
+    const codged = getField(i, "CODGED", "codged", "cod_ged");
+    const cidade = getField(i, "CIDADE", "cidade");
+    const bloco = getField(i, "BLOCO", "bloco");
+    const endereco = getField(i, "ENDEREÇO", "ENDERECO", "endereco", "endereco_entrada");
+    const qtdeBlocos = getField(i, "Qtde Blocos", "QTDE_BLOCOS", "qtd_blocos");
+    const statusMdu = getField(i, "STATUS MDU", "STATUS_MDU", "status_mdu");
+    const statusLiberacao = getField(i, "STATUS LIBERAÇÃO", "STATUS_LIBERACAO", "status_liberacao");
+    const recordKey = String(codigo || codged || `projeto-f-${realIndex}`).replace(/"/g, '&quot;');
+    return `
+      <tr>
+        <td>${cidade || '-'}</td>
+        <td>${bloco || '-'}</td>
+        <td>${codged || '-'}</td>
+        <td>${endereco || '-'}</td>
+        <td>${qtdeBlocos || '-'}</td>
+        <td>${statusMdu || '-'}</td>
+        <td>${statusLiberacao || '-'}</td>
+        <td><button type="button" class="btn-visualizar" data-row-index="${realIndex}" data-record-key="${recordKey}" onclick="visualizarProjetoF(this)">VISUALIZAR</button></td>
+      </tr>`;
+  }).join('');
+
+  tbody.innerHTML = buildRows();
+
+  // Controles de paginação
+  let paginacaoEl = document.getElementById('paginacao-projeto-f');
+  if (!paginacaoEl) {
+    paginacaoEl = document.createElement('div');
+    paginacaoEl.id = 'paginacao-projeto-f';
+    paginacaoEl.style.display = 'flex';
+    paginacaoEl.style.justifyContent = 'center';
+    paginacaoEl.style.alignItems = 'center';
+    paginacaoEl.style.gap = '8px';
+    paginacaoEl.style.margin = '12px 0';
+    tbody.parentElement.parentElement.insertBefore(paginacaoEl, tbody.parentElement.nextSibling);
+  }
+  paginacaoEl.innerHTML = `
+    <button type="button" class="btn-secondary" ${currentPage === 1 ? 'disabled' : ''} onclick="mudarPaginaProjetoF(1)">Primeira</button>
+    <button type="button" class="btn-secondary" ${currentPage === 1 ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${currentPage - 1})">Anterior</button>
+    <span style="font-weight:600;">Página ${currentPage} de ${totalPages}</span>
+    <button type="button" class="btn-secondary" ${currentPage === totalPages ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${currentPage + 1})">Próxima</button>
+    <button type="button" class="btn-secondary" ${currentPage === totalPages ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${totalPages})">Última</button>
+  `;
 }
 
-function popularFiltroStatusMdu() {
-  const select = document.getElementById('status-filter-mdu');
-  if (!select) return;
-
-  const valorAtual = select.value || "";
-  const dados = dadosPorCategoria['mdu-ongoing'] || [];
-  const statusUnicos = [...new Set(dados
-    .map(item => (getField(item, 'STATUS_GERAL') || '').trim())
-    .filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
-
-  select.innerHTML = '';
-  const optionTodos = document.createElement('option');
-  optionTodos.value = '';
-  optionTodos.textContent = 'Todos';
-  select.appendChild(optionTodos);
-
-  statusUnicos.forEach(status => {
-    const option = document.createElement('option');
-    option.value = status;
-    option.textContent = status;
-    select.appendChild(option);
-  });
-
-  if (statusUnicos.includes(valorAtual)) {
-    select.value = valorAtual;
-  } else {
+window.mudarPaginaProjetoF = function(pagina) {
+  window.__projetoFPagination = window.__projetoFPagination || { page: 1 };
+  window.__projetoFPagination.page = pagina;
+  // Reaplica filtros para garantir consistência
+  aplicarFiltrosProjetoF();
+};
     select.value = '';
   }
 }
