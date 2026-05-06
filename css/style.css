@@ -1,3 +1,19 @@
+/* --- HOTFIX: Força cards e botões sempre clicáveis --- */
+.categoria-card,
+.categoria-card *,
+.categorias-grid,
+.btn-primary,
+.btn-secondary,
+.menu-btn,
+.notification-btn,
+.settings-btn {
+  pointer-events: auto !important;
+  z-index: 3 !important;
+}
+.categoria-card::before,
+.categoria-card::after {
+  pointer-events: none !important;
+}
 * {
   box-sizing: border-box;
   font-family: "Segoe UI", Arial, sans-serif;
@@ -3504,8 +3520,6 @@ td:first-child {
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
   position: relative;
   overflow: hidden;
-  pointer-events: auto !important;
-  z-index: 1;
 }
 .categoria-card::before {
   content: '';
