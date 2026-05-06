@@ -4035,6 +4035,47 @@ function renderTabelaSarRede(id, lista) {
     const status = String(flexField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'statusprojetoreal', 'Status', 'STATUS') || '').trim();
     return Boolean(idProjeto || cidade || cliente || status);
   });
+  // Aplica filtro de status se selecionado
+  const select = document.getElementById('status-filter-sar');
+  if (select && select.value && select.value !== 'Todos') {
+    const statusSelecionado = select.value;
+    function normalizarCampoStatus(nome) {
+      return String(nome || '').normalize('NFD').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    }
+    function getStatus(item) {
+      const keys = Object.keys(item);
+      const key = keys.find(k => normalizarCampoStatus(k).includes('statusprojetoreal'));
+      return (key ? (item[key] || '').trim() : '').toUpperCase() || 'Sem Status';
+    }
+    const filtrados = dados.filter(item => getStatus(item) === statusSelecionado);
+    window.__sarRedeRowsSnapshot = filtrados;
+    renderMiniCardsStatusSarRede();
+    tbody.innerHTML = filtrados.map((item, index) => {
+      const idProjeto = flexField(item, 'ID Projeto', 'ID_PROJETO', 'idprojeto') || '-';
+      const ddd = flexField(item, 'DDD', 'ddd') || '-';
+      const cidade = flexField(item, 'Cidade', 'CIDADE', 'cidade') || '-';
+      const cliente = flexField(item, 'Cliente', 'CLIENTE', 'cliente') || '-';
+      const projetado = flexField(item, 'PROJETADO', 'projetado') || '-';
+      const ageGeral = flexField(item, 'AGE GERAL', 'AGE_GERAL', 'age geral', 'age_geral', 'AGE', 'age') || '-';
+      const enviado = flexField(item, 'ENVIADO', 'enviado') || '-';
+      const previsao = flexField(item, 'PREVISÃO', 'PREVISAO', 'previsao', 'previsão') || '-';
+      const statusProjetoReal = flexField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'statusprojetoreal', 'Status', 'STATUS') || '-';
+      return `
+        <tr>
+          <td>${escapeHtml(idProjeto)}</td>
+          <td>${escapeHtml(ddd)}</td>
+          <td>${escapeHtml(cidade)}</td>
+          <td><span class="table-address-cell" title="${escapeHtml(cliente)}">${escapeHtml(cliente)}</span></td>
+          <td>${escapeHtml(projetado)}</td>
+          <td><strong>${escapeHtml(ageGeral)}</strong></td>
+          <td>${escapeHtml(enviado)}</td>
+          <td>${escapeHtml(previsao)}</td>
+          <td>${escapeHtml(statusProjetoReal)}</td>
+          <td><button type="button" class="btn-visualizar" onclick="visualizarSarRedePorIndice(${index})">Visualizar</button></td>
+        </tr>`;
+    }).join('');
+    return;
+  }
   if (!dados.length) {
     window.__sarRedeRowsSnapshot = [];
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center">Nenhum registro</td></tr>';
@@ -11608,7 +11649,7 @@ function visualizarSarRedePorIndice(index) {
   const epo = getField(item, 'EPO', 'epo') || _getFieldByKeyHint(item, 'epo') || '-';
   const site = getField(item, 'SITE', 'site') || _getFieldByKeyHint(item, 'site') || '-';
   const caboFo = getField(item, 'CABO FO', 'CABO_FO', 'cabo_fo', 'cabo fo') || _getFieldByKeyHint(item, 'cabo fo') || '-';
-  const observacoesGerais = getField(item, 'Observações Gerais', 'Observacoes Gerais', 'OBSERVACOES GERAIS', 'obs_gerais', 'OBS')
+  const observacoesGerais = getField(item, 'Observações Gerais', 'Observacoes Gerais', 'OBSERVACOES GERAIS', 'obs_gerais', 'OBS', 'OBS ORIGINAL', 'OBSERVAÇÃO', 'OBSERVACAO', 'obs_original', 'obs_original', 'obs')
     || _getFieldByKeyHint(item, 'observ')
     || '-';
   const blocos = getField(item, 'BLOCOS', 'blocos') || _getFieldByKeyHint(item, 'blocos') || '-';
