@@ -312,7 +312,12 @@ window.abrirCategoria = function abrirCategoria(categoriaId) {
   if (typeof mostrarSecao === 'function') mostrarSecao(categoriaId);
   if (categoriaId === 'liberados' && typeof resetarFluxoLiberados === 'function') resetarFluxoLiberados();
   if (categoriaId === 'epo' && typeof resetarSelecaoEpo === 'function') resetarSelecaoEpo();
-  if (typeof carregarDadosCategoria === 'function') carregarDadosCategoria(categoriaId);
+  try {
+    if (typeof carregarDadosCategoria === 'function') carregarDadosCategoria(categoriaId);
+  } catch (e) {
+    console.error('Erro ao carregar categoria:', categoriaId, e);
+    alert('Erro ao carregar a categoria. Tente novamente ou recarregue a página.');
+  }
 };
   const filtrados = base.filter(item => {
     const statusItem = normalizarTextoSeguro(getSarRedeStatusProjetoReal(item));
@@ -389,33 +394,38 @@ function abrirCategoria(categoriaId) {
     return;
   }
   if (categoriaId === 'projeto-f') {
-    fetch('/api/projeto-f')
-      .then(res => res.ok ? res.json() : null)
-      .then(dados => {
-        if (Array.isArray(dados) && dados.length) {
-          salvarPlanilhaIndexedDB('projeto-f', dados);
-          applyDatasetToState('projeto-f', dados);
-          renderTabelaProjetoF('tabela-projeto-f', dados);
-          popularFiltroStatusProjetoF(dados);
-        } else {
-          // Fallback garantido: sempre tenta IndexedDB
+    try {
+      fetch('/api/projeto-f')
+        .then(res => res.ok ? res.json() : null)
+        .then(dados => {
+          if (Array.isArray(dados) && dados.length) {
+            salvarPlanilhaIndexedDB('projeto-f', dados);
+            applyDatasetToState('projeto-f', dados);
+            renderTabelaProjetoF('tabela-projeto-f', dados);
+            popularFiltroStatusProjetoF(dados);
+          } else {
+            // Fallback garantido: sempre tenta IndexedDB
+            lerPlanilhaIndexedDB('projeto-f').then(items => {
+              const dadosIndexed = Array.isArray(items) ? items : [];
+              applyDatasetToState('projeto-f', dadosIndexed);
+              renderTabelaProjetoF('tabela-projeto-f', dadosIndexed);
+              popularFiltroStatusProjetoF(dadosIndexed);
+            });
+          }
+        })
+        .catch(() => {
+          // Fallback garantido: sempre tenta IndexedDB em caso de erro/falha de rede
           lerPlanilhaIndexedDB('projeto-f').then(items => {
             const dadosIndexed = Array.isArray(items) ? items : [];
             applyDatasetToState('projeto-f', dadosIndexed);
             renderTabelaProjetoF('tabela-projeto-f', dadosIndexed);
             popularFiltroStatusProjetoF(dadosIndexed);
           });
-        }
-      })
-      .catch(() => {
-        // Fallback garantido: sempre tenta IndexedDB em caso de erro/falha de rede
-        lerPlanilhaIndexedDB('projeto-f').then(items => {
-          const dadosIndexed = Array.isArray(items) ? items : [];
-          applyDatasetToState('projeto-f', dadosIndexed);
-          renderTabelaProjetoF('tabela-projeto-f', dadosIndexed);
-          popularFiltroStatusProjetoF(dadosIndexed);
         });
-      });
+    } catch (e) {
+      console.error('Erro ao carregar dados do Projeto F:', e);
+      alert('Erro ao carregar dados do Projeto F. Os outros cards continuam funcionando normalmente.');
+    }
     return;
   }
   if (categoriaId === 'mdu-ongoing') {
