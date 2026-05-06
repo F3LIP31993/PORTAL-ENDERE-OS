@@ -4602,33 +4602,22 @@ function visualizarLiberado(index) {
 
   tbody.innerHTML = buildRows();
 
-  // Controles de paginação - fora do card, logo após o card
-  let paginacaoEl = document.getElementById('paginacao-projeto-f');
-  if (!paginacaoEl) {
-    paginacaoEl = document.createElement('div');
-    paginacaoEl.id = 'paginacao-projeto-f';
+  // Controles de paginação - container já está fixo no HTML
+  const paginacaoEl = document.getElementById('paginacao-projeto-f');
+  if (paginacaoEl) {
     paginacaoEl.style.display = 'flex';
     paginacaoEl.style.justifyContent = 'center';
     paginacaoEl.style.alignItems = 'center';
     paginacaoEl.style.gap = '8px';
     paginacaoEl.style.margin = '12px 0';
-    // Insere o container de paginação logo após o card do Projeto F
-    const card = tbody.closest('.card');
-    if (card && card.parentElement) {
-      if (card.nextSibling) {
-        card.parentElement.insertBefore(paginacaoEl, card.nextSibling);
-      } else {
-        card.parentElement.appendChild(paginacaoEl);
-      }
-    }
+    paginacaoEl.innerHTML = `
+      <button type="button" class="btn-secondary" ${currentPage === 1 ? 'disabled' : ''} onclick="mudarPaginaProjetoF(1)">Primeira</button>
+      <button type="button" class="btn-secondary" ${currentPage === 1 ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${currentPage - 1})">Anterior</button>
+      <span style="font-weight:600;">Página ${currentPage} de ${totalPages}</span>
+      <button type="button" class="btn-secondary" ${currentPage === totalPages ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${currentPage + 1})">Próxima</button>
+      <button type="button" class="btn-secondary" ${currentPage === totalPages ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${totalPages})">Última</button>
+    `;
   }
-  paginacaoEl.innerHTML = `
-    <button type="button" class="btn-secondary" ${currentPage === 1 ? 'disabled' : ''} onclick="mudarPaginaProjetoF(1)">Primeira</button>
-    <button type="button" class="btn-secondary" ${currentPage === 1 ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${currentPage - 1})">Anterior</button>
-    <span style="font-weight:600;">Página ${currentPage} de ${totalPages}</span>
-    <button type="button" class="btn-secondary" ${currentPage === totalPages ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${currentPage + 1})">Próxima</button>
-    <button type="button" class="btn-secondary" ${currentPage === totalPages ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${totalPages})">Última</button>
-  `;
 }
 
 window.mudarPaginaProjetoF = function(pagina) {
