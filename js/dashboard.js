@@ -301,61 +301,19 @@ async function carregarHistoricoEventos() {
   window.__historicoEventos = eventos;
 }
 
-function abrirModalHistorico(idx) {
-  const eventos = window.__historicoEventos || [];
-  const ev = eventos[idx];
-  if (!ev) return;
-  document.getElementById('modal-hist-data').textContent = ev.created_at ? new Date(ev.created_at).toLocaleString() : '-';
-  document.getElementById('modal-hist-user').textContent = ev.created_by || '-';
-  document.getElementById('modal-hist-origem').textContent = ev.source || ev.entity || '-';
-  document.getElementById('modal-hist-codigo').textContent = ev.reference || '-';
-  document.getElementById('modal-hist-obs').textContent = ev.message || ev.obs || ev.note || '-';
-  document.getElementById('modal-historico').classList.remove('hidden');
-  document.getElementById('btn-aceitar-historico').onclick = function() { aceitarHistorico(idx); };
-}
-
-function fecharModalHistorico() {
-  document.getElementById('modal-historico').classList.add('hidden');
-}
-
-function aceitarHistorico(idx) {
-  const eventos = window.__historicoEventos || [];
-  const ev = eventos[idx];
-  if (!ev) return;
-  // Marca como aceito localmente (pode ser expandido para API futuramente)
-  if (!ev.type || ev.type !== 'observacao') return fecharModalHistorico();
-  const key = 'historico_aceito_' + btoa(ev.type + '|' + (ev.reference || '') + '|' + (ev.created_at || ''));
-  localStorage.setItem(key, '1');
-  fecharModalHistorico();
-  // Feedback visual
-  const tr = document.querySelector(`#tabela-historico tr[data-idx="${idx}"]`);
-  if (tr) tr.style.opacity = '.5';
-}
-
-// Exibe histórico ao abrir a aba
-document.addEventListener('DOMContentLoaded', () => {
-  const btnHistorico = document.querySelector('button.menu-btn[onclick*="historico"]');
-  if (btnHistorico) {
-    btnHistorico.addEventListener('click', carregarHistoricoEventos);
-  }
-});
-// === REGRA DE OURO: Filtro nunca altera o dataset base, só a lista renderizada ===
-function normalizarTextoSeguro(valor) {
-  return String(valor || '')
-    .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-}
-
-function filtrarPorStatusSeguro(categoria, statusSelecionado) {
-  const base = Array.isArray(dadosPorCategoria[categoria]) ? dadosPorCategoria[categoria] : [];
-  // Se “Todos” ou vazio, renderiza tudo
-  if (!statusSelecionado || statusSelecionado === 'Todos') {
-    renderTabelaCategoria(categoria, base);
+// Função global única para abrir categoria (admin, mostrarSecao, carregarDadosCategoria)
+window.abrirCategoria = function abrirCategoria(categoriaId) {
+  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  const isAdmin = user?.role === 'admin';
+  if (!isAdmin && categoriaId === 'financeiro') {
+    alert('⚠️ A categoria Financeiro está disponível apenas para administrador.');
     return;
   }
-  const statusNorm = normalizarTextoSeguro(statusSelecionado);
+  if (typeof mostrarSecao === 'function') mostrarSecao(categoriaId);
+  if (categoriaId === 'liberados' && typeof resetarFluxoLiberados === 'function') resetarFluxoLiberados();
+  if (categoriaId === 'epo' && typeof resetarSelecaoEpo === 'function') resetarSelecaoEpo();
+  if (typeof carregarDadosCategoria === 'function') carregarDadosCategoria(categoriaId);
+};
   const filtrados = base.filter(item => {
     const statusItem = normalizarTextoSeguro(getSarRedeStatusProjetoReal(item));
     return statusItem.includes(statusNorm);
@@ -395,19 +353,27 @@ function renderTabelaCategoria(categoria, lista) {
 }
 
 // Função central para abrir qualquer card/categoria e garantir renderização correta
-// Função global única para evitar conflitos
-window.abrirCategoria = function abrirCategoria(categoriaId) {
-  const user = getCurrentUser && getCurrentUser();
-  const isAdmin = user?.role === 'admin';
-  if (!isAdmin && categoriaId === 'financeiro') {
-    alert('⚠️ A categoria Financeiro está disponível apenas para administrador.');
-    return;
-  }
-  mostrarSecao(categoriaId);
-  if (categoriaId === 'liberados') resetarFluxoLiberados && resetarFluxoLiberados();
-  if (categoriaId === 'epo') resetarSelecaoEpo && resetarSelecaoEpo();
-  carregarDadosCategoria && carregarDadosCategoria(categoriaId);
-};
+function abrirCategoria(categoriaId) {
+  // Remove classe ativa de todas as seções
+  document.querySelectorAll('.secao').forEach(secao => secao.classList.remove('ativa'));
+  // Ativa a seção correta
+  const secao = document.getElementById(categoriaId);
+  if (secao) secao.classList.add('ativa');
+
+  // Carrega e renderiza dados para cada categoria
+  if (categoriaId === 'sar-rede') {
+    // SAR REDE: buscar do backend e sincronizar IndexedDB
+    fetch('/api/sar-rede')
+      .then(res => res.ok ? res.json() : [])
+      .then(dados => {
+        if (Array.isArray(dados) && dados.length) {
+          salvarPlanilhaIndexedDB('sar-rede', dados);
+          aposImportarCsvSarRede(dados);
+        } else {
+          // fallback: tenta IndexedDB se backend vazio
+          lerPlanilhaIndexedDB('sar-rede').then(items => {
+            const dadosCompletos = Array.isArray(items) ? items : [];
+            if (!dadosCompletos.length) {
               const tabela = document.getElementById('tabela-sar-rede');
               if (tabela) {
                 tabela.innerHTML = `<tr><td colspan='20' style='text-align:center;color:red;font-weight:bold;'>Nenhum dado encontrado no SAR REDE. Por favor, importe a planilha.</td></tr>`;
@@ -4550,19 +4516,26 @@ function visualizarLiberado(index) {
   if (!tbody) return;
   tbody.innerHTML = "";
 
+  // Paginação
+  const PAGE_SIZE = 50;
+  window.__projetoFPagination = window.__projetoFPagination || { page: 1 };
+  const page = window.__projetoFPagination.page || 1;
   const dados = Array.isArray(lista) ? lista : [];
+  const totalPages = Math.max(1, Math.ceil(dados.length / PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  window.__projetoFPagination.page = currentPage;
+
   if (!dados.length) {
     window.__projetoFModalData = [];
     tbody.innerHTML = `<tr><td colspan="8">Nenhum registro</td></tr>`;
-    popularFiltroCidadeProjetoF();
-    popularFiltroStatusProjetoF(dadosPorCategoria['projeto-f'] || []);
     return;
   }
 
   window.__projetoFModalData = dados;
-  // Exibe todas as linhas de uma vez
-  const buildRows = (startIndex, endIndex) => dados.slice(startIndex, endIndex).map((i, localIndex) => {
-    const index = startIndex + localIndex;
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const endIndex = Math.min(startIndex + PAGE_SIZE, dados.length);
+  const buildRows = () => dados.slice(startIndex, endIndex).map((i, index) => {
+    const realIndex = startIndex + index;
     const codigo = getField(i, "COD-MDUGO", "cod-mdugo", "codmdugo");
     const codged = getField(i, "CODGED", "codged", "cod_ged");
     const cidade = getField(i, "CIDADE", "cidade");
@@ -4571,7 +4544,7 @@ function visualizarLiberado(index) {
     const qtdeBlocos = getField(i, "Qtde Blocos", "QTDE_BLOCOS", "qtd_blocos");
     const statusMdu = getField(i, "STATUS MDU", "STATUS_MDU", "status_mdu");
     const statusLiberacao = getField(i, "STATUS LIBERAÇÃO", "STATUS_LIBERACAO", "status_liberacao");
-    const recordKey = String(codigo || codged || `projeto-f-${index}`).replace(/"/g, '&quot;');
+    const recordKey = String(codigo || codged || `projeto-f-${realIndex}`).replace(/"/g, '&quot;');
     return `
       <tr>
         <td>${cidade || '-'}</td>
@@ -4581,14 +4554,28 @@ function visualizarLiberado(index) {
         <td>${qtdeBlocos || '-'}</td>
         <td>${statusMdu || '-'}</td>
         <td>${statusLiberacao || '-'}</td>
-        <td><button type="button" class="btn-visualizar" data-row-index="${index}" data-record-key="${recordKey}" onclick="visualizarProjetoF(this)">VISUALIZAR</button></td>
+        <td><button type="button" class="btn-visualizar" data-row-index="${realIndex}" data-record-key="${recordKey}" onclick="visualizarProjetoF(this)">VISUALIZAR</button></td>
       </tr>`;
   }).join('');
 
-  tbody.innerHTML = buildRows(0, dados.length);
+  tbody.innerHTML = buildRows();
 
-  popularFiltroCidadeProjetoF();
-  popularFiltroStatusProjetoF(dadosPorCategoria['projeto-f'] || []);
+  // Controles de paginação - container já está fixo no HTML
+  const paginacaoEl = document.getElementById('paginacao-projeto-f');
+  if (paginacaoEl) {
+    paginacaoEl.style.display = 'flex';
+    paginacaoEl.style.justifyContent = 'center';
+    paginacaoEl.style.alignItems = 'center';
+    paginacaoEl.style.gap = '8px';
+    paginacaoEl.style.margin = '12px 0';
+    paginacaoEl.innerHTML = `
+      <button type="button" class="btn-secondary" ${currentPage === 1 ? 'disabled' : ''} onclick="mudarPaginaProjetoF(1)">Primeira</button>
+      <button type="button" class="btn-secondary" ${currentPage === 1 ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${currentPage - 1})">Anterior</button>
+      <span style="font-weight:600;">Página ${currentPage} de ${totalPages}</span>
+      <button type="button" class="btn-secondary" ${currentPage === totalPages ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${currentPage + 1})">Próxima</button>
+      <button type="button" class="btn-secondary" ${currentPage === totalPages ? 'disabled' : ''} onclick="mudarPaginaProjetoF(${totalPages})">Última</button>
+    `;
+  }
 }
 
 window.mudarPaginaProjetoF = function(pagina) {
@@ -7563,28 +7550,8 @@ function exportarOngoing() {
 // ===== FUNÇÕES PARA CATEGORIAS =====
 
 // Abrir seção de categoria clicando no card
-function abrirCategoria(categoriaId) {
-  const user = getCurrentUser();
-  const isAdmin = user?.role === 'admin';
-  if (!isAdmin && categoriaId === 'financeiro') {
-    alert('⚠️ A categoria Financeiro está disponível apenas para administrador.');
-    return;
-  }
+// (duplicata removida, função global já definida acima)
 
-  // Mostra a seção e ajusta/importa o bloco de importação
-  mostrarSecao(categoriaId);
-
-  if (categoriaId === 'liberados') {
-    resetarFluxoLiberados();
-  }
-
-  if (categoriaId === 'epo') {
-    resetarSelecaoEpo();
-  }
-
-  // Carregar dados da categoria
-  carregarDadosCategoria(categoriaId);
-}
 
 // Voltar à página inicial
 function voltarDoCategoria() {
