@@ -4602,7 +4602,7 @@ function visualizarLiberado(index) {
 
   tbody.innerHTML = buildRows();
 
-  // Controles de paginação - sempre logo após a tabela
+  // Controles de paginação - fora do card, logo após o card
   let paginacaoEl = document.getElementById('paginacao-projeto-f');
   if (!paginacaoEl) {
     paginacaoEl = document.createElement('div');
@@ -4612,10 +4612,14 @@ function visualizarLiberado(index) {
     paginacaoEl.style.alignItems = 'center';
     paginacaoEl.style.gap = '8px';
     paginacaoEl.style.margin = '12px 0';
-    // Garante que o container de paginação fique logo após a tabela
-    const table = tbody.closest('table');
-    if (table && table.parentElement) {
-      table.parentElement.appendChild(paginacaoEl);
+    // Insere o container de paginação logo após o card do Projeto F
+    const card = tbody.closest('.card');
+    if (card && card.parentElement) {
+      if (card.nextSibling) {
+        card.parentElement.insertBefore(paginacaoEl, card.nextSibling);
+      } else {
+        card.parentElement.appendChild(paginacaoEl);
+      }
     }
   }
   paginacaoEl.innerHTML = `
