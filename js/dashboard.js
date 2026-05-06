@@ -46,29 +46,6 @@ function renderMiniCardsStatusSarRede() {
   const container = document.getElementById('mini-cards-status-sarrede');
   if (!container) return;
   const dados = dadosPorCategoria['sar-rede'] || [];
-  // Adiciona dropdown de filtro de Status Projeto Real
-  let filtroContainer = document.getElementById('filtro-status-projeto-real-sarrede');
-  if (!filtroContainer) {
-    filtroContainer = document.createElement('div');
-    filtroContainer.id = 'filtro-status-projeto-real-sarrede';
-    filtroContainer.style.margin = '8px 0 12px 0';
-    container.parentNode.insertBefore(filtroContainer, container);
-  }
-  // Coleta todos os status únicos
-  const statusSet = new Set();
-  dados.forEach(item => {
-    const keys = Object.keys(item);
-    const key = keys.find(k => String(k).normalize('NFD').replace(/[^a-zA-Z0-9]/g, '').toLowerCase().includes('statusprojetoreal'));
-    const status = (key ? (item[key] || '').trim() : '').toUpperCase() || 'Sem Status';
-    statusSet.add(status);
-  });
-  const statusList = Array.from(statusSet).filter(s => s && s !== 'Sem Status');
-  filtroContainer.innerHTML = `<label style='font-weight:600;margin-right:8px;'>Status Projeto Real:</label><select id='select-status-projeto-real-sarrede' style='padding:4px 10px;border-radius:6px;border:1px solid #bbb;font-size:1em;'><option value=''>Todos</option>${statusList.map(s => `<option value='${s}'>${s}</option>`).join('')}</select>`;
-  document.getElementById('select-status-projeto-real-sarrede').onchange = function() {
-    window.__sarRedeStatusAtivo = this.value;
-    aplicarMiniCardFiltroSarRede();
-    renderMiniCardsStatusSarRede();
-  };
   // Coletar todos os status únicos
   const statusMap = {};
   // Busca flexível do campo de status
@@ -288,79 +265,39 @@ if (window.renderTabelaMduOngoing) {
 // === HISTÓRICO GLOBAL DE OBSERVAÇÕES ===
 async function carregarHistoricoEventos() {
   const tbody = document.getElementById('tabela-historico');
-  const buscaInputId = 'busca-historico-global';
-  const exportBtnId = 'exportar-historico-global';
   if (!tbody) return;
-  // Adiciona barra de busca e exportação premium
-  let buscaBar = document.getElementById('historico-barra-premium');
-  if (!buscaBar) {
-    buscaBar = document.createElement('div');
-    buscaBar.id = 'historico-barra-premium';
-    buscaBar.style = 'display:flex;gap:12px;align-items:center;margin-bottom:10px;';
-    buscaBar.innerHTML = `
-      <input id="${buscaInputId}" type="text" placeholder="Buscar histórico (palavra-chave, usuário, código, ação)" style="flex:1;padding:7px 12px;border-radius:7px;border:1px solid #bbb;font-size:1em;outline:none;" />
-      <button id="${exportBtnId}" style="padding:7px 18px;border-radius:7px;background:#1e3a8a;color:#fff;font-weight:600;border:none;cursor:pointer;">Exportar CSV</button>
-      <span style="background:#ffc107;color:#222;padding:6px 14px;border-radius:7px;font-weight:700;box-shadow:0 2px 8px #0001;">⚡ ATENÇÃO: Trate os eventos diariamente!</span>
-    `;
-    tbody.parentNode.insertBefore(buscaBar, tbody);
-  }
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;opacity:.7">Carregando histórico...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:.7">Carregando histórico...</td></tr>';
   let eventos = [];
   try {
-    const res = await fetch('/api/history?limit=500', { credentials: 'include' });
+    const res = await fetch('/api/history?limit=100', { credentials: 'include' });
     if (res.ok) {
       eventos = await res.json();
     }
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#b00">Erro ao carregar histórico</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#b00">Erro ao carregar histórico</td></tr>';
     return;
   }
   if (!eventos.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;opacity:.7">Nenhum evento registrado.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:.7">Nenhum evento registrado.</td></tr>';
     return;
   }
-  // Campo extra: prioridade/ação
-  eventos = eventos.map(ev => ({...ev, prioridade: ev.prioridade || (String(ev.message||ev.obs||ev.note||'').toLowerCase().includes('urgente') ? 'Alta' : 'Normal')}));
-  // Busca dinâmica
-  function renderHistoricoFiltrado(filtro) {
-    const filtroNorm = String(filtro||'').toLowerCase();
-    const filtrados = !filtroNorm ? eventos : eventos.filter(ev => {
-      return [ev.created_at, ev.created_by, ev.source, ev.entity, ev.reference, ev.message, ev.obs, ev.note, ev.prioridade].some(v => String(v||'').toLowerCase().includes(filtroNorm));
-    });
-    tbody.innerHTML = filtrados.map((ev, idx) => `
-      <tr style="${ev.prioridade==='Alta'?'background:#fff3cd;':''}">
-        <td>${ev.created_at ? new Date(ev.created_at).toLocaleString() : '-'}</td>
-        <td>${ev.created_by || '-'}</td>
-        <td>${ev.source || ev.entity || '-'}</td>
-        <td>${ev.reference || '-'}</td>
-        <td>${ev.message || ev.obs || ev.note || '-'}</td>
-        <td><span style="font-weight:700;color:${ev.prioridade==='Alta'?'#b00':'#1e3a8a'}">${ev.prioridade||'-'}</span></td>
-        <td><button class="btn-primary" onclick="abrirModalHistorico(${eventos.indexOf(ev)})">Visualizar</button></td>
-      </tr>
-    `).join('');
-  }
-  renderHistoricoFiltrado('');
-  // Busca
-  document.getElementById(buscaInputId).oninput = e => renderHistoricoFiltrado(e.target.value);
-  // Exportação CSV
-  document.getElementById(exportBtnId).onclick = () => {
-    const csv = ['Data,Usuário,Origem,Código,Mensagem,Prioridade'];
-    eventos.forEach(ev => {
-      csv.push([
-        ev.created_at ? new Date(ev.created_at).toLocaleString() : '-',
-        ev.created_by || '-',
-        ev.source || ev.entity || '-',
-        ev.reference || '-',
-        (ev.message || ev.obs || ev.note || '-').replace(/\n|\r|,/g,' '),
-        ev.prioridade || '-'
-      ].map(v => '"'+String(v).replace(/"/g,'""')+'"').join(','));
-    });
-    const blob = new Blob([csv.join('\n')], {type:'text/csv'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'historico_portal.csv';
-    a.click();
-  };
+  tbody.innerHTML = '';
+  eventos.forEach((ev, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${ev.created_at ? new Date(ev.created_at).toLocaleString() : '-'}</td>
+      <td>${ev.created_by || '-'}</td>
+      <td>${ev.source || ev.entity || '-'}</td>
+      <td>${ev.reference || '-'}</td>
+      <td>${ev.message || ev.obs || ev.note || '-'}</td>
+      <td>
+        <button class="btn-primary" onclick="abrirModalHistorico(${idx})">Visualizar</button>
+        <button class="btn-secondary" onclick="aceitarHistorico(${idx})">Aceito</button>
+      </td>
+    `;
+    tr.dataset.idx = idx;
+    tbody.appendChild(tr);
+  });
   window.__historicoEventos = eventos;
 }
 
@@ -501,14 +438,16 @@ function abrirCategoria(categoriaId) {
           salvarPlanilhaIndexedDB('projeto-f', dados);
           applyDatasetToState('projeto-f', dados);
           renderTabelaProjetoF('tabela-projeto-f', dados);
-          // Removido quadro de cidades e filtro cidade
+          renderTabelaCidadesProjetoFInline();
+          popularFiltroCidadeProjetoF();
           popularFiltroStatusProjetoF(dados);
         } else {
           lerPlanilhaIndexedDB('projeto-f').then(items => {
             const dados = Array.isArray(items) ? items : [];
             applyDatasetToState('projeto-f', dados);
             renderTabelaProjetoF('tabela-projeto-f', dados);
-            // Removido quadro de cidades e filtro cidade
+            renderTabelaCidadesProjetoFInline();
+            popularFiltroCidadeProjetoF();
             popularFiltroStatusProjetoF(dados);
           });
         }
@@ -4096,47 +4035,6 @@ function renderTabelaSarRede(id, lista) {
     const status = String(flexField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'statusprojetoreal', 'Status', 'STATUS') || '').trim();
     return Boolean(idProjeto || cidade || cliente || status);
   });
-  // Aplica filtro de status se selecionado
-  const select = document.getElementById('status-filter-sar');
-  if (select && select.value && select.value !== 'Todos') {
-    const statusSelecionado = select.value;
-    function normalizarCampoStatus(nome) {
-      return String(nome || '').normalize('NFD').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    }
-    function getStatus(item) {
-      const keys = Object.keys(item);
-      const key = keys.find(k => normalizarCampoStatus(k).includes('statusprojetoreal'));
-      return (key ? (item[key] || '').trim() : '').toUpperCase() || 'Sem Status';
-    }
-    const filtrados = dados.filter(item => getStatus(item) === statusSelecionado);
-    window.__sarRedeRowsSnapshot = filtrados;
-    renderMiniCardsStatusSarRede();
-    tbody.innerHTML = filtrados.map((item, index) => {
-      const idProjeto = flexField(item, 'ID Projeto', 'ID_PROJETO', 'idprojeto') || '-';
-      const ddd = flexField(item, 'DDD', 'ddd') || '-';
-      const cidade = flexField(item, 'Cidade', 'CIDADE', 'cidade') || '-';
-      const cliente = flexField(item, 'Cliente', 'CLIENTE', 'cliente') || '-';
-      const projetado = flexField(item, 'PROJETADO', 'projetado') || '-';
-      const ageGeral = flexField(item, 'AGE GERAL', 'AGE_GERAL', 'age geral', 'age_geral', 'AGE', 'age') || '-';
-      const enviado = flexField(item, 'ENVIADO', 'enviado') || '-';
-      const previsao = flexField(item, 'PREVISÃO', 'PREVISAO', 'previsao', 'previsão') || '-';
-      const statusProjetoReal = flexField(item, 'Status Projeto Real', 'STATUS PROJETO REAL', 'statusprojetoreal', 'Status', 'STATUS') || '-';
-      return `
-        <tr>
-          <td>${escapeHtml(idProjeto)}</td>
-          <td>${escapeHtml(ddd)}</td>
-          <td>${escapeHtml(cidade)}</td>
-          <td><span class="table-address-cell" title="${escapeHtml(cliente)}">${escapeHtml(cliente)}</span></td>
-          <td>${escapeHtml(projetado)}</td>
-          <td><strong>${escapeHtml(ageGeral)}</strong></td>
-          <td>${escapeHtml(enviado)}</td>
-          <td>${escapeHtml(previsao)}</td>
-          <td>${escapeHtml(statusProjetoReal)}</td>
-          <td><button type="button" class="btn-visualizar" onclick="visualizarSarRedePorIndice(${index})">Visualizar</button></td>
-        </tr>`;
-    }).join('');
-    return;
-  }
   if (!dados.length) {
     window.__sarRedeRowsSnapshot = [];
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center">Nenhum registro</td></tr>';
@@ -8609,9 +8507,9 @@ function atualizarCountPillsEpo() {
     const counts = getEpoCountsByName(epoName);
     const span = btn.querySelector('.epo-pill-count');
     if (span) {
-      // Exibe sempre o número real de registros, sem texto de bloqueio ou número fixo
-      span.textContent = `(${counts.gpon || 0}/${counts.projetoF || 0})`;
-      span.title = `GPON ONGOING: ${counts.gpon || 0} | PROJETO F: ${counts.projetoF || 0}`;
+      const hasAny = counts.gpon > 0 || counts.projetoF > 0;
+      span.textContent = hasAny ? ` (${counts.gpon}/${counts.projetoF})` : '';
+      span.title = hasAny ? `GPON ONGOING: ${counts.gpon} | PROJETO F: ${counts.projetoF}` : '';
     }
   });
 
@@ -10493,37 +10391,7 @@ async function carregarObservacoesPendente(codigo) {
     }
   }
 
-  renderObservacoesListaProfissional(codigo, notes);
-}
-
-// Exibe histórico profissional: ordenado, com ação, usuário, data/hora
-function renderObservacoesListaProfissional(codigo, notas) {
-  const container = document.getElementById('modal-notes');
-  if (!container) return;
-
-  if (!notas || notas.length === 0) {
-    container.innerHTML = '<li style="opacity:.7">Nenhuma observação registrada.</li>';
-    return;
-  }
-
-  // Ordena por data crescente
-  notas.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  container.innerHTML = notas.map(n => {
-    const who = n.created_by ? `<strong>${escapeHtml(n.created_by)}</strong>` : '';
-    const when = n.created_at ? `<span style="color:#888;font-size:11px;">${escapeHtml(formatarDataHoraProfissional(n.created_at))}</span>` : '';
-    const acao = n.acao ? `<span style="color:#0a7cff;font-size:11px;">[${escapeHtml(n.acao)}]</span>` : '';
-    return `<li class="note-item" style="margin-bottom:8px;">
-      <div style="display:flex;align-items:center;gap:8px;">${who} ${when} ${acao}</div>
-      <div style="margin-top:2px;white-space:pre-line;">${escapeHtml(n.note)}</div>
-    </li>`;
-  }).join('');
-}
-
-function formatarDataHoraProfissional(dt) {
-  if (!dt) return '-';
-  const d = new Date(dt);
-  if (isNaN(d)) return dt;
-  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+  renderObservacoesLista(codigo, notes);
 }
 
 function renderObservacoesLista(codigo, notas) {
@@ -11710,21 +11578,9 @@ function visualizarSarRedePorIndice(index) {
   const epo = getField(item, 'EPO', 'epo') || _getFieldByKeyHint(item, 'epo') || '-';
   const site = getField(item, 'SITE', 'site') || _getFieldByKeyHint(item, 'site') || '-';
   const caboFo = getField(item, 'CABO FO', 'CABO_FO', 'cabo_fo', 'cabo fo') || _getFieldByKeyHint(item, 'cabo fo') || '-';
-  // Busca robusta para OBS original
-  const obsKeys = [
-    'OBSERVAÇÕES GERAIS', 'Observações Gerais', 'OBSERVACOES GERAIS', 'obs_gerais',
-    'OBS', 'OBS ORIGINAL', 'OBSERVAÇÃO', 'OBSERVACAO', 'obs_original', 'obs', 'OBSERVACOES', 'OBSERVACOES_ORIGINAIS', 'OBSERVACAO_ORIGINAL'
-  ];
-  let observacoesGerais = '-';
-  for (const k of Object.keys(item)) {
-    if (obsKeys.some(ok => k.toUpperCase().replace(/[^A-Z]/g, '') === ok.replace(/[^A-Z]/g, ''))) {
-      const val = item[k];
-      if (val && String(val).trim() !== '') {
-        observacoesGerais = val;
-        break;
-      }
-    }
-  }
+  const observacoesGerais = getField(item, 'Observações Gerais', 'Observacoes Gerais', 'OBSERVACOES GERAIS', 'obs_gerais', 'OBS')
+    || _getFieldByKeyHint(item, 'observ')
+    || '-';
   const blocos = getField(item, 'BLOCOS', 'blocos') || _getFieldByKeyHint(item, 'blocos') || '-';
   const hps = getField(item, 'HPS', 'hps') || _getFieldByKeyHint(item, 'hps') || '-';
   const area = getField(item, 'Área', 'Area', 'AREA', 'área') || _getFieldByKeyHint(item, 'area') || '-';
