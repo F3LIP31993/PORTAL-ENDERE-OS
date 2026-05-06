@@ -268,7 +268,6 @@
 
         <p class="epo-subheading epo-selecao-intro" id="epo-selecao-intro">Selecione uma EPO para abrir importações e a área de equipes.</p>
 
-
         <div class="epo-pill-grid" role="list" aria-label="Lista de EPOs">
           <button type="button" class="epo-pill" data-epo="ACESSO" role="listitem" onclick="selecionarEpo('ACESSO')">ACESSO<span class="epo-pill-count"></span></button>
           <button type="button" class="epo-pill" data-epo="ANTEC" role="listitem" onclick="selecionarEpo('ANTEC')">ANTEC<span class="epo-pill-count"></span></button>
@@ -293,7 +292,6 @@
             <button type="button" class="btn-secondary epo-action-trigger" data-action="gpon-ongoing" onclick="executarAcaoEpo('gpon-ongoing')">GPON ONGOING</button>
             <button type="button" class="btn-secondary epo-action-trigger" data-action="projeto-f" onclick="executarAcaoEpo('projeto-f')">PROJETO F</button>
           </div>
-          <!-- MINI CARDS DE STATUS EPO REMOVIDOS (formato antigo restaurado) -->
           <div id="epo-action-content" class="epo-action-content"></div>
           <div id="epo-action-result" class="epo-action-result">Selecione uma EPO para habilitar as opções.</div>
         </div>
@@ -469,11 +467,42 @@
       </div>
 
       <div class="card card-projetof-filtros">
-        <div id="mini-cards-status-projetof" class="mini-cards-status" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;"></div>
-        <div class="filtros-projeto-f" style="margin-bottom:0;">
+        <div class="filtros-projeto-f">
+          <div class="filtro-item filtro-item-cidade-projetof">
+            <label>Cidades disponíveis:</label>
+            <div id="tabela-cidades-projeto-f-inline" style="margin:0 0 8px 0;"></div>
+          <!-- Modal de cidades Projeto F -->
+          <div id="modal-cidades-projeto-f" class="modal hidden">
+            <div class="modal-content" style="max-width:420px;">
+              <div class="modal-header modal-header-professional">
+                <div>
+                  <p class="modal-kicker">Visualização rápida</p>
+                  <h2>Cidades do Projeto F</h2>
+                </div>
+                <button class="btn-voltar modal-close-professional" onclick="fecharModalCidadesProjetoF()">×</button>
+              </div>
+              <div class="modal-body">
+                <table style="width:100%;border-collapse:collapse;">
+                  <thead>
+                    <tr><th style="text-align:left;padding:6px 8px;">Cidade</th><th style="text-align:right;padding:6px 8px;">Qtd</th></tr>
+                  </thead>
+                  <tbody id="tabela-cidades-projeto-f"></tbody>
+                </table>
+              </div>
+              <div class="modal-footer">
+                <button class="btn-secondary" type="button" onclick="fecharModalCidadesProjetoF()">Fechar</button>
+              </div>
+            </div>
+          </div>
+          </div>
           <div class="filtro-item">
             <label for="filtro-endereco-projeto-f">Buscar Endereço:</label>
             <input type="text" id="filtro-endereco-projeto-f" placeholder="Digite parte do endereço..." oninput="aplicarFiltrosProjetoF()" />
+          </div>
+          <div class="filtro-item filtro-item-status-projetof">
+            <label for="filtro-status-projeto-f">Status MDU:</label>
+            <input type="text" id="filtro-status-projeto-f" placeholder="Digite o status..." oninput="aplicarFiltrosProjetoF()" onfocus="mostrarSugestoesStatusProjetoF()" autocomplete="off" />
+            <div id="filtro-status-projeto-f-sugestoes" class="filtro-status-projeto-f-sugestoes hidden"></div>
           </div>
         </div>
         <table>
