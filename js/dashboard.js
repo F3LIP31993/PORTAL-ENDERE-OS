@@ -46,6 +46,29 @@ function renderMiniCardsStatusSarRede() {
   const container = document.getElementById('mini-cards-status-sarrede');
   if (!container) return;
   const dados = dadosPorCategoria['sar-rede'] || [];
+  // Adiciona dropdown de filtro de Status Projeto Real
+  let filtroContainer = document.getElementById('filtro-status-projeto-real-sarrede');
+  if (!filtroContainer) {
+    filtroContainer = document.createElement('div');
+    filtroContainer.id = 'filtro-status-projeto-real-sarrede';
+    filtroContainer.style.margin = '8px 0 12px 0';
+    container.parentNode.insertBefore(filtroContainer, container);
+  }
+  // Coleta todos os status únicos
+  const statusSet = new Set();
+  dados.forEach(item => {
+    const keys = Object.keys(item);
+    const key = keys.find(k => String(k).normalize('NFD').replace(/[^a-zA-Z0-9]/g, '').toLowerCase().includes('statusprojetoreal'));
+    const status = (key ? (item[key] || '').trim() : '').toUpperCase() || 'Sem Status';
+    statusSet.add(status);
+  });
+  const statusList = Array.from(statusSet).filter(s => s && s !== 'Sem Status');
+  filtroContainer.innerHTML = `<label style='font-weight:600;margin-right:8px;'>Status Projeto Real:</label><select id='select-status-projeto-real-sarrede' style='padding:4px 10px;border-radius:6px;border:1px solid #bbb;font-size:1em;'><option value=''>Todos</option>${statusList.map(s => `<option value='${s}'>${s}</option>`).join('')}</select>`;
+  document.getElementById('select-status-projeto-real-sarrede').onchange = function() {
+    window.__sarRedeStatusAtivo = this.value;
+    aplicarMiniCardFiltroSarRede();
+    renderMiniCardsStatusSarRede();
+  };
   // Coletar todos os status únicos
   const statusMap = {};
   // Busca flexível do campo de status
@@ -265,39 +288,79 @@ if (window.renderTabelaMduOngoing) {
 // === HISTÓRICO GLOBAL DE OBSERVAÇÕES ===
 async function carregarHistoricoEventos() {
   const tbody = document.getElementById('tabela-historico');
+  const buscaInputId = 'busca-historico-global';
+  const exportBtnId = 'exportar-historico-global';
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:.7">Carregando histórico...</td></tr>';
+  // Adiciona barra de busca e exportação premium
+  let buscaBar = document.getElementById('historico-barra-premium');
+  if (!buscaBar) {
+    buscaBar = document.createElement('div');
+    buscaBar.id = 'historico-barra-premium';
+    buscaBar.style = 'display:flex;gap:12px;align-items:center;margin-bottom:10px;';
+    buscaBar.innerHTML = `
+      <input id="${buscaInputId}" type="text" placeholder="Buscar histórico (palavra-chave, usuário, código, ação)" style="flex:1;padding:7px 12px;border-radius:7px;border:1px solid #bbb;font-size:1em;outline:none;" />
+      <button id="${exportBtnId}" style="padding:7px 18px;border-radius:7px;background:#1e3a8a;color:#fff;font-weight:600;border:none;cursor:pointer;">Exportar CSV</button>
+      <span style="background:#ffc107;color:#222;padding:6px 14px;border-radius:7px;font-weight:700;box-shadow:0 2px 8px #0001;">⚡ ATENÇÃO: Trate os eventos diariamente!</span>
+    `;
+    tbody.parentNode.insertBefore(buscaBar, tbody);
+  }
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;opacity:.7">Carregando histórico...</td></tr>';
   let eventos = [];
   try {
-    const res = await fetch('/api/history?limit=100', { credentials: 'include' });
+    const res = await fetch('/api/history?limit=500', { credentials: 'include' });
     if (res.ok) {
       eventos = await res.json();
     }
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#b00">Erro ao carregar histórico</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#b00">Erro ao carregar histórico</td></tr>';
     return;
   }
   if (!eventos.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:.7">Nenhum evento registrado.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;opacity:.7">Nenhum evento registrado.</td></tr>';
     return;
   }
-  tbody.innerHTML = '';
-  eventos.forEach((ev, idx) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${ev.created_at ? new Date(ev.created_at).toLocaleString() : '-'}</td>
-      <td>${ev.created_by || '-'}</td>
-      <td>${ev.source || ev.entity || '-'}</td>
-      <td>${ev.reference || '-'}</td>
-      <td>${ev.message || ev.obs || ev.note || '-'}</td>
-      <td>
-        <button class="btn-primary" onclick="abrirModalHistorico(${idx})">Visualizar</button>
-        <button class="btn-secondary" onclick="aceitarHistorico(${idx})">Aceito</button>
-      </td>
-    `;
-    tr.dataset.idx = idx;
-    tbody.appendChild(tr);
-  });
+  // Campo extra: prioridade/ação
+  eventos = eventos.map(ev => ({...ev, prioridade: ev.prioridade || (String(ev.message||ev.obs||ev.note||'').toLowerCase().includes('urgente') ? 'Alta' : 'Normal')}));
+  // Busca dinâmica
+  function renderHistoricoFiltrado(filtro) {
+    const filtroNorm = String(filtro||'').toLowerCase();
+    const filtrados = !filtroNorm ? eventos : eventos.filter(ev => {
+      return [ev.created_at, ev.created_by, ev.source, ev.entity, ev.reference, ev.message, ev.obs, ev.note, ev.prioridade].some(v => String(v||'').toLowerCase().includes(filtroNorm));
+    });
+    tbody.innerHTML = filtrados.map((ev, idx) => `
+      <tr style="${ev.prioridade==='Alta'?'background:#fff3cd;':''}">
+        <td>${ev.created_at ? new Date(ev.created_at).toLocaleString() : '-'}</td>
+        <td>${ev.created_by || '-'}</td>
+        <td>${ev.source || ev.entity || '-'}</td>
+        <td>${ev.reference || '-'}</td>
+        <td>${ev.message || ev.obs || ev.note || '-'}</td>
+        <td><span style="font-weight:700;color:${ev.prioridade==='Alta'?'#b00':'#1e3a8a'}">${ev.prioridade||'-'}</span></td>
+        <td><button class="btn-primary" onclick="abrirModalHistorico(${eventos.indexOf(ev)})">Visualizar</button></td>
+      </tr>
+    `).join('');
+  }
+  renderHistoricoFiltrado('');
+  // Busca
+  document.getElementById(buscaInputId).oninput = e => renderHistoricoFiltrado(e.target.value);
+  // Exportação CSV
+  document.getElementById(exportBtnId).onclick = () => {
+    const csv = ['Data,Usuário,Origem,Código,Mensagem,Prioridade'];
+    eventos.forEach(ev => {
+      csv.push([
+        ev.created_at ? new Date(ev.created_at).toLocaleString() : '-',
+        ev.created_by || '-',
+        ev.source || ev.entity || '-',
+        ev.reference || '-',
+        (ev.message || ev.obs || ev.note || '-').replace(/\n|\r|,/g,' '),
+        ev.prioridade || '-'
+      ].map(v => '"'+String(v).replace(/"/g,'""')+'"').join(','));
+    });
+    const blob = new Blob([csv.join('\n')], {type:'text/csv'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'historico_portal.csv';
+    a.click();
+  };
   window.__historicoEventos = eventos;
 }
 
@@ -11649,9 +11712,21 @@ function visualizarSarRedePorIndice(index) {
   const epo = getField(item, 'EPO', 'epo') || _getFieldByKeyHint(item, 'epo') || '-';
   const site = getField(item, 'SITE', 'site') || _getFieldByKeyHint(item, 'site') || '-';
   const caboFo = getField(item, 'CABO FO', 'CABO_FO', 'cabo_fo', 'cabo fo') || _getFieldByKeyHint(item, 'cabo fo') || '-';
-  const observacoesGerais = getField(item, 'Observações Gerais', 'Observacoes Gerais', 'OBSERVACOES GERAIS', 'obs_gerais', 'OBS', 'OBS ORIGINAL', 'OBSERVAÇÃO', 'OBSERVACAO', 'obs_original', 'obs_original', 'obs')
-    || _getFieldByKeyHint(item, 'observ')
-    || '-';
+  // Busca robusta para OBS original
+  const obsKeys = [
+    'OBSERVAÇÕES GERAIS', 'Observações Gerais', 'OBSERVACOES GERAIS', 'obs_gerais',
+    'OBS', 'OBS ORIGINAL', 'OBSERVAÇÃO', 'OBSERVACAO', 'obs_original', 'obs', 'OBSERVACOES', 'OBSERVACOES_ORIGINAIS', 'OBSERVACAO_ORIGINAL'
+  ];
+  let observacoesGerais = '-';
+  for (const k of Object.keys(item)) {
+    if (obsKeys.some(ok => k.toUpperCase().replace(/[^A-Z]/g, '') === ok.replace(/[^A-Z]/g, ''))) {
+      const val = item[k];
+      if (val && String(val).trim() !== '') {
+        observacoesGerais = val;
+        break;
+      }
+    }
+  }
   const blocos = getField(item, 'BLOCOS', 'blocos') || _getFieldByKeyHint(item, 'blocos') || '-';
   const hps = getField(item, 'HPS', 'hps') || _getFieldByKeyHint(item, 'hps') || '-';
   const area = getField(item, 'Área', 'Area', 'AREA', 'área') || _getFieldByKeyHint(item, 'area') || '-';
