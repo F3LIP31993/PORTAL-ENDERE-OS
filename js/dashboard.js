@@ -438,16 +438,12 @@ function abrirCategoria(categoriaId) {
           salvarPlanilhaIndexedDB('projeto-f', dados);
           applyDatasetToState('projeto-f', dados);
           renderTabelaProjetoF('tabela-projeto-f', dados);
-          renderTabelaCidadesProjetoFInline();
-          popularFiltroCidadeProjetoF();
           popularFiltroStatusProjetoF(dados);
         } else {
           lerPlanilhaIndexedDB('projeto-f').then(items => {
             const dados = Array.isArray(items) ? items : [];
             applyDatasetToState('projeto-f', dados);
             renderTabelaProjetoF('tabela-projeto-f', dados);
-            renderTabelaCidadesProjetoFInline();
-            popularFiltroCidadeProjetoF();
             popularFiltroStatusProjetoF(dados);
           });
         }
@@ -691,13 +687,7 @@ function abrirCardLiberados(subcard) {
 }
 
 // Renderizar a lista de cidades ao carregar os dados do Projeto F
-const _oldApplyDatasetToStatePF = applyDatasetToState;
-applyDatasetToState = function(categoria, items) {
-  _oldApplyDatasetToStatePF.apply(this, arguments);
-  if (categoria === 'projeto-f') {
-    renderTabelaCidadesProjetoFInline();
-  }
-};
+// Removido quadro de cidades Projeto F
 // ====== IndexedDB Utility for Large Datasets ======
 const PLANILHA_DB_NAME = 'portalPlanilhasDB';
 const PLANILHA_DB_VERSION = 1;
@@ -4831,12 +4821,10 @@ function filtrarProjetoFPorStatus(listaBase = null) {
 }
 
 function aplicarFiltrosProjetoF() {
-  popularFiltroCidadeProjetoF();
+  // Apenas busca por endereço e status MDU
+  let dadosFiltrados = dadosPorCategoria['projeto-f'] || [];
 
-  // Aplicar filtro de cidade
-  let dadosFiltrados = filtrarProjetoFPorCidade();
-
-  // Aplicar filtro de endereço sobre os dados já filtrados por cidade
+  // Aplicar filtro de endereço
   const filtroEndereco = document.getElementById('filtro-endereco-projeto-f')?.value?.toLowerCase().trim() || '';
   if (filtroEndereco) {
     dadosFiltrados = dadosFiltrados.filter(item => {
@@ -4852,13 +4840,7 @@ function aplicarFiltrosProjetoF() {
 }
 
 document.addEventListener('click', (event) => {
-  const filtroProjetoF = document.querySelector('.filtro-item-cidade-projetof');
   const filtroStatusProjetoF = document.querySelector('.filtro-item-status-projetof');
-
-  if (filtroProjetoF && !filtroProjetoF.contains(event.target)) {
-    ocultarSugestoesCidadeProjetoF();
-  }
-
   if (filtroStatusProjetoF && !filtroStatusProjetoF.contains(event.target)) {
     ocultarSugestoesStatusProjetoF();
   }
