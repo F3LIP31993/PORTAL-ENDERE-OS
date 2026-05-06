@@ -501,16 +501,14 @@ function abrirCategoria(categoriaId) {
           salvarPlanilhaIndexedDB('projeto-f', dados);
           applyDatasetToState('projeto-f', dados);
           renderTabelaProjetoF('tabela-projeto-f', dados);
-          renderTabelaCidadesProjetoFInline();
-          popularFiltroCidadeProjetoF();
+          // Removido quadro de cidades e filtro cidade
           popularFiltroStatusProjetoF(dados);
         } else {
           lerPlanilhaIndexedDB('projeto-f').then(items => {
             const dados = Array.isArray(items) ? items : [];
             applyDatasetToState('projeto-f', dados);
             renderTabelaProjetoF('tabela-projeto-f', dados);
-            renderTabelaCidadesProjetoFInline();
-            popularFiltroCidadeProjetoF();
+            // Removido quadro de cidades e filtro cidade
             popularFiltroStatusProjetoF(dados);
           });
         }
