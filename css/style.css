@@ -3504,6 +3504,8 @@ td:first-child {
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
   position: relative;
   overflow: hidden;
+  pointer-events: auto !important;
+  z-index: 1;
 }
 .categoria-card::before {
   content: '';
