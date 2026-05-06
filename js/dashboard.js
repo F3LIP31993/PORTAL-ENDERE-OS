@@ -395,27 +395,19 @@ function renderTabelaCategoria(categoria, lista) {
 }
 
 // Função central para abrir qualquer card/categoria e garantir renderização correta
-function abrirCategoria(categoriaId) {
-  // Remove classe ativa de todas as seções
-  document.querySelectorAll('.secao').forEach(secao => secao.classList.remove('ativa'));
-  // Ativa a seção correta
-  const secao = document.getElementById(categoriaId);
-  if (secao) secao.classList.add('ativa');
-
-  // Carrega e renderiza dados para cada categoria
-  if (categoriaId === 'sar-rede') {
-    // SAR REDE: buscar do backend e sincronizar IndexedDB
-    fetch('/api/sar-rede')
-      .then(res => res.ok ? res.json() : [])
-      .then(dados => {
-        if (Array.isArray(dados) && dados.length) {
-          salvarPlanilhaIndexedDB('sar-rede', dados);
-          aposImportarCsvSarRede(dados);
-        } else {
-          // fallback: tenta IndexedDB se backend vazio
-          lerPlanilhaIndexedDB('sar-rede').then(items => {
-            const dadosCompletos = Array.isArray(items) ? items : [];
-            if (!dadosCompletos.length) {
+// Função global única para evitar conflitos
+window.abrirCategoria = function abrirCategoria(categoriaId) {
+  const user = getCurrentUser && getCurrentUser();
+  const isAdmin = user?.role === 'admin';
+  if (!isAdmin && categoriaId === 'financeiro') {
+    alert('⚠️ A categoria Financeiro está disponível apenas para administrador.');
+    return;
+  }
+  mostrarSecao(categoriaId);
+  if (categoriaId === 'liberados') resetarFluxoLiberados && resetarFluxoLiberados();
+  if (categoriaId === 'epo') resetarSelecaoEpo && resetarSelecaoEpo();
+  carregarDadosCategoria && carregarDadosCategoria(categoriaId);
+};
               const tabela = document.getElementById('tabela-sar-rede');
               if (tabela) {
                 tabela.innerHTML = `<tr><td colspan='20' style='text-align:center;color:red;font-weight:bold;'>Nenhum dado encontrado no SAR REDE. Por favor, importe a planilha.</td></tr>`;
