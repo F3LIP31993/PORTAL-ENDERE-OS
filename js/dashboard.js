@@ -286,6 +286,10 @@ async function carregarHistoricoEventos() {
 
 
 // Função global para abrir qualquer card/categoria e garantir renderização correta
+// Garante que todas as funções essenciais estejam no escopo global
+window.mostrarSecao = mostrarSecao;
+window.logout = logout;
+window.abrirCategoria = window.abrirCategoria;
 function mostrarSecao(id) {
   document.querySelectorAll('.secao').forEach(secao => secao.classList.remove('ativa'));
   const secao = document.getElementById(id);
