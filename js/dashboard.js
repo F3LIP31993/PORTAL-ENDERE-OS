@@ -1,4 +1,4 @@
-// Arquivo corrigido
+
 // === NORMALIZAÇÃO UNIVERSAL DE STATUS ===
 function normalizarStatus(valor) {
   return String(valor || "")
@@ -7398,7 +7398,7 @@ function voltarDoCategoria() {
 }
 
 // let epoSelecionadaAtual = ''; // Removido duplicidade, já existe declaração anterior
-let epoAcaoAtual = '';
+// let epoAcaoAtual = ''; // Removido duplicidade, já existe declaração anterior
 let epoUltimoAceite = null;
 let epoTecnicoEditIndex = -1;
 const STORAGE_EPO_TECNICOS_KEY = 'portalEpoTecnicos';
