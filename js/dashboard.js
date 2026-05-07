@@ -456,7 +456,7 @@ window.abrirCategoria = function abrirCategoria(categoriaId) {
     return;
   }
   // Para outras categorias, apenas ativa a seção
-};
+// ...existing code...
 
 // Substitua a chamada de exibição do card EPO > PROJETO F para usar abrirCardEpoProjetoF()
 // Exemplo: ao clicar no botão/aba PROJETO F dentro do card EPO, chame abrirCardEpoProjetoF() ao invés de só mostrar a tela.
@@ -703,8 +703,7 @@ const MAX_LOCAL_CACHE_ITEMS_BY_CATEGORY = {
   'empresarial': 5000,
   'pendente-autorizacao': 5000,
   'backlog': 5000
-};
-// (Removido fechamento de bloco/função pendente incorreto)
+}
 const PRIORITY_DATASET_CACHE_KEYS = [
   'projeto-f',
   'liberados',
