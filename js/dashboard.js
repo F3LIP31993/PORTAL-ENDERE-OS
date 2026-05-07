@@ -321,6 +321,7 @@ window.abrirCategoria = function abrirCategoria(categoriaId) {
       });
     return;
   }
+  }
   // Funções essenciais para o HTML (garantir escopo global)
   window.mostrarSecao = window.mostrarSecao || function mostrarSecao(id) {
     document.querySelectorAll('.secao').forEach(secao => secao.classList.remove('ativa'));
@@ -719,7 +720,7 @@ const PRIORITY_DATASET_CACHE_KEYS = [
 const runtimeDatasetCache = {};
 const runtimeEpoStores = {
   'gpon-ongoing': null,
-  'projeto-f': null,
+  'projeto-f': null
 };
 let currentPortalBuildVersion = '';
 let portalBuildReloadScheduled = false;
@@ -7381,6 +7382,7 @@ async function abrirDetalhesOngoing(indice) {
       }
     };
   }
+}
 
   window.scrollTo(0, 0);
 }
