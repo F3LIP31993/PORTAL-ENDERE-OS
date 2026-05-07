@@ -286,6 +286,19 @@ async function carregarHistoricoEventos() {
 
 
 // Função global para abrir qualquer card/categoria e garantir renderização correta
+function mostrarSecao(id) {
+  document.querySelectorAll('.secao').forEach(secao => secao.classList.remove('ativa'));
+  const secao = document.getElementById(id);
+  if (secao) secao.classList.add('ativa');
+}
+window.mostrarSecao = mostrarSecao;
+
+function logout() {
+  localStorage.removeItem('portalCurrentUser');
+  window.location.reload();
+}
+window.logout = logout;
+
 window.abrirCategoria = function abrirCategoria(categoriaId) {
   // Remove classe ativa de todas as seções
   document.querySelectorAll('.secao').forEach(secao => secao.classList.remove('ativa'));
@@ -321,37 +334,7 @@ window.abrirCategoria = function abrirCategoria(categoriaId) {
       });
     return;
   }
-  // Funções essenciais para o HTML (garantir escopo global)
-function mostrarSecao(id) {
-  document.querySelectorAll('.secao').forEach(secao => secao.classList.remove('ativa'));
-  const secao = document.getElementById(id);
-  if (secao) secao.classList.add('ativa');
-}
-window.mostrarSecao = mostrarSecao;
-
-  window.logout = window.logout || function logout() {
-    // Simples: remove usuário do localStorage e recarrega
-    localStorage.removeItem('portalCurrentUser');
-    window.location.reload();
-  };
-
-  window.toggleNotifications = window.toggleNotifications || function toggleNotifications() {
-    const panel = document.getElementById('notificationPanel');
-    if (panel) panel.classList.toggle('hidden');
-  };
-
-  window.toggleSettings = window.toggleSettings || function toggleSettings() {
-    const panel = document.getElementById('settingsPanel');
-    if (panel) panel.classList.toggle('hidden');
-  };
-
-  window.openChangePassword = window.openChangePassword || function openChangePassword() {
-    alert('Funcionalidade de alteração de senha em desenvolvimento.');
-  };
-
-  window.openEditProfile = window.openEditProfile || function openEditProfile() {
-    alert('Funcionalidade de edição de perfil em desenvolvimento.');
-  };
+  // ...restante da função permanece igual...
   if (categoriaId === 'projeto-f') {
     try {
       fetch('/api/projeto-f')
