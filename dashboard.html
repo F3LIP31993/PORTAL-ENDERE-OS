@@ -248,61 +248,22 @@
         <h1>👷 EPO</h1>
       </div>
       <div class="card epo-premium-card">
+
         <div class="epo-heading-wrap" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <h2 class="epo-heading">EPO</h2>
-  </main>
-
-  <!-- SCRIPTS: sempre ao final do body para garantir que o DOM já foi carregado -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="js/api-config.js"></script>
-  <script src="js/dashboard.js"></script>
-  </body>
-  </html>
-              <button type="button" class="btn-secondary epo-clip-upload" onclick="abrirImportEpoGponOngoing()" title="Importar planilha do backlog ONGOING (GPON)">📎</button>
-              <span style="font-size:11px;font-weight:700;color:#334155;">GPON ONGOING</span>
-              <span id="epo-gpon-import-status" style="font-size:11px;color:#64748b;font-weight:600;"></span>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <input id="epo-projetof-import-file" type="file" accept=".csv,.txt" style="display:none;" onchange="importarPlanilhaEpoProjetoF()" />
-              <button type="button" class="btn-secondary epo-clip-upload" onclick="abrirImportEpoProjetoF()" title="Importar planilha de CONSTRUÇÃO MDU PROJETO_F">📎</button>
-              <span style="font-size:11px;font-weight:700;color:#334155;">PROJETO F</span>
-              <span id="epo-projetof-import-status" style="font-size:11px;color:#64748b;font-weight:600;"></span>
-            </div>
-          </div>
-        </div>
-
-        <p class="epo-subheading epo-selecao-intro" id="epo-selecao-intro">Selecione uma EPO para abrir importações e a área de equipes.</p>
-
-        <div class="epo-pill-grid" role="list" aria-label="Lista de EPOs">
-          <button type="button" class="epo-pill" data-epo="ACESSO" role="listitem" onclick="selecionarEpo('ACESSO')">ACESSO<span class="epo-pill-count"></span></button>
-          <button type="button" class="epo-pill" data-epo="ANTEC" role="listitem" onclick="selecionarEpo('ANTEC')">ANTEC<span class="epo-pill-count"></span></button>
-          <button type="button" class="epo-pill" data-epo="ARCAD" role="listitem" onclick="selecionarEpo('ARCAD')">ARCAD<span class="epo-pill-count"></span></button>
-          <button type="button" class="epo-pill" data-epo="BASIC" role="listitem" onclick="selecionarEpo('BASIC')">BASIC<span class="epo-pill-count"></span></button>
-          <button type="button" class="epo-pill" data-epo="CANTOIA" role="listitem" onclick="selecionarEpo('CANTOIA')">CANTOIA<span class="epo-pill-count"></span></button>
-          <button type="button" class="epo-pill" data-epo="CSC" role="listitem" onclick="selecionarEpo('CSC')">CSC<span class="epo-pill-count"></span></button>
-          <button type="button" class="epo-pill" data-epo="DANLEX" role="listitem" onclick="selecionarEpo('DANLEX')">DANLEX<span class="epo-pill-count"></span></button>
-          <button type="button" class="epo-pill" data-epo="ELETRONET" role="listitem" onclick="selecionarEpo('ELETRONET')">ELETRONET<span class="epo-pill-count"></span></button>
-          <button type="button" class="epo-pill" data-epo="PSNET" role="listitem" onclick="selecionarEpo('PSNET')">PSNET<span class="epo-pill-count"></span></button>
-          <button type="button" class="epo-pill" data-epo="SCRIPT_CALL" role="listitem" onclick="selecionarEpo('SCRIPT_CALL')">SCRIPT_CALL<span class="epo-pill-count"></span></button>
-          <button type="button" class="epo-pill" data-epo="VISIUM" role="listitem" onclick="selecionarEpo('VISIUM')">VISIUM<span class="epo-pill-count"></span></button>
-        </div>
-
-        <div id="epo-action-panel" class="epo-action-panel" style="display:none;">
-          <div class="epo-action-header">
-            <p class="epo-action-title">EPO selecionada: <strong id="epo-selected-name">-</strong></p>
-            <button type="button" id="epo-reset-selecao" class="btn-secondary" onclick="resetarSelecaoEpo()">Trocar EPO</button>
-          </div>
-          <div class="epo-action-buttons">
-            <button type="button" class="btn-primary epo-action-trigger" data-action="equipes" onclick="executarAcaoEpo('equipes')">LISTA DE EQUIPES</button>
-            <button type="button" class="btn-secondary epo-action-trigger" data-action="gpon-ongoing" onclick="executarAcaoEpo('gpon-ongoing')">GPON ONGOING</button>
-            <button type="button" class="btn-secondary epo-action-trigger" data-action="projeto-f" onclick="executarAcaoEpo('projeto-f')">PROJETO F</button>
-          </div>
-          <div id="epo-action-content" class="epo-action-content"></div>
-          <div id="epo-action-result" class="epo-action-result">Selecione uma EPO para habilitar as opções.</div>
         </div>
       </div>
-
     </section>
+
+  </main>
+</div>
+
+<!-- SCRIPTS: sempre ao final do body para garantir que o DOM já foi carregado -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="js/api-config.js"></script>
+<script src="js/dashboard.js"></script>
+</body>
+</html>
 
     <section id="financeiro" class="secao" data-admin-only="true">
       <div class="categoria-header">
