@@ -1,3 +1,4 @@
+window.abrirCategoria = abrirCategoria;
 // Arquivo corrigido
 // === NORMALIZAÇÃO UNIVERSAL DE STATUS ===
 function normalizarStatus(valor) {
@@ -3793,6 +3794,7 @@ function atualizarSeccaoAtivaComDados() {
 
 // RENDER
 function renderTabela(id, lista, atualizarRelatoriosFlag = true) {
+  window.renderTabela = renderTabela;
   const tbody = document.getElementById(id);
   if (!tbody) return;
   tbody.innerHTML = "";
