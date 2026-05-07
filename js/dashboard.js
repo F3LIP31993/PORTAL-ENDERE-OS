@@ -7397,7 +7397,7 @@ function voltarDoCategoria() {
   });
 }
 
-let epoSelecionadaAtual = '';
+// let epoSelecionadaAtual = ''; // Removido duplicidade, já existe declaração anterior
 let epoAcaoAtual = '';
 let epoUltimoAceite = null;
 let epoTecnicoEditIndex = -1;
