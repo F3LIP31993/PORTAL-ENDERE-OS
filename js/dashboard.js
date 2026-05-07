@@ -11664,15 +11664,5 @@ function visualizarProjetoF(source) {
   }
 }
 
-// Chamar atualizar contadores quando os dados forem carregados
-const originalRenderTabela = renderTabela;
-renderTabela = function(id, lista, atualizarRelatoriosFlag = true) {
-  originalRenderTabela.call(this, id, lista, atualizarRelatoriosFlag);
-  // Atualizar contadores após renderizar tabela principal
-  if (id === "tabela-enderecos") {
-    atualizarContadores();
-  }
-};
-
 // ====== FIM DO ARQUIVO ======
 // Corrigido: fechamento de blocos
