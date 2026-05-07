@@ -1,3 +1,4 @@
+// Arquivo corrigido
 // === NORMALIZAÇÃO UNIVERSAL DE STATUS ===
 function normalizarStatus(valor) {
   return String(valor || "")
@@ -28,7 +29,6 @@ function contarPorStatusSarRede() {
     contagem[status] = (contagem[status] || 0) + 1;
   });
   return contagem;
-}
 }
 
 // === APÓS IMPORTAR O CSV SAR REDE ===
@@ -67,7 +67,6 @@ function renderMiniCardsStatusSarRede() {
   });
   // Ordem premium dos status (ajuste conforme necessário)
   const ordem = [
-}
     '1.VISTORIA',
     '2.PROJETO_INTERNO',
     '3.PROJETO_REDE',
@@ -241,29 +240,11 @@ function renderMiniCardsStatusMduOngoing() {
     };
     container.appendChild(btn);
   });
-}
-
-function aplicarMiniCardFiltroMduOngoing() {
-  const status = window.__mduOngoingStatusAtivo || '';
-  const dados = dadosPorCategoria['mdu-ongoing'] || [];
-  let filtrados = dados;
-  if (status) {
-    filtrados = dados.filter(item => {
-      const s = (item['STATUS_GERAL'] || item['status_geral'] || item['Status Geral'] || '').trim();
-      return s === status;
-    });
-  }
-  renderTabelaMduOngoing('tabela-mdu-ongoing', filtrados);
-}
-
-// Chamar ao importar planilha ou abrir card
-if (window.renderTabelaMduOngoing) {
   const originalRenderTabelaMduOngoing = window.renderTabelaMduOngoing;
   window.renderTabelaMduOngoing = function(id, lista) {
     originalRenderTabelaMduOngoing(id, lista);
     renderMiniCardsStatusMduOngoing();
   };
-}
 // === HISTÓRICO GLOBAL DE OBSERVAÇÕES ===
 async function carregarHistoricoEventos() {
   const tbody = document.getElementById('tabela-historico');
@@ -320,32 +301,6 @@ window.abrirCategoria = function abrirCategoria(categoriaId) {
     console.error('Erro ao carregar categoria:', categoriaId, e);
     alert('Erro ao carregar a categoria. Tente novamente ou recarregue a página.');
   }
-};
-  const filtrados = base.filter(item => {
-    const statusItem = normalizarTextoSeguro(getSarRedeStatusProjetoReal(item));
-    return statusItem.includes(statusNorm);
-  });
-  // Se filtro não encontrou nada → NÃO APAGA A TABELA
-  if (!filtrados.length) {
-    mostrarAvisoFiltro(
-      'Nenhum registro encontrado para este status.',
-      categoria
-    );
-    renderTabelaCategoria(categoria, base);
-  
-  }
-  // Aviso visual para filtro (UX profissional)
-  function mostrarAvisoFiltro(mensagem, categoria) {
-    const container = document.getElementById(`aviso-filtro-${categoria}`);
-    if (!container) return;
-    container.textContent = mensagem;
-    container.style.display = 'block';
-    clearTimeout(container._timeout);
-    container._timeout = setTimeout(() => {
-      container.style.display = 'none';
-    }, 3000);
-  }
-  renderTabelaCategoria(categoria, filtrados);
 }
 
 // Função para renderizar SAR REDE (usada pelo filtro seguro)
@@ -572,43 +527,25 @@ function renderDropdownCidadesLiberados(subcard) {
   const cidades = Array.from(cidadesSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
   // Sempre mostra o dropdown, mesmo sem cidades
+
   container.innerHTML = `
     <button id="btn-dropdown-cidade-${subcard}" style="padding:6px 16px;min-width:180px;max-width:320px;display:flex;align-items:center;justify-content:space-between;border:1px solid #bfc9d1;background:#fff;border-radius:4px;cursor:pointer;font-size:15px;">
       <span style="flex:1;text-align:left;">${cidades.length ? 'Selecionar cidade' : 'Nenhuma cidade encontrada'}</span>
       <span style="font-size:18px;">&#9660;</span>
     </button>
     <div id="dropdown-cidade-lista-${subcard}" style="display:none;position:absolute;z-index:10;background:#fff;border:1px solid #ccc;width:320px;max-height:220px;overflow-y:auto;box-shadow:0 2px 8px #0002;">
-      ${cidades.length ? cidades.map(cidade => `<div style='padding:8px;cursor:pointer;' onmousedown="selecionarCidadeLiberados('${subcard}','${cidade.replace(/'/g, "\'")}')">${cidade}</div>`).join('') : `<div style='padding:8px;text-align:center;color:#888;'>Nenhuma cidade</div>`}
+      ${cidades.length ? cidades.map(cidade => `<div style='padding:8px;cursor:pointer;' onmousedown=\"selecionarCidadeLiberados('${subcard}','${cidade.replace(/'/g, "\\'")}')\">${cidade}</div>`).join('') : `<div style='padding:8px;text-align:center;color:#888;'>Nenhuma cidade</div>`}
     </div>
   `;
-  // Eventos
-  const btn = document.getElementById(`btn-dropdown-cidade-${subcard}`);
-  const lista = document.getElementById(`dropdown-cidade-lista-${subcard}`);
-  if (btn && lista) {
-    btn.onclick = () => {
-      lista.style.display = lista.style.display === 'block' ? 'none' : 'block';
-    };
-    document.addEventListener('click', function handler(e) {
-      if (!btn.contains(e.target) && !lista.contains(e.target)) {
-        lista.style.display = 'none';
-        document.removeEventListener('click', handler);
-      }
-    });
-  }
-}
-
-function selecionarCidadeLiberados(subcard, cidade) {
-  window._cidadeLiberadosSelecionada = window._cidadeLiberadosSelecionada || {};
-  window._cidadeLiberadosSelecionada[subcard] = cidade;
-  aplicarFiltrosLiberados(subcard);
-  // Fecha dropdown
-  const lista = document.getElementById(`dropdown-cidade-lista-${subcard}`);
-  if (lista) lista.style.display = 'none';
 }
 
 function aplicarFiltrosLiberados(subcard) {
   const cidade = (window._cidadeLiberadosSelecionada && window._cidadeLiberadosSelecionada[subcard]) || '';
   // Filtra os dados do subcard pela cidade selecionada
+  renderTabelaLiberados(subcard, cidade);
+}
+
+function renderTabelaLiberados(subcard, cidade) {
   const rows = Array.isArray(dadosPorCategoria[subcard]) ? dadosPorCategoria[subcard] : [];
   let filtrados = rows;
   if (cidade && cidade !== 'Todos') {
@@ -622,7 +559,7 @@ function aplicarFiltrosLiberados(subcard) {
   const tbody = document.getElementById(tabelaId);
   if (!tbody) return;
   if (!filtrados.length) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center">Nenhum dado</td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center">Nenhum dado</td></tr>';
     return;
   }
   tbody.innerHTML = filtrados.map(row => `
@@ -766,6 +703,8 @@ const MAX_LOCAL_CACHE_ITEMS_BY_CATEGORY = {
   'pendente-autorizacao': 5000,
   'backlog': 5000
 };
+// Fechamento de bloco/função pendente
+}
 const PRIORITY_DATASET_CACHE_KEYS = [
   'projeto-f',
   'liberados',
@@ -4596,9 +4535,6 @@ window.mudarPaginaProjetoF = function(pagina) {
   // Reaplica filtros para garantir consistência
   aplicarFiltrosProjetoF();
 };
-    select.value = '';
-  }
-}
 
 function popularFiltroCidadeProjetoF() {
   const input = document.getElementById('filtro-cidade-projeto-f');
@@ -11846,7 +11782,6 @@ function visualizarProjetoF(source) {
 const originalRenderTabela = renderTabela;
 renderTabela = function(id, lista, atualizarRelatoriosFlag = true) {
   originalRenderTabela.call(this, id, lista, atualizarRelatoriosFlag);
-  
   // Atualizar contadores após renderizar tabela principal
   if (id === "tabela-enderecos") {
     atualizarContadores();
