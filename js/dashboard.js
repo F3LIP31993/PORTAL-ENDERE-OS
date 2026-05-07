@@ -323,11 +323,12 @@ window.abrirCategoria = function abrirCategoria(categoriaId) {
   }
   }
   // Funções essenciais para o HTML (garantir escopo global)
-  window.mostrarSecao = window.mostrarSecao || function mostrarSecao(id) {
-    document.querySelectorAll('.secao').forEach(secao => secao.classList.remove('ativa'));
-    const secao = document.getElementById(id);
-    if (secao) secao.classList.add('ativa');
-  };
+function mostrarSecao(id) {
+  document.querySelectorAll('.secao').forEach(secao => secao.classList.remove('ativa'));
+  const secao = document.getElementById(id);
+  if (secao) secao.classList.add('ativa');
+}
+window.mostrarSecao = mostrarSecao;
 
   window.logout = window.logout || function logout() {
     // Simples: remove usuário do localStorage e recarrega
