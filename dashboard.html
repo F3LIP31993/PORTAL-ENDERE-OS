@@ -250,9 +250,14 @@
       <div class="card epo-premium-card">
         <div class="epo-heading-wrap" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <h2 class="epo-heading">EPO</h2>
-          <div id="epo-import-tools" class="epo-import-tools" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div style="display:flex;align-items:center;gap:6px;">
-              <input id="epo-gpon-import-file" type="file" accept=".csv,.txt" style="display:none;" onchange="importarPlanilhaEpoGponOngoing()" />
+  </main>
+
+  <!-- SCRIPTS: sempre ao final do body para garantir que o DOM já foi carregado -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="js/api-config.js"></script>
+  <script src="js/dashboard.js"></script>
+  </body>
+  </html>
               <button type="button" class="btn-secondary epo-clip-upload" onclick="abrirImportEpoGponOngoing()" title="Importar planilha do backlog ONGOING (GPON)">📎</button>
               <span style="font-size:11px;font-weight:700;color:#334155;">GPON ONGOING</span>
               <span id="epo-gpon-import-status" style="font-size:11px;color:#64748b;font-weight:600;"></span>
