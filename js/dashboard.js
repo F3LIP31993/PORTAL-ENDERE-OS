@@ -284,38 +284,9 @@ async function carregarHistoricoEventos() {
   window.__historicoEventos = eventos;
 }
 
-// Função global única para abrir categoria (admin, mostrarSecao, carregarDadosCategoria)
+
+// Função global para abrir qualquer card/categoria e garantir renderização correta
 window.abrirCategoria = function abrirCategoria(categoriaId) {
-  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
-  const isAdmin = user?.role === 'admin';
-  if (!isAdmin && categoriaId === 'financeiro') {
-    alert('⚠️ A categoria Financeiro está disponível apenas para administrador.');
-    return;
-  }
-  if (typeof mostrarSecao === 'function') mostrarSecao(categoriaId);
-  if (categoriaId === 'liberados' && typeof resetarFluxoLiberados === 'function') resetarFluxoLiberados();
-  if (categoriaId === 'epo' && typeof resetarSelecaoEpo === 'function') resetarSelecaoEpo();
-  try {
-    if (typeof carregarDadosCategoria === 'function') carregarDadosCategoria(categoriaId);
-  } catch (e) {
-    console.error('Erro ao carregar categoria:', categoriaId, e);
-    alert('Erro ao carregar a categoria. Tente novamente ou recarregue a página.');
-  }
-}
-
-// Função para renderizar SAR REDE (usada pelo filtro seguro)
-function renderTabelaCategoria(categoria, lista) {
-  if (categoria === 'sar-rede') {
-    // Sempre renderiza a partir do dataset base
-    renderTabelaSarRede('tabela-sar-rede', dadosPorCategoria['sar-rede'] || []);
-    renderMiniCardsStatusSarRede();
-    return;
-  }
-  // Adicione outros casos se quiser expandir para outros cards
-}
-
-// Função central para abrir qualquer card/categoria e garantir renderização correta
-function abrirCategoria(categoriaId) {
   // Remove classe ativa de todas as seções
   document.querySelectorAll('.secao').forEach(secao => secao.classList.remove('ativa'));
   // Ativa a seção correta
@@ -350,6 +321,36 @@ function abrirCategoria(categoriaId) {
       });
     return;
   }
+  // Funções essenciais para o HTML (garantir escopo global)
+  window.mostrarSecao = window.mostrarSecao || function mostrarSecao(id) {
+    document.querySelectorAll('.secao').forEach(secao => secao.classList.remove('ativa'));
+    const secao = document.getElementById(id);
+    if (secao) secao.classList.add('ativa');
+  };
+
+  window.logout = window.logout || function logout() {
+    // Simples: remove usuário do localStorage e recarrega
+    localStorage.removeItem('portalCurrentUser');
+    window.location.reload();
+  };
+
+  window.toggleNotifications = window.toggleNotifications || function toggleNotifications() {
+    const panel = document.getElementById('notificationPanel');
+    if (panel) panel.classList.toggle('hidden');
+  };
+
+  window.toggleSettings = window.toggleSettings || function toggleSettings() {
+    const panel = document.getElementById('settingsPanel');
+    if (panel) panel.classList.toggle('hidden');
+  };
+
+  window.openChangePassword = window.openChangePassword || function openChangePassword() {
+    alert('Funcionalidade de alteração de senha em desenvolvimento.');
+  };
+
+  window.openEditProfile = window.openEditProfile || function openEditProfile() {
+    alert('Funcionalidade de edição de perfil em desenvolvimento.');
+  };
   if (categoriaId === 'projeto-f') {
     try {
       fetch('/api/projeto-f')
@@ -455,7 +456,7 @@ function abrirCategoria(categoriaId) {
     return;
   }
   // Para outras categorias, apenas ativa a seção
-}
+};
 
 // Substitua a chamada de exibição do card EPO > PROJETO F para usar abrirCardEpoProjetoF()
 // Exemplo: ao clicar no botão/aba PROJETO F dentro do card EPO, chame abrirCardEpoProjetoF() ao invés de só mostrar a tela.
