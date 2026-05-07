@@ -704,8 +704,7 @@ const MAX_LOCAL_CACHE_ITEMS_BY_CATEGORY = {
   'pendente-autorizacao': 5000,
   'backlog': 5000
 };
-// Fechamento de bloco/função pendente
-}
+// (Removido fechamento de bloco/função pendente incorreto)
 const PRIORITY_DATASET_CACHE_KEYS = [
   'projeto-f',
   'liberados',
