@@ -1,4 +1,3 @@
-window.abrirCategoria = abrirCategoria;
 // Arquivo corrigido
 // === NORMALIZAÇÃO UNIVERSAL DE STATUS ===
 function normalizarStatus(valor) {
@@ -321,7 +320,6 @@ window.abrirCategoria = function abrirCategoria(categoriaId) {
         }
       });
     return;
-  }
   }
   // Funções essenciais para o HTML (garantir escopo global)
 function mostrarSecao(id) {
