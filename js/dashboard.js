@@ -11789,3 +11789,7 @@ renderTabela = function(id, lista, atualizarRelatoriosFlag = true) {
     atualizarContadores();
   }
 };
+
+// ====== FIM DO ARQUIVO ======
+// Corrigido: fechamento de blocos
+}
